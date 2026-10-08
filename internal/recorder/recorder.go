@@ -19,6 +19,7 @@ type Recorder struct {
 	seq     uint64
 	sink    *json.Encoder
 	subs    []chan Event
+	closed  bool
 }
 
 // New creates a recorder for a new session. sink may be nil.
@@ -94,6 +95,37 @@ func (r *Recorder) Subscribe(buffer int) <-chan Event {
 	return ch
 }
 
+// Watch atomically returns the events recorded so far and a channel with all
+// the following ones, so a late subscriber (e.g. a browser that just opened
+// the dashboard) sees neither gaps nor duplicates. Call cancel when done.
+// The channel is closed when the recorder is closed or cancel is called.
+func (r *Recorder) Watch(buffer int) (history []Event, live <-chan Event, cancel func()) {
+	ch := make(chan Event, buffer)
+
+	r.mu.Lock()
+	history = make([]Event, len(r.events))
+	copy(history, r.events)
+	if r.closed {
+		close(ch)
+	} else {
+		r.subs = append(r.subs, ch)
+	}
+	r.mu.Unlock()
+
+	cancel = func() {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+		for i, s := range r.subs {
+			if s == ch {
+				r.subs = append(r.subs[:i], r.subs[i+1:]...)
+				close(ch)
+				return
+			}
+		}
+	}
+	return history, ch, cancel
+}
+
 // Close marks the session as completed and closes subscriber channels.
 func (r *Recorder) Close() {
 	r.mu.Lock()
@@ -103,6 +135,7 @@ func (r *Recorder) Close() {
 	r.Record(Event{Type: EventSessionCompleted, Status: StatusOK})
 
 	r.mu.Lock()
+	r.closed = true
 	for _, ch := range r.subs {
 		close(ch)
 	}
