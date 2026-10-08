@@ -230,7 +230,7 @@ export default function App() {
         <Detail row={selected} />
       </main>
 
-      {/* Floating Human-in-the-Loop Approval Bar */}
+      {/* Human-in-the-Loop approval dock (part of the layout, below the panes) */}
       <ApprovalBar
         pendingRow={pendingRow}
         more={Math.max(0, awaiting.length - 1)}

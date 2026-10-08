@@ -46,8 +46,10 @@ export function ApprovalBar({ pendingRow, more, busy, error, onApprove, onBlock 
   const rule = pendingRow.request?.rule;
 
   return (
-    <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 animate-in fade-in slide-in-from-bottom-4 duration-200">
-      <div className="flex flex-col overflow-hidden rounded-2xl border border-amber-500/40 bg-ink-900/95 p-4 shadow-2xl backdrop-blur-xl ring-1 ring-amber-500/20 max-w-xl w-[92vw]">
+    // A docked bar in the page layout (not floating): it pushes the timeline up
+    // instead of covering its last rows.
+    <div className="shrink-0 border-t border-amber-500/40 bg-ink-900 px-5 py-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+      <div className="mx-auto flex w-full max-w-3xl flex-col rounded-xl border border-amber-500/30 bg-ink-900 p-4 ring-1 ring-amber-500/10">
         {/* Banner header */}
         <div className="flex items-center justify-between gap-3 pb-3 border-b border-ink-800">
           <div className="flex items-center gap-2.5 min-w-0">

@@ -90,7 +90,8 @@ export function buildRows(events: SentinelEvent[]): Row[] {
         if (row) {
           row.response = e;
           row.status = e.status;
-          row.durationMs = e.durationMs;
+          // The server omits 0; a matched response always has a duration.
+          row.durationMs = e.durationMs ?? 0;
           if (e.risk !== "none") row.risk = e.risk;
           open.delete(e.rpcId!);
         } else {
