@@ -34,6 +34,8 @@ func main() {
 		printHelp()
 	case "mcp":
 		os.Exit(runMCP(os.Args[2:]))
+	case "ui":
+		os.Exit(runUI(os.Args[2:]))
 	case "run":
 		runCmd := flag.NewFlagSet("run", flag.ExitOnError)
 		runCmd.Parse(os.Args[2:])
@@ -56,9 +58,9 @@ func printHelp() {
 	fmt.Printf("Agent Sentinel v%s\n\n", Version)
 	fmt.Println("Usage:")
 	fmt.Println("  sentinel run <agent-command>  Supervise an AI coding agent process (e.g. sentinel run claude)")
-	fmt.Println("  sentinel mcp [--log FILE|-] -- <server-cmd> [args]")
+	fmt.Println("  sentinel mcp [--ui] [--port N] [--log FILE|-] -- <server-cmd> [args]")
 	fmt.Println("                                Wrap an MCP stdio server, recording every JSON-RPC frame")
-	fmt.Println("  sentinel ui                   Launch the Sentinel Cockpit web dashboard")
+	fmt.Println("  sentinel ui [--port N] [FILE]  Replay a recorded session (default: latest) in the cockpit")
 	fmt.Println("  sentinel version              Show current version")
 	fmt.Println("  sentinel help                 Show this help message")
 }

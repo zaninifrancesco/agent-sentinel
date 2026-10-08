@@ -25,6 +25,9 @@ func runMCP(args []string) int {
 	fs := flag.NewFlagSet("mcp", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	logPath := fs.String("log", "", `JSONL event log path ("-" = disabled; default ~/.sentinel/sessions/<timestamp>.jsonl)`)
+	withUI := fs.Bool("ui", false, "serve the live cockpit while proxying")
+	port := fs.Int("port", 8848, "cockpit port (with --ui)")
+	open := fs.Bool("open", false, "open the cockpit in the browser (with --ui)")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -56,6 +59,18 @@ func runMCP(args []string) int {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	if *withUI {
+		url, err := startCockpit(ctx, rec, *port)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
+			return 1
+		}
+		fmt.Fprintf(os.Stderr, "sentinel: cockpit at %s\n", url)
+		if *open {
+			openBrowser(url)
+		}
+	}
 
 	p := &proxy.StdioProxy{
 		Command: server,
