@@ -38,4 +38,9 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/checksums.txt --generate-notes --title "$GITHUB_REF_NAME"
+        run: |
+          # A tag with a suffix (v0.1.0-alpha) is a pre-release.
+          pre=""
+          case "$GITHUB_REF_NAME" in *-*) pre="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/checksums.txt \
+            --generate-notes --title "$GITHUB_REF_NAME" $pre
