@@ -5,9 +5,11 @@ import (
 	"os"
 )
 
+// Version is stamped at build time (make build, make dist): -X main.Version=...
+var Version = "0.1.0-alpha"
+
 const (
-	Version = "0.1.0-alpha"
-	Banner  = `
+	Banner = `
    _____                    __     _____            __  _            __
   /  _  \   ____   ____   _/  |_  /  ___/  ____    /  |_(_)  ____   /  |
  /  /_\  \ / ___\_/ __ \  \   __\ \___ \ _/ __ \  /   __\ | /    \ /   |
