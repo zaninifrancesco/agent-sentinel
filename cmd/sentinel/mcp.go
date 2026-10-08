@@ -13,8 +13,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/zaninifrancesco/agent-sentinel/internal/policy"
 	"github.com/zaninifrancesco/agent-sentinel/internal/proxy"
 	"github.com/zaninifrancesco/agent-sentinel/internal/recorder"
+	serverpkg "github.com/zaninifrancesco/agent-sentinel/internal/server"
 )
 
 // runMCP implements `sentinel mcp [flags] -- <server-cmd> [args...]`.
@@ -29,15 +31,26 @@ func runMCP(args []string) int {
 	port := fs.Int("port", 8848, "cockpit port (with --ui)")
 	open := fs.Bool("open", false, "open the cockpit in the browser (with --ui)")
 	dev := fs.Bool("dev", false, "also accept the Vite dev server (npm run dev) as WebSocket origin (with --ui)")
+	policyArg := fs.String("policy", "", `policy file (JSON), or "off" to only record; default: built-in rules`)
+	maxCost := fs.Float64("max-cost", 2.0, "estimated session budget in USD before a human must confirm (0 = no limit)")
+	approvalTimeout := fs.Duration("approval-timeout", proxy.DefaultApprovalTimeout, "how long a held call waits for a human before it is refused")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
 		}
 		return 2
 	}
+	explicit := map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
 	server := fs.Args()
 	if len(server) == 0 {
 		fmt.Fprintln(os.Stderr, "sentinel mcp: missing server command, e.g.\n  sentinel mcp -- npx -y @modelcontextprotocol/server-filesystem .")
+		return 2
+	}
+
+	engine, budget, policyName, err := buildGuardrails(*policyArg, *maxCost, explicit["max-cost"])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
 		return 2
 	}
 
@@ -61,8 +74,16 @@ func runMCP(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Held calls can only be approved from a cockpit. Without --ui there is no
+	// broker, so anything needing approval is refused (fail closed).
+	var broker *policy.Broker
 	if *withUI {
-		url, err := startCockpit(ctx, rec, *port, *dev)
+		broker = policy.NewBroker()
+		cfg := serverpkg.Config{Policy: policyName}
+		if budget != nil {
+			cfg.MaxCostUSD = budget.MaxCostUSD()
+		}
+		url, err := startCockpit(ctx, rec, *port, *dev, broker, cfg)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
 			return 1
@@ -79,6 +100,11 @@ func runMCP(args []string) int {
 		Out:     os.Stdout,
 		Stderr:  os.Stderr,
 		Rec:     rec,
+
+		Policy:          engine,
+		Budget:          budget,
+		Approvals:       broker,
+		ApprovalTimeout: *approvalTimeout,
 	}
 	if err := p.Run(ctx); err != nil {
 		var exitErr *exec.ExitError
@@ -89,6 +115,47 @@ func runMCP(args []string) int {
 		return 1
 	}
 	return 0
+}
+
+// buildGuardrails turns the CLI flags (and the optional policy file) into the
+// policy engine and the budget. An explicit --max-cost beats the file.
+func buildGuardrails(policyArg string, maxCost float64, costExplicit bool) (*policy.Engine, *policy.Budget, string, error) {
+	var engine *policy.Engine
+	var cfg *policy.Config
+	name := "default"
+
+	switch policyArg {
+	case "off":
+		name = "off"
+	default:
+		if policyArg != "" {
+			c, err := policy.LoadFile(policyArg)
+			if err != nil {
+				return nil, nil, "", err
+			}
+			cfg, name = c, policyArg
+		}
+		e, err := policy.NewEngine(cfg)
+		if err != nil {
+			return nil, nil, "", err
+		}
+		engine = e
+	}
+
+	var maxTokens int64
+	if cfg != nil {
+		if cfg.MaxCostUSD != nil && !costExplicit {
+			maxCost = *cfg.MaxCostUSD
+		}
+		if cfg.MaxTokens != nil {
+			maxTokens = *cfg.MaxTokens
+		}
+	}
+	var budget *policy.Budget
+	if maxCost > 0 || maxTokens > 0 {
+		budget = policy.NewBudget(maxCost, maxTokens)
+	}
+	return engine, budget, name, nil
 }
 
 func openLog(flagValue string) (*os.File, string, error) {

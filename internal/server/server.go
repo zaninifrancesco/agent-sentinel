@@ -9,10 +9,14 @@ import (
 	"io/fs"
 	"net"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/coder/websocket"
 
+	"github.com/zaninifrancesco/agent-sentinel/internal/policy"
 	"github.com/zaninifrancesco/agent-sentinel/internal/recorder"
 )
 
@@ -37,6 +41,21 @@ type Server struct {
 	// to open the WebSocket, on top of the server's own origin. Only meant for
 	// the Vite dev server (`--dev`); empty by default.
 	AllowedOrigins []string
+
+	// Approvals receives the human decisions for held tool calls. Nil when
+	// replaying a recorded session: there is nothing left to approve.
+	Approvals *policy.Broker
+
+	// Config is what the cockpit needs to know about the running session.
+	Config Config
+}
+
+// Config is served at /api/config.
+type Config struct {
+	MaxCostUSD float64 `json:"maxCostUsd"` // 0 = no budget
+	MaxTokens  int64   `json:"maxTokens"`
+	Policy     string  `json:"policy"`    // "default", a file path or "off"
+	Approvals  bool    `json:"approvals"` // can this session approve held calls?
 }
 
 func New(rec *recorder.Recorder, assets fs.FS) *Server {
@@ -51,9 +70,101 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/session", s.handleSession)
 	mux.HandleFunc("GET /api/events", s.handleEvents)
+	mux.HandleFunc("GET /api/config", s.handleConfig)
+	mux.HandleFunc("POST /api/approvals/{seq}", s.handleApproval)
 	mux.HandleFunc("GET /ws", s.handleWS)
 	mux.Handle("/", s.spa())
-	return mux
+	return s.loopbackOnly(mux)
+}
+
+// loopbackOnly rejects any request whose Host is not a loopback name. The
+// listener is bound to 127.0.0.1, but a malicious page could still reach it
+// through DNS rebinding (evil.com resolving to 127.0.0.1); that request would
+// carry Host: evil.com, which we refuse.
+func (s *Server) loopbackOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		host := r.Host
+		if h, _, err := net.SplitHostPort(host); err == nil {
+			host = h
+		}
+		switch strings.Trim(host, "[]") {
+		case "127.0.0.1", "localhost", "::1":
+			next.ServeHTTP(w, r)
+		default:
+			http.Error(w, "forbidden host", http.StatusForbidden)
+		}
+	})
+}
+
+func (s *Server) handleConfig(w http.ResponseWriter, _ *http.Request) {
+	cfg := s.Config
+	cfg.Approvals = s.Approvals != nil
+	writeJSON(w, cfg)
+}
+
+type approvalRequest struct {
+	Approved bool   `json:"approved"`
+	Feedback string `json:"feedback"`
+}
+
+// handleApproval resolves a held tool call. It is the most sensitive endpoint
+// of the cockpit (it can let an agent run a dangerous command), so besides the
+// loopback Host check it also defends against cross-site requests:
+//   - Content-Type must be application/json, which a cross-origin page cannot
+//     send without a CORS preflight that we never grant;
+//   - if the browser sends an Origin it must be our own (or the dev server).
+func (s *Server) handleApproval(w http.ResponseWriter, r *http.Request) {
+	if s.Approvals == nil {
+		http.Error(w, "this session has nothing to approve", http.StatusNotFound)
+		return
+	}
+	if !s.originOK(r) {
+		http.Error(w, "cross-origin request refused", http.StatusForbidden)
+		return
+	}
+	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(strings.ToLower(ct), "application/json") {
+		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		return
+	}
+	seq, err := strconv.ParseUint(r.PathValue("seq"), 10, 64)
+	if err != nil {
+		http.Error(w, "bad seq", http.StatusBadRequest)
+		return
+	}
+	var req approvalRequest
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&req); err != nil {
+		http.Error(w, "bad body", http.StatusBadRequest)
+		return
+	}
+	switch err := s.Approvals.Resolve(seq, policy.Verdict{Approved: req.Approved, Feedback: strings.TrimSpace(req.Feedback)}); {
+	case err == nil:
+		w.WriteHeader(http.StatusNoContent)
+	case errors.Is(err, policy.ErrNotPending):
+		// Already answered, timed out or cancelled by the agent.
+		http.Error(w, "this request is no longer pending", http.StatusConflict)
+	default:
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) originOK(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true // not a browser (curl, scripts): same trust level as the user
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	if u.Host == r.Host {
+		return true
+	}
+	for _, o := range s.AllowedOrigins {
+		if u.Host == o {
+			return true
+		}
+	}
+	return false
 }
 
 // Serve runs the server on ln until ctx is cancelled.

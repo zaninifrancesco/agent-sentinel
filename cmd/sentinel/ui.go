@@ -13,6 +13,7 @@ import (
 	"sort"
 	"syscall"
 
+	"github.com/zaninifrancesco/agent-sentinel/internal/policy"
 	"github.com/zaninifrancesco/agent-sentinel/internal/recorder"
 	"github.com/zaninifrancesco/agent-sentinel/internal/server"
 	"github.com/zaninifrancesco/agent-sentinel/internal/ui"
@@ -24,12 +25,14 @@ import (
 //
 // With dev=true the Vite dev server origin may also open the WebSocket, so
 // `npm run dev` (hot reload) can talk to a real Sentinel.
-func startCockpit(ctx context.Context, rec *recorder.Recorder, port int, dev bool) (string, error) {
+func startCockpit(ctx context.Context, rec *recorder.Recorder, port int, dev bool, broker *policy.Broker, cfg server.Config) (string, error) {
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return "", fmt.Errorf("cannot listen on port %d (use --port): %w", port, err)
 	}
 	srv := server.New(rec, ui.Assets())
+	srv.Approvals = broker
+	srv.Config = cfg
 	if dev {
 		srv.AllowedOrigins = server.DevOrigins
 	}
@@ -79,7 +82,7 @@ func runUI(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	url, err := startCockpit(ctx, rec, *port, *dev)
+	url, err := startCockpit(ctx, rec, *port, *dev, nil, server.Config{Policy: "replay"})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "sentinel ui: %v\n", err)
 		return 1

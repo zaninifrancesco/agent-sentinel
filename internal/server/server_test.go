@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"github.com/zaninifrancesco/agent-sentinel/internal/policy"
 	"github.com/zaninifrancesco/agent-sentinel/internal/recorder"
 )
 
@@ -116,5 +118,80 @@ func TestAPIAndSPAFallback(t *testing.T) {
 	}
 	if !strings.Contains(get("/assets/app.js"), "console.log") {
 		t.Error("static assets should be served")
+	}
+}
+
+func TestApprovalEndpointDefences(t *testing.T) {
+	rec := recorder.New(nil, nil)
+	b := policy.NewBroker()
+	srv := New(rec, nil)
+	srv.Approvals = b
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	post := func(seq, body, contentType, origin, host string) int {
+		req, _ := http.NewRequest("POST", ts.URL+"/api/approvals/"+seq, strings.NewReader(body))
+		if contentType != "" {
+			req.Header.Set("Content-Type", contentType)
+		}
+		if origin != "" {
+			req.Header.Set("Origin", origin)
+		}
+		if host != "" {
+			req.Host = host
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	pending := func() bool { return len(b.Pending()) == 1 }
+
+	b.Open(5)
+	own := ts.URL // same origin as the server
+	body := `{"approved":true,"feedback":"ok"}`
+
+	for name, code := range map[string]int{
+		"foreign origin":  post("5", body, "application/json", "https://evil.example", ""),
+		"form content":    post("5", body, "text/plain", own, ""),
+		"no content type": post("5", body, "", "", ""),
+		"rebinding host":  post("5", body, "application/json", "", "evil.example:8848"),
+		"bad seq":         post("abc", body, "application/json", own, ""),
+	} {
+		if code < 400 {
+			t.Errorf("%s was accepted (%d)", name, code)
+		}
+		if !pending() {
+			t.Fatalf("%s resolved the approval", name)
+		}
+	}
+
+	if code := post("5", body, "application/json", own, ""); code != http.StatusNoContent {
+		t.Fatalf("legit approval got %d", code)
+	}
+	if pending() {
+		t.Fatal("approval still pending after a legit POST")
+	}
+	if code := post("5", body, "application/json", own, ""); code != http.StatusConflict {
+		t.Fatalf("second answer got %d, want 409", code)
+	}
+}
+
+func TestConfigEndpoint(t *testing.T) {
+	srv := New(recorder.New(nil, nil), nil)
+	srv.Config = Config{MaxCostUSD: 3.5, Policy: "default"}
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/api/config")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var cfg Config
+	if err := json.NewDecoder(resp.Body).Decode(&cfg); err != nil || cfg.MaxCostUSD != 3.5 || cfg.Approvals {
+		t.Fatalf("bad config %+v (%v)", cfg, err)
 	}
 }
