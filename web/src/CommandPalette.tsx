@@ -15,6 +15,9 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // A new query changes the list: start again from the first result.
+  useEffect(() => setSelectedIndex(0), [query]);
+
   useEffect(() => {
     if (isOpen) {
       setQuery("");
@@ -31,8 +34,14 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
       icon: React.ReactNode;
       action: () => void;
       category: "Actions" | "Events" | "Errors";
-    }> = [
-      {
+    }> = [];
+
+    // Actions only show up when they match what was typed (or nothing was typed
+    // yet), so searching for an event and pressing Enter never exports by accident.
+    const q = query.trim().toLowerCase();
+    const exportKeywords = "export standalone audit report html download deliverable";
+    if (!q || q.split(/\s+/).every((word) => exportKeywords.includes(word))) {
+      list.push({
         id: "action-export",
         title: "Export Standalone Audit Report",
         subtitle: "Generate self-contained HTML deliverable",
@@ -42,8 +51,8 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
           onClose();
         },
         category: "Actions",
-      },
-    ];
+      });
+    }
 
     // Filter events
     for (const r of rows) {
@@ -84,24 +93,30 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        // Capture phase + stopPropagation: Esc closes the palette only, it must
+        // not also reach the approval dock ("Esc = block").
         e.preventDefault();
+        e.stopPropagation();
         onClose();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
+        e.stopPropagation(); // keep the timeline from moving behind the palette
         setSelectedIndex((prev) => (prev + 1) % Math.max(1, items.length));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
+        e.stopPropagation();
         setSelectedIndex((prev) => (prev - 1 + items.length) % Math.max(1, items.length));
       } else if (e.key === "Enter") {
         e.preventDefault();
+        e.stopPropagation(); // Cmd+Enter must not approve the pending call
         if (items[selectedIndex]) {
           items[selectedIndex].action();
         }
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
   }, [isOpen, items, selectedIndex, onClose]);
 
   if (!isOpen) return null;

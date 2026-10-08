@@ -77,10 +77,15 @@ export default function App() {
 
   const selected = rows.find((r) => r.key === selectedKey) ?? null;
 
-  // Pending item for Human-in-the-Loop intervention
+  // Human-in-the-Loop: only a still-open, high-risk call in a LIVE session needs
+  // a decision. Every call is "pending" while it is in flight, and a finished
+  // (replayed) session has nothing left to approve.
   const pendingRow = useMemo(() => {
-    return rows.find((r) => r.status === "pending") ?? null;
-  }, [rows]);
+    if (connection !== "live") return null;
+    return (
+      rows.find((r) => r.status === "pending" && (r.risk === "high" || r.risk === "critical")) ?? null
+    );
+  }, [rows, connection]);
 
   const stats = useMemo(() => {
     const tools = rows.filter((r) => r.kind === "tool");

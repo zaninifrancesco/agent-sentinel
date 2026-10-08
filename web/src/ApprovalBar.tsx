@@ -16,6 +16,7 @@ export function ApprovalBar({ pendingRow, onApprove, onBlock }: Props) {
     if (!pendingRow) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return; // an overlay already handled this key
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
         onApprove(pendingRow.key, feedback.trim() || undefined);
