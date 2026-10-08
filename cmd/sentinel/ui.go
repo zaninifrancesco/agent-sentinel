@@ -21,12 +21,18 @@ import (
 // startCockpit serves the dashboard for rec on 127.0.0.1:port (loopback only:
 // the cockpit exposes everything the agent does) and returns its URL.
 // The server stops when ctx is cancelled.
-func startCockpit(ctx context.Context, rec *recorder.Recorder, port int) (string, error) {
+//
+// With dev=true the Vite dev server origin may also open the WebSocket, so
+// `npm run dev` (hot reload) can talk to a real Sentinel.
+func startCockpit(ctx context.Context, rec *recorder.Recorder, port int, dev bool) (string, error) {
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return "", fmt.Errorf("cannot listen on port %d (use --port): %w", port, err)
 	}
 	srv := server.New(rec, ui.Assets())
+	if dev {
+		srv.AllowedOrigins = server.DevOrigins
+	}
 	go func() {
 		if err := srv.Serve(ctx, ln); err != nil {
 			fmt.Fprintf(os.Stderr, "sentinel: cockpit server stopped: %v\n", err)
@@ -42,6 +48,7 @@ func runUI(args []string) int {
 	fs.SetOutput(os.Stderr)
 	port := fs.Int("port", 8848, "port for the cockpit")
 	open := fs.Bool("open", false, "open the cockpit in the default browser")
+	dev := fs.Bool("dev", false, "also accept the Vite dev server (npm run dev) as WebSocket origin")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -72,7 +79,7 @@ func runUI(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	url, err := startCockpit(ctx, rec, *port)
+	url, err := startCockpit(ctx, rec, *port, *dev)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "sentinel ui: %v\n", err)
 		return 1

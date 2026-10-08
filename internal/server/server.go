@@ -32,11 +32,19 @@ type eventMsg struct {
 type Server struct {
 	rec    *recorder.Recorder
 	assets fs.FS // built SPA (index.html + assets); may be nil/empty
+
+	// AllowedOrigins lists extra browser origins (host[:port] patterns) allowed
+	// to open the WebSocket, on top of the server's own origin. Only meant for
+	// the Vite dev server (`--dev`); empty by default.
+	AllowedOrigins []string
 }
 
 func New(rec *recorder.Recorder, assets fs.FS) *Server {
 	return &Server{rec: rec, assets: assets}
 }
+
+// DevOrigins are the origins of the Vite dev server (`npm run dev`).
+var DevOrigins = []string{"localhost:5173", "127.0.0.1:5173"}
 
 // Handler returns the HTTP handler with all routes mounted.
 func (s *Server) Handler() http.Handler {
@@ -85,7 +93,7 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
 	// Accept rejects cross-origin browsers by default, which is exactly what
 	// we want for a local-only cockpit: no random website can read the
 	// agent's activity through the user's browser.
-	conn, err := websocket.Accept(w, r, nil)
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: s.AllowedOrigins})
 	if err != nil {
 		return
 	}

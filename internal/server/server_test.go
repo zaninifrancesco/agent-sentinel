@@ -49,6 +49,38 @@ func TestWebSocketSnapshotThenLive(t *testing.T) {
 	}
 }
 
+func TestWebSocketOriginCheck(t *testing.T) {
+	dial := func(allowed []string, origin string) error {
+		srv := New(recorder.New(nil, nil), nil)
+		srv.AllowedOrigins = allowed
+		ts := httptest.NewServer(srv.Handler())
+		defer ts.Close()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		c, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(ts.URL, "http")+"/ws", &websocket.DialOptions{
+			HTTPHeader: map[string][]string{"Origin": {origin}},
+		})
+		if err == nil {
+			c.CloseNow()
+		}
+		return err
+	}
+
+	if err := dial(nil, "http://evil.example"); err == nil {
+		t.Error("a foreign origin must be rejected by default")
+	}
+	if err := dial(nil, "http://localhost:5173"); err == nil {
+		t.Error("the Vite origin must be rejected unless --dev is set")
+	}
+	if err := dial(DevOrigins, "http://localhost:5173"); err != nil {
+		t.Errorf("the Vite origin must be accepted with --dev: %v", err)
+	}
+	if err := dial(DevOrigins, "http://evil.example"); err == nil {
+		t.Error("--dev must not open the door to other origins")
+	}
+}
+
 func TestAPIAndSPAFallback(t *testing.T) {
 	rec := recorder.New(nil, nil)
 	assets := fstest.MapFS{

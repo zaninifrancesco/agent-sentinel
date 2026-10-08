@@ -13,7 +13,7 @@ test:
 	go test -race ./...
 
 # Vite dev server with hot reload; proxies /api and /ws to a running
-# `sentinel mcp --ui` or `sentinel ui` on :8848.
+# `sentinel mcp --ui --dev` or `sentinel ui --dev` on :8848.
 dev-web:
 	cd web && npm run dev
 

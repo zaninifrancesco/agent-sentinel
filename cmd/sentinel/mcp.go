@@ -28,6 +28,7 @@ func runMCP(args []string) int {
 	withUI := fs.Bool("ui", false, "serve the live cockpit while proxying")
 	port := fs.Int("port", 8848, "cockpit port (with --ui)")
 	open := fs.Bool("open", false, "open the cockpit in the browser (with --ui)")
+	dev := fs.Bool("dev", false, "also accept the Vite dev server (npm run dev) as WebSocket origin (with --ui)")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -61,7 +62,7 @@ func runMCP(args []string) int {
 	defer stop()
 
 	if *withUI {
-		url, err := startCockpit(ctx, rec, *port)
+		url, err := startCockpit(ctx, rec, *port, *dev)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
 			return 1
