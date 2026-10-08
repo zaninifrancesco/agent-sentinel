@@ -171,9 +171,18 @@ func NewEngine(cfg *Config) (*Engine, error) {
 func (e *Engine) Rules() []Rule { return e.rules }
 
 // Evaluate returns the strictest outcome among all matching rules.
-func (e *Engine) Evaluate(c Call) Result {
+func (e *Engine) Evaluate(c Call) Result { return e.EvaluateWhere(c, nil) }
+
+// EvaluateWhere is Evaluate restricted to the rules keep accepts (nil = all).
+// Reading a file is judged on its path with every rule, but on its content
+// with the secret rules only: a shell script that mentions sudo is not a
+// privilege escalation.
+func (e *Engine) EvaluateWhere(c Call, keep func(Rule) bool) Result {
 	best := Result{Decision: Allow, Risk: recorder.RiskNone}
 	for _, r := range e.rules {
+		if keep != nil && !keep(r) {
+			continue
+		}
 		frag := r.match(c)
 		if frag == "" {
 			continue

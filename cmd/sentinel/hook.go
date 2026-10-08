@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"unicode/utf8"
 )
 
 const defaultServePort = 8848
@@ -55,13 +56,14 @@ func runHook(args []string) int {
 		target = fmt.Sprintf("http://127.0.0.1:%d", defaultServePort)
 	}
 
-	body, err := io.ReadAll(io.LimitReader(os.Stdin, 8<<20))
+	// A file Cursor is about to read comes with its whole content.
+	body, err := io.ReadAll(io.LimitReader(os.Stdin, 64<<20))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "sentinel hook: cannot read input: %v\n", err)
 		return 1
 	}
 
-	out, err := forwardHook(strings.TrimRight(target, "/"), body)
+	out, err := forwardHook(strings.TrimRight(target, "/"), shrinkRead(body))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "sentinel hook: %v\n", err)
 		out = offlineAnswer(body, *offline)
@@ -94,9 +96,41 @@ func forwardHook(base string, body []byte) ([]byte, error) {
 	return out, nil
 }
 
+// maxForward is how much of a file's content is sent to Sentinel, enough to
+// look for secrets without pushing megabytes through the hook for every read.
+const maxForward = 256 << 10
+
+// shrinkRead cuts the content of a beforeReadFile input down to maxForward,
+// keeping the real size in content_bytes. Any other input passes untouched.
+func shrinkRead(body []byte) []byte {
+	var in map[string]any
+	if json.Unmarshal(body, &in) != nil || in["hook_event_name"] != "beforeReadFile" {
+		return body
+	}
+	content, _ := in["content"].(string)
+	if len(content) <= maxForward {
+		return body
+	}
+	cut := content[:maxForward]
+	for len(cut) > 0 && !utf8.ValidString(cut) {
+		cut = cut[:len(cut)-1]
+	}
+	in["content"], in["content_bytes"] = cut, len(content)
+	out, err := json.Marshal(in)
+	if err != nil {
+		return body
+	}
+	return out
+}
+
 // offlineAnswer is what Cursor is told when Sentinel could not decide. Only
 // the "before" hooks carry a decision; the "after" ones just get an empty
 // object.
+//
+// Reading a file can only be allowed or denied: Cursor has no "ask" for it, and
+// a response outside its schema blocks the read. So with the default mode
+// ("ask") an unreachable Sentinel lets reads through, while commands still go
+// back to the user; --offline deny refuses both.
 func offlineAnswer(input []byte, mode string) []byte {
 	var in struct {
 		Event string `json:"hook_event_name"`
@@ -104,6 +138,12 @@ func offlineAnswer(input []byte, mode string) []byte {
 	_ = json.Unmarshal(input, &in)
 	if !strings.HasPrefix(in.Event, "before") {
 		return []byte("{}\n")
+	}
+	if in.Event == "beforeReadFile" {
+		if mode == "deny" {
+			return []byte(`{"permission":"deny","user_message":"Agent Sentinel could not be reached, so this file was not read."}` + "\n")
+		}
+		return []byte(`{"permission":"allow"}` + "\n")
 	}
 	resp := map[string]string{"permission": mode}
 	switch mode {

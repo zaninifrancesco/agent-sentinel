@@ -5,6 +5,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -220,5 +221,23 @@ func TestBudgetSetLimits(t *testing.T) {
 	b.Extend()
 	if c, _ := b.Limits(); c != 2 {
 		t.Fatalf("extension step = %v, want 1 on top of 1", c-1)
+	}
+}
+
+func TestEvaluateWhereOnlyLooksAtTheChosenRules(t *testing.T) {
+	e, err := NewEngine(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := Call{Texts: []string{"sudo ls; key AKIAIOSFODNN7EXAMPLE"}}
+	if all := e.Evaluate(c); all.RuleID == "" {
+		t.Fatal("the default rules should see this")
+	}
+	onlySecrets := e.EvaluateWhere(c, func(r Rule) bool { return strings.HasPrefix(r.ID, "secret-") })
+	if onlySecrets.RuleID != "secret-token" {
+		t.Fatalf("got %q, want secret-token", onlySecrets.RuleID)
+	}
+	if none := e.EvaluateWhere(Call{Texts: []string{"sudo ls"}}, func(r Rule) bool { return strings.HasPrefix(r.ID, "secret-") }); none.Decision != Allow {
+		t.Fatalf("sudo is not a secret: %+v", none)
 	}
 }

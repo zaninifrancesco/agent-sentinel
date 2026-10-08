@@ -33,6 +33,7 @@ const maxOutput = 64 << 10
 
 // Hook events Handler acts on. Anything else is acknowledged and ignored.
 const (
+	EventBeforeRead  = "beforeReadFile"
 	EventBeforeShell = "beforeShellExecution"
 	EventAfterShell  = "afterShellExecution"
 	EventBeforeMCP   = "beforeMCPExecution"
@@ -80,6 +81,8 @@ type input struct {
 	MCPServer      string          `json:"mcp_server_name"`
 	ResultJSON     string          `json:"result_json"`
 	FilePath       string          `json:"file_path"`
+	Content        string          `json:"content"`       // beforeReadFile: never stored
+	ContentBytes   int             `json:"content_bytes"` // set by `sentinel hook` when it shortened Content
 	Edits          []struct {
 		Old string `json:"old_string"`
 		New string `json:"new_string"`
@@ -110,6 +113,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case EventBeforeMCP:
 		tool, args := mcpCall(in)
 		resp = h.before(r.Context(), in, tool, args, in.ToolName+"\x00"+string(in.ToolInput))
+	case EventBeforeRead:
+		resp = h.before(r.Context(), in, "read_file", readArgs(in), in.FilePath)
+		// beforeReadFile answers with permission and user_message only; a
+		// response that does not match its schema blocks the read.
+		resp.AgentMessage = ""
 	case EventAfterShell:
 		h.afterShell(in)
 	case EventAfterMCP:
@@ -138,6 +146,45 @@ func shellArgs(in input) map[string]any {
 		args["cwd"] = in.Cwd
 	}
 	return args
+}
+
+// readArgs are the arguments recorded for a file read: the path and the size,
+// never the content (it would put the file's secrets into the session log).
+func readArgs(in input) map[string]any {
+	return map[string]any{"file_path": in.FilePath, "bytes": readBytes(in)}
+}
+
+func readBytes(in input) int {
+	if in.ContentBytes > 0 {
+		return in.ContentBytes
+	}
+	return len(in.Content)
+}
+
+// maxScan caps how much of a file is searched for secrets.
+const maxScan = 256 << 10
+
+// contentFlag searches what the model is about to read for secrets. It only
+// flags: the file path decides whether the read is allowed. The reason names
+// the rule, not the secret, so a real key never lands in the log or the report.
+func (h *Handler) contentFlag(in input) (policy.Result, bool) {
+	if h.Engine == nil || in.Content == "" {
+		return policy.Result{}, false
+	}
+	text := in.Content
+	if len(text) > maxScan {
+		text = text[:maxScan]
+	}
+	res := h.Engine.EvaluateWhere(policy.Call{Tool: "read_file", Texts: []string{text}},
+		func(r policy.Rule) bool { return strings.HasPrefix(r.ID, "secret-") })
+	if res.Decision == policy.Allow {
+		return policy.Result{}, false
+	}
+	desc, _, _ := strings.Cut(res.Reason, " ("+res.RuleID+")")
+	return policy.Result{
+		Decision: policy.Warn, Risk: res.Risk, RuleID: res.RuleID,
+		Reason: fmt.Sprintf("the file's content matches a secret rule: %s", desc),
+	}, true
 }
 
 // mcpCall names an MCP tool as "server:tool" and parses its JSON parameters.
@@ -199,9 +246,19 @@ func (h *Handler) before(ctx context.Context, in input, tool string, args map[st
 	if h.Engine != nil {
 		res = h.Engine.Evaluate(policy.NewCall(tool, args))
 	}
+	isRead := in.Event == EventBeforeRead
+	if isRead && res.Decision == policy.Allow {
+		if flag, ok := h.contentFlag(in); ok {
+			res = flag
+		}
+	}
 	budgetHit := false
 	if h.Budget != nil {
-		h.Budget.AddOutput(len(payload))
+		if isRead {
+			h.Budget.AddInput(readBytes(in)) // the file goes to the model
+		} else {
+			h.Budget.AddOutput(len(payload))
+		}
 		if hit, why := h.Budget.Exceeded(); hit {
 			budgetHit = true
 			if res.Decision < policy.RequireApproval {
@@ -237,6 +294,12 @@ func (h *Handler) before(ctx context.Context, in input, tool string, args map[st
 		return h.hold(ctx, in, req, key, res, budgetHit)
 
 	default:
+		if isRead {
+			// Nothing reports back after a read: the row is complete now.
+			req.Status = recorder.StatusOK
+			h.Rec.Record(req)
+			return allow()
+		}
 		h.Rec.Record(req)
 		h.trackOpen(in, key, id, tool)
 		return allow()
@@ -261,7 +324,16 @@ func (h *Handler) hold(ctx context.Context, in input, req recorder.Event, key st
 		if budgetHit && h.Budget != nil {
 			h.Budget.Extend()
 		}
-		h.trackOpen(in, key, req.RPCID, req.ToolName)
+		if in.Event == EventBeforeRead {
+			h.Rec.Record(recorder.Event{
+				Type: recorder.EventToolCallResponse, Direction: recorder.ServerToClient,
+				Method: req.Method, ToolName: req.ToolName, RPCID: req.RPCID, Status: recorder.StatusOK,
+				Risk: req.Risk, Decision: req.Decision, Rule: req.Rule, Reason: req.Reason,
+				Payload: resultPayload(req.RPCID, "The operator allowed this file to be read.", false),
+			})
+		} else {
+			h.trackOpen(in, key, req.RPCID, req.ToolName)
+		}
 		r := allow()
 		if verdict.Feedback != "" {
 			r.AgentMessage = "[Agent Sentinel] The operator approved this call with a note: " + verdict.Feedback

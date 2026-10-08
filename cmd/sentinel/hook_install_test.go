@@ -43,8 +43,8 @@ func TestInstallKeepsOtherHooksAndIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.installOurs("/opt/sentinel", shellEvents, 135, "ask")
-	f.installOurs("/opt/sentinel", shellEvents, 135, "ask") // run it twice
+	f.installOurs("/opt/sentinel", coreEvents, 135, "ask")
+	f.installOurs("/opt/sentinel", coreEvents, 135, "ask") // run it twice
 
 	if got := commandsOf(t, f, "preToolUse"); len(got) != 1 || !strings.Contains(got[0], "impeccable") {
 		t.Fatalf("another tool's hook was disturbed: %v", got)
@@ -53,7 +53,7 @@ func TestInstallKeepsOtherHooksAndIsIdempotent(t *testing.T) {
 	if len(after) != 2 || after[0] != "./format.sh" || after[1] != "/opt/sentinel hook" {
 		t.Fatalf("afterFileEdit = %v", after)
 	}
-	for _, ev := range shellEvents {
+	for _, ev := range coreEvents {
 		n := 0
 		for _, c := range commandsOf(t, f, ev) {
 			if strings.HasSuffix(c, "sentinel hook") {
@@ -74,9 +74,9 @@ func TestInstallKeepsOtherHooksAndIsIdempotent(t *testing.T) {
 
 func TestUninstallRemovesOnlyOurs(t *testing.T) {
 	f, _ := parseHooksFile([]byte(existing))
-	f.installOurs("/opt/sentinel dev/sentinel", append(append([]string{}, shellEvents...), mcpEvents...), 135, "deny")
-	if n := f.removeOurs(); n != 5 {
-		t.Fatalf("removed %d entries, want 5 (quoted path and a flag included)", n)
+	f.installOurs("/opt/sentinel dev/sentinel", append(append([]string{}, coreEvents...), mcpEvents...), 135, "deny")
+	if n := f.removeOurs(); n != 6 {
+		t.Fatalf("removed %d entries, want 6 (quoted path and a flag included)", n)
 	}
 	if _, ok := f.Hooks["beforeShellExecution"]; ok {
 		t.Fatal("empty events must be dropped")
@@ -91,7 +91,7 @@ func TestUninstallRemovesOnlyOurs(t *testing.T) {
 
 func TestMarshalIsValidJSONWithVersionFirst(t *testing.T) {
 	f, _ := parseHooksFile([]byte(existing))
-	f.installOurs("/opt/sentinel", shellEvents, 135, "ask")
+	f.installOurs("/opt/sentinel", coreEvents, 135, "ask")
 	out := string(f.marshal())
 	if !strings.HasPrefix(out, "{\n  \"version\": 1") {
 		t.Fatalf("version should come first:\n%s", out)
@@ -112,7 +112,7 @@ func TestInstallIntoMissingOrEmptyFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.installOurs("/opt/sentinel", shellEvents, 135, "ask")
+	f.installOurs("/opt/sentinel", coreEvents, 135, "ask")
 	if !strings.Contains(string(f.marshal()), "beforeShellExecution") {
 		t.Fatal("hooks missing from a fresh file")
 	}
@@ -172,7 +172,7 @@ func TestInstallCommandOnDisk(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, ev := range append(append([]string{}, shellEvents...), mcpEvents...) {
+	for _, ev := range append(append([]string{}, coreEvents...), mcpEvents...) {
 		n := 0
 		for _, c := range commandsOf(t, f, ev) {
 			if ours.MatchString(c) {
@@ -205,5 +205,53 @@ func TestInstallCommandOnDisk(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(path); string(data) != "{not json" {
 		t.Fatalf("the broken file was modified: %q", data)
+	}
+}
+
+func TestShrinkReadKeepsTheSizeAndOnlyTouchesReads(t *testing.T) {
+	big := strings.Repeat("é", maxForward) // two bytes each: well over the cap
+	in, _ := json.Marshal(map[string]any{"hook_event_name": "beforeReadFile", "file_path": "/p/big", "content": big})
+	out := shrinkRead(in)
+	var got struct {
+		Content      string `json:"content"`
+		ContentBytes int    `json:"content_bytes"`
+		FilePath     string `json:"file_path"`
+	}
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Content) > maxForward || got.ContentBytes != len(big) || got.FilePath != "/p/big" {
+		t.Fatalf("content %d bytes, content_bytes %d, path %q", len(got.Content), got.ContentBytes, got.FilePath)
+	}
+	if strings.ContainsRune(got.Content, '\uFFFD') {
+		t.Fatal("a multi-byte character was cut in half")
+	}
+
+	small := []byte(`{"hook_event_name":"beforeReadFile","file_path":"/p/a","content":"hi"}`)
+	if string(shrinkRead(small)) != string(small) {
+		t.Fatal("a small read must pass untouched")
+	}
+	shellIn, _ := json.Marshal(map[string]any{"hook_event_name": "afterShellExecution", "output": big})
+	if string(shrinkRead(shellIn)) != string(shellIn) {
+		t.Fatal("other hooks must pass untouched")
+	}
+	if string(shrinkRead([]byte("garbage"))) != "garbage" {
+		t.Fatal("unreadable input must pass untouched")
+	}
+}
+
+func TestOfflineReadAnswersStayInsideTheReadSchema(t *testing.T) {
+	read := []byte(`{"hook_event_name":"beforeReadFile","file_path":"/p/a"}`)
+	for mode, want := range map[string]string{"ask": "allow", "allow": "allow", "deny": "deny"} {
+		var got map[string]string
+		if err := json.Unmarshal(offlineAnswer(read, mode), &got); err != nil || got["permission"] != want {
+			t.Errorf("%s: %v (%v)", mode, got, err)
+		}
+		if _, extra := got["agent_message"]; extra {
+			t.Errorf("%s: agent_message is outside the beforeReadFile schema", mode)
+		}
+		if got["permission"] == "ask" {
+			t.Errorf("%s: a read cannot be asked about", mode)
+		}
 	}
 }

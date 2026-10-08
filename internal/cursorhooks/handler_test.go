@@ -3,6 +3,7 @@ package cursorhooks
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -382,5 +383,148 @@ func TestEmptyCwdIsNotRecordedAndInsertionHunkStartsAtZero(t *testing.T) {
 	}
 	if !strings.Contains(gotEdit, "@@ -0,0 +1,1 @@") {
 		t.Errorf("a pure insertion starts at 0,0: %s", gotEdit)
+	}
+}
+
+func read(path, content string) map[string]any {
+	return map[string]any{"hook_event_name": EventBeforeRead, "conversation_id": "c1", "file_path": path, "content": content}
+}
+
+func requests(h *Handler) []recorder.Event {
+	var out []recorder.Event
+	for _, e := range h.Rec.Events() {
+		if e.Type == recorder.EventToolCallRequest {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func TestReadingAnOrdinaryFileIsAllowedAndNeverStoresItsContent(t *testing.T) {
+	h := newHandler(t, policy.NewBroker(), time.Second)
+	h.Budget = policy.NewBudget(0, 0)
+	const content = "package main // CONTENT-MARKER"
+	r := post(t, h, context.Background(), read("/proj/main.go", content))
+	if r != (Response{Permission: "allow"}) {
+		t.Fatalf("got %+v", r)
+	}
+	evs := requests(h)
+	if len(evs) != 1 || evs[0].ToolName != "read_file" || evs[0].Status != recorder.StatusOK {
+		t.Fatalf("bad events: %+v", evs)
+	}
+	for _, e := range h.Rec.Events() {
+		if strings.Contains(string(e.Payload), "CONTENT-MARKER") || strings.Contains(e.Reason, "CONTENT-MARKER") {
+			t.Fatalf("the file content leaked into the session log: %s", e.Payload)
+		}
+	}
+	if !strings.Contains(string(evs[0].Payload), fmt.Sprintf(`"bytes":%d`, len(content))) || !strings.Contains(string(evs[0].Payload), `"file_path":"/proj/main.go"`) {
+		t.Fatalf("path and size must be recorded: %s", evs[0].Payload)
+	}
+	if _, tokens := h.Budget.Spent(); tokens == 0 {
+		t.Fatal("a file handed to the model counts as input tokens")
+	}
+}
+
+func TestSensitiveFilesAreRefusedWithAnAnswerCursorAccepts(t *testing.T) {
+	h := newHandler(t, policy.NewBroker(), time.Second)
+	for path, rule := range map[string]string{
+		"/proj/.env":                "dotenv-access",
+		"/proj/.env.production":     "dotenv-access",
+		"/Users/me/.ssh/id_ed25519": "ssh-keys",
+	} {
+		b, _ := json.Marshal(read(path, "SECRET=hunter2-NEVER-LOG"))
+		rr := httptest.NewRecorder()
+		h.ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/", strings.NewReader(string(b))))
+		// beforeReadFile's schema is permission + user_message: nothing else.
+		var raw map[string]any
+		_ = json.Unmarshal(rr.Body.Bytes(), &raw)
+		if raw["permission"] != "deny" || raw["user_message"] == nil || raw["agent_message"] != nil || len(raw) != 2 {
+			t.Fatalf("%s: answer outside the beforeReadFile schema: %s", path, rr.Body.String())
+		}
+		var found bool
+		for _, e := range requests(h) {
+			if strings.Contains(string(e.Payload), path) && e.Status == recorder.StatusBlocked && e.Rule == rule {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("%s: expected a blocked event from %s", path, rule)
+		}
+	}
+	for _, e := range h.Rec.Events() {
+		if strings.Contains(string(e.Payload), "hunter2-NEVER-LOG") {
+			t.Fatalf("the content of a refused file leaked into the log")
+		}
+	}
+}
+
+func TestSecretInsideAnAllowedFileIsFlaggedWithoutQuotingIt(t *testing.T) {
+	h := newHandler(t, policy.NewBroker(), time.Second)
+	r := post(t, h, context.Background(), read("/proj/config.go", "var key = \"AKIAIOSFODNN7EXAMPLE\""))
+	if r.Permission != "allow" {
+		t.Fatalf("content only flags, the path decides: %+v", r)
+	}
+	ev := requests(h)[0]
+	if ev.Decision != "warn" || ev.Rule != "secret-token" || ev.Risk != recorder.RiskCritical {
+		t.Fatalf("not flagged: %+v", ev)
+	}
+	if strings.Contains(ev.Reason, "AKIA") || strings.Contains(string(ev.Payload), "AKIA") {
+		t.Fatalf("the key must not be copied into the log: %q", ev.Reason)
+	}
+}
+
+func TestContentIsOnlySearchedForSecrets(t *testing.T) {
+	h := newHandler(t, policy.NewBroker(), time.Second)
+	// A script that mentions sudo and rm -rf is not a command being run.
+	post(t, h, context.Background(), read("/proj/deploy.sh", "sudo systemctl restart app\nrm -rf /tmp/build\n"))
+	if ev := requests(h)[0]; ev.Decision != "" || ev.Status != recorder.StatusOK {
+		t.Fatalf("a shell script must read freely: %+v", ev)
+	}
+}
+
+func TestReadNeedingApprovalWaitsForTheHuman(t *testing.T) {
+	b := policy.NewBroker()
+	h := newHandler(t, b, 5*time.Second)
+	const cred = "/Users/me/.aws/credentials"
+
+	// Approve.
+	done := make(chan Response, 1)
+	go func() { done <- post(t, h, context.Background(), read(cred, "x")) }()
+	ev := waitEvent(t, h.Rec, "held read", awaiting)
+	if ev.Rule != "credential-files" {
+		t.Fatalf("rule = %q", ev.Rule)
+	}
+	b.Resolve(ev.Seq, policy.Verdict{Approved: true, Feedback: "just this once"})
+	if r := <-done; r != (Response{Permission: "allow"}) {
+		t.Fatalf("approved read got %+v (no agent_message allowed)", r)
+	}
+	res := waitEvent(t, h.Rec, "closing response", ofType(recorder.EventToolCallResponse))
+	if res.Status != recorder.StatusOK || res.RPCID != ev.RPCID {
+		t.Fatalf("an approved read must close its own row: %+v", res)
+	}
+
+	// Reject.
+	h2 := newHandler(t, b, 5*time.Second)
+	go func() { done <- post(t, h2, context.Background(), read(cred, "x")) }()
+	ev2 := waitEvent(t, h2.Rec, "held read", awaiting)
+	b.Resolve(ev2.Seq, policy.Verdict{Approved: false})
+	if r := <-done; r.Permission != "deny" || r.AgentMessage != "" {
+		t.Fatalf("rejected read got %+v", r)
+	}
+}
+
+func TestReadsCountTowardsTheBudget(t *testing.T) {
+	b := policy.NewBroker()
+	h := newHandler(t, b, 5*time.Second)
+	h.Budget = policy.NewBudget(0.0001, 0)
+	done := make(chan Response, 1)
+	go func() { done <- post(t, h, context.Background(), read("/proj/big.txt", strings.Repeat("a", 100_000))) }()
+	ev := waitEvent(t, h.Rec, "budget hold", awaiting)
+	if ev.Rule != "budget" {
+		t.Fatalf("rule = %q, want budget", ev.Rule)
+	}
+	b.Resolve(ev.Seq, policy.Verdict{Approved: false})
+	if r := <-done; r.Permission != "deny" {
+		t.Fatalf("got %+v", r)
 	}
 }

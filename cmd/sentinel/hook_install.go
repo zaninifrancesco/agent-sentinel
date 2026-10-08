@@ -17,12 +17,12 @@ import (
 	"github.com/zaninifrancesco/agent-sentinel/internal/proxy"
 )
 
-// Cursor hook events Sentinel listens to. Shell is always installed; the MCP
-// pair is opt-in because an MCP server that already goes through
-// `sentinel mcp` would be judged twice.
+// Cursor hook events Sentinel listens to. Shell, file reads and file edits are
+// always installed; the MCP pair is opt-in because an MCP server that already
+// goes through `sentinel mcp` would be judged twice.
 var (
-	shellEvents = []string{cursorhooks.EventBeforeShell, cursorhooks.EventAfterShell, cursorhooks.EventAfterEdit}
-	mcpEvents   = []string{cursorhooks.EventBeforeMCP, cursorhooks.EventAfterMCP}
+	coreEvents = []string{cursorhooks.EventBeforeShell, cursorhooks.EventAfterShell, cursorhooks.EventBeforeRead, cursorhooks.EventAfterEdit}
+	mcpEvents  = []string{cursorhooks.EventBeforeMCP, cursorhooks.EventAfterMCP}
 )
 
 // ours matches the command of an entry Sentinel wrote: "<path>/sentinel hook",
@@ -185,9 +185,9 @@ func runHookInstall(args []string, install bool) int {
 			fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
 			return 1
 		}
-		events := shellEvents
+		events := coreEvents
 		if *mcp {
-			events = append(append([]string{}, shellEvents...), mcpEvents...)
+			events = append(append([]string{}, coreEvents...), mcpEvents...)
 		}
 		// Cursor kills a hook after its timeout, so it must outlast the wait for a human.
 		timeout := int((*approvalTimeout + 15*time.Second).Seconds())
