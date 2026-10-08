@@ -215,6 +215,7 @@ export default function App() {
         onClose={() => setIsExportModalOpen(false)}
         session={session}
         rows={rows}
+        config={config}
       />
     </div>
   );

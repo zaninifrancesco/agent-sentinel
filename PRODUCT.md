@@ -36,7 +36,7 @@ It is on the wire, not beside it: because it proxies the protocol it can stop a 
 - Cost and tokens are estimates from tool traffic size only (the proxy cannot see the LLM API); the UI must label them as estimates.
 - The UI is a React + Vite + Tailwind SPA built into `internal/ui/dist` and embedded in the Go binary with `go:embed`. It must work offline, with no CDN assets or external fonts.
 - Statuses the UI must express: pending, awaiting approval, ok, error, blocked (by policy), rejected (by a human or timeout).
-- The standalone HTML report export exists but is on hold as a later extra feature; do not design around it.
+- The standalone HTML report (Export button) is built in the browser from the timeline rows: summary facts, every policy and human decision with its rule and reason, and the timetable with each call's journey. It is one offline file with no script, follows the reader's light or dark theme, and leaves payloads out. It is a secondary surface; do not design the cockpit around it. A `sentinel export` command does not exist yet.
 - Undecided: light theme, multi-session views, mobile layout.
 
 ## Evidence on Hand

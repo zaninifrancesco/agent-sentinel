@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import type { Row } from "./types";
+import { computeMetrics, COST_NOTE } from "./metrics";
 
 interface Props {
   rows: Row[];
@@ -9,39 +10,8 @@ interface Props {
 
 export function MetricsBar({ rows, maxCostUsd }: Props) {
   const m = useMemo(() => {
-    const tools = rows.filter((r) => r.kind === "tool");
-    const durations = rows
-      .filter((r) => r.durationMs !== undefined && r.durationMs > 0 && r.status !== "rejected")
-      .map((r) => r.durationMs!)
-      .sort((a, b) => a - b);
-    const at = (q: number) => (durations.length ? durations[Math.min(durations.length - 1, Math.floor(durations.length * q))] : 0);
-
-    // Token & cost ESTIMATE from the real size of what crossed the proxy
-    // (~4 characters per token). The proxy cannot see the LLM API traffic, so
-    // this only covers tool traffic and ignores the conversation context:
-    //  - call arguments were written by the model  -> output tokens
-    //  - tool results are fed back to the model    -> input tokens
-    const approx = (payload: unknown) => (payload === undefined ? 0 : Math.ceil(JSON.stringify(payload).length / 4));
-    let tin = 0;
-    let tout = 0;
-    for (const r of tools) {
-      tout += approx(r.request?.payload);
-      tin += approx(r.response?.payload);
-    }
-    const cost = (tin / 1_000_000) * 3 + (tout / 1_000_000) * 15;
-
-    return {
-      calls: tools.length,
-      waiting: rows.filter((r) => r.status === "awaiting_approval").length,
-      running: rows.filter((r) => r.status === "pending").length,
-      refused: rows.filter((r) => r.status === "blocked" || r.status === "rejected").length,
-      errors: rows.filter((r) => r.status === "error").length,
-      tokens: tin + tout,
-      cost,
-      share: maxCostUsd > 0 ? Math.min(1, cost / maxCostUsd) : 0,
-      p50: at(0.5),
-      p95: at(0.95),
-    };
+    const base = computeMetrics(rows);
+    return { ...base, share: maxCostUsd > 0 ? Math.min(1, base.cost / maxCostUsd) : 0 };
   }, [rows, maxCostUsd]);
 
   const near = maxCostUsd > 0 && m.share > 0.8;
@@ -56,7 +26,7 @@ export function MetricsBar({ rows, maxCostUsd }: Props) {
 
       <div
         className="ml-auto flex items-center gap-2.5"
-        title="Estimated from the size of tool calls and results (~4 chars/token, $3/M in, $15/M out). Does not include the LLM conversation context."
+        title={COST_NOTE}
       >
         <span className="text-ink-2">Cost (estimate)</span>
         <span className="fig font-semibold text-ink">~${m.cost.toFixed(3)}</span>

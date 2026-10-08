@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Row, SentinelEvent } from "./types";
 import { RiskChip, StatusIcon } from "./Timeline";
 import { formatDuration, formatTime } from "./format";
+import { journeyStops, statusText, type Tone } from "./journey";
 import { DiffViewer, diffFilename, extractDiff, isDiff } from "./DiffViewer";
 import { Check, Copy } from "lucide-react";
 
@@ -141,80 +142,9 @@ function Field({ label, value, figure }: { label: string; value: string; figure?
   );
 }
 
-function statusText(s: Row["status"]): string {
-  return {
-    pending: "Running",
-    awaiting_approval: "Waiting for you",
-    ok: "Done",
-    error: "Tool error",
-    blocked: "Blocked by policy",
-    rejected: "Rejected",
-  }[s];
-}
-
-type Tone = "done" | "alert" | "held" | "warn" | "quiet";
-
-interface Stop {
-  title: string;
-  at?: string;
-  text: string;
-  detail?: string;
-  tone: Tone;
-}
-
 /** The call as a journey: where it came from, what policy said, who decided, what came back. */
 function Journey({ row }: { row: Row }) {
-  const req = row.request!;
-  const stops: Stop[] = [];
-
-  stops.push({
-    title: "Requested",
-    at: req.timestamp,
-    text: row.subtitle ?? row.title,
-    tone: "done",
-  });
-
-  const decision = req.decision;
-  stops.push({
-    title: "Policy",
-    at: req.timestamp,
-    text: !decision
-      ? "No rule matched"
-      : decision === "block"
-        ? `Blocked by ${req.rule}`
-        : decision === "approve"
-          ? `Needs approval · ${req.rule}`
-          : `Allowed with a warning · ${req.rule}`,
-    detail: req.reason,
-    tone: !decision ? "quiet" : decision === "block" ? "alert" : decision === "approve" ? "held" : "warn",
-  });
-
-  if (row.status === "awaiting_approval") {
-    stops.push({ title: "Human", text: "Waiting for you to approve or reject", tone: "held" });
-  } else if (row.resolution) {
-    const d = row.resolution.decision;
-    const label =
-      d === "approved" ? "Approved" : d === "rejected" ? "Rejected" : d === "timeout" ? "Timed out, refused" : "Cancelled by the agent";
-    stops.push({
-      title: "Human",
-      at: row.resolution.timestamp,
-      text: label,
-      detail: row.resolution.reason ? `Note: ${row.resolution.reason}` : undefined,
-      tone: d === "approved" ? "done" : "alert",
-    });
-  }
-
-  if (row.response) {
-    stops.push({
-      title: "Answered",
-      at: row.response.timestamp,
-      text: row.status === "blocked" || row.status === "rejected" ? "Refusal sent to the agent, nothing ran" : statusText(row.status),
-      detail: row.durationMs !== undefined ? `took ${formatDuration(row.durationMs)}` : undefined,
-      tone: row.status === "ok" ? "done" : row.status === "error" ? "warn" : row.status === "pending" ? "quiet" : "alert",
-    });
-  } else if (row.status === "pending") {
-    stops.push({ title: "Answered", text: "Running…", tone: "quiet" });
-  }
+  const stops = journeyStops(row);
 
   const dot: Record<Tone, string> = {
     done: "border-ink bg-ink",

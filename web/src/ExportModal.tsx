@@ -1,29 +1,18 @@
 import { useEffect, useState } from "react";
 import { Download, Copy, Check, X, Sparkles } from "lucide-react";
-import type { Session, Row } from "./types";
-
-/**
- * Everything in the report that originates from the agent or an MCP server
- * (tool names, methods, ids...) is untrusted: a malicious server could name a
- * tool `<script>...</script>`. Escape it before it is put into HTML.
- */
-function esc(value: unknown): string {
-  return String(value)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+import type { Session, Row, SentinelConfig } from "./types";
+import { buildReportHtml } from "./report";
+import { computeMetrics } from "./metrics";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   session: Session | null;
   rows: Row[];
+  config: SentinelConfig;
 }
 
-export function ExportModal({ isOpen, onClose, session, rows }: Props) {
+export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
   const [copied, setCopied] = useState(false);
 
   // Esc closes the modal. Capture phase + stopPropagation so it does not also
@@ -43,55 +32,8 @@ export function ExportModal({ isOpen, onClose, session, rows }: Props) {
 
   if (!isOpen) return null;
 
-  const totalTools = rows.filter((r) => r.kind === "tool").length;
-  const totalErrors = rows.filter((r) => r.status === "error" || r.status === "blocked").length;
-
-  const generateReportHtml = () => {
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <!-- Defense in depth: the report is static, so no script or network access at all. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'" />
-  <title>Agent Sentinel Audit Report - ${esc(session?.id || "session")}</title>
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; background: #0b0e14; color: #e6e9f2; margin: 40px auto; max-width: 900px; padding: 0 20px; }
-    h1 { font-size: 24px; color: #7aa2ff; margin-bottom: 4px; }
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; background: #212837; color: #a3adc2; }
-    .card { background: #10141c; border: 1px solid #212837; border-radius: 12px; padding: 20px; margin-top: 20px; }
-    .stats { display: flex; gap: 24px; margin-top: 15px; }
-    .stat-val { font-size: 20px; font-weight: bold; color: #fff; }
-    .event-row { padding: 12px; border-bottom: 1px solid #161b25; display: flex; justify-content: space-between; font-family: monospace; font-size: 13px; }
-    .event-ok { color: #34d399; }
-    .event-err { color: #f87171; }
-  </style>
-</head>
-<body>
-  <h1>🛡️ Agent Sentinel Session Audit</h1>
-  <div class="badge">Session ID: ${esc(session?.id || "unknown")}</div>
-  <div class="badge">Exported: ${new Date().toISOString()}</div>
-
-  <div class="card">
-    <h3>Session Summary</h3>
-    <div class="stats">
-      <div><div>Total Events</div><div class="stat-val">${rows.length}</div></div>
-      <div><div>Tool Calls</div><div class="stat-val">${totalTools}</div></div>
-      <div><div>Errors / Intercepts</div><div class="stat-val">${totalErrors}</div></div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h3>Activity Timeline</h3>
-    ${rows.map((r) => `
-      <div class="event-row">
-        <span>${esc(r.title)} ${r.subtitle ? `<small style="color:#5b667d">(${esc(r.subtitle)})</small>` : ""}</span>
-        <span class="${r.status === "ok" ? "event-ok" : "event-err"}">${esc(r.status.toUpperCase())} ${r.durationMs ? `(${esc(r.durationMs)}ms)` : ""}</span>
-      </div>
-    `).join("")}
-  </div>
-</body>
-</html>`;
-  };
+  const m = computeMetrics(rows);
+  const generateReportHtml = () => buildReportHtml({ session, rows, config, exportedAt: new Date() });
 
   const handleDownload = () => {
     const html = generateReportHtml();
@@ -123,32 +65,31 @@ export function ExportModal({ isOpen, onClose, session, rows }: Props) {
           </button>
         </div>
 
-        <div className="p-6 text-xs text-ink-2 space-y-4">
+        <div className="space-y-4 p-6 text-xs text-ink-2">
           <p>
-            Generates a self-contained, zero-dependency HTML file containing the complete execution timeline,
-            tool call metrics, and audit evidence. Perfect for attaching to GitHub Pull Requests or sharing with your engineering team.
+            One self-contained HTML file: what policy and you decided on each call, the full timetable with every
+            call's journey, and the session numbers. It opens offline, runs no script, and follows the reader's
+            light or dark theme.
           </p>
 
-          <div className="rounded-sm border border-rule bg-paper p-4 space-y-2">
-            <div className="flex justify-between">
-              <span className="text-ink-2">Session ID:</span>
-              <span className="font-mono text-ink">{session?.id || "active"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ink-2">Total Recorded Events:</span>
-              <span className="font-mono text-ink">{rows.length}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-ink-2">Format:</span>
-              <span className="font-mono text-ok">Single-File HTML (Portable)</span>
-            </div>
+          <div className="space-y-2 rounded-sm border border-rule bg-paper p-4">
+            <Line label="Session" value={session?.id || "active"} />
+            <Line label="Events" value={String(rows.length)} />
+            <Line label="Tool calls" value={String(m.calls)} />
+            <Line label="Refused" value={String(m.refused)} alert={m.refused > 0} />
+            {m.waiting > 0 && <Line label="Still waiting for a human" value={String(m.waiting)} />}
           </div>
+
+          <p>
+            Payloads are left out: the report shows each call's arguments as summarised in the cockpit, not the full
+            request and response bodies. Cost and tokens are written as estimates.
+          </p>
         </div>
 
         <div className="flex items-center justify-end gap-3 border-t border-rule bg-paper px-6 py-3.5">
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 rounded-sm border border-rule-strong bg-paper px-3 py-1.5 text-xs text-ink hover:bg-paper"
+            className="flex items-center gap-1.5 rounded-sm border border-rule-strong bg-paper px-3 py-1.5 text-xs text-ink hover:border-ink"
           >
             {copied ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />}
             <span>{copied ? "Copied" : "Copy HTML"}</span>
@@ -163,6 +104,15 @@ export function ExportModal({ isOpen, onClose, session, rows }: Props) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Line({ label, value, alert }: { label: string; value: string; alert?: boolean }) {
+  return (
+    <div className="flex justify-between">
+      <span className="text-ink-2">{label}</span>
+      <span className={`fig font-mono ${alert ? "font-semibold text-signal" : "text-ink"}`}>{value}</span>
     </div>
   );
 }
