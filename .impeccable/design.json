@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-08T20:10:00Z",
+  "title": "Design System: Agent Sentinel Cockpit",
+  "extensions": {
+    "colorMeta": {
+      "timetable-yellow": { "role": "primary", "displayName": "Timetable Yellow", "canonical": "#ffd92e", "tonalRamp": ["#3d3300", "#665400", "#8f7600", "#b89900", "#e0bb00", "#ffd92e", "#ffe76b", "#fff0a3"] },
+      "signal-red": { "role": "secondary", "displayName": "Signal Red", "canonical": "#d5001c", "tonalRamp": ["#3a0007", "#600010", "#86000f", "#ab0017", "#d5001c", "#ef4a5d", "#f7949f", "#fbe4e4"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#15140f", "tonalRamp": ["#15140f", "#2a2820", "#46433a", "#6b675b", "#8d8979", "#b3ae9c", "#d9d5c7", "#f4f2ea"] },
+      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#f4f2ea", "tonalRamp": ["#15140f", "#46433a", "#6b675b", "#b3ae9c", "#d9d5c7", "#ebe8dc", "#f4f2ea", "#fbfaf5"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Tool name of the selected call." },
+      "title": { "displayName": "Title", "purpose": "Held call in the approval dock." },
+      "body": { "displayName": "Body", "purpose": "Rows, journey text, controls." },
+      "label": { "displayName": "Label", "purpose": "Column headers, field labels, tabs." },
+      "figure": { "displayName": "Figure", "purpose": "Times, durations, counts: tabular, condensed width." },
+      "code": { "displayName": "Code", "purpose": "Payloads, arguments, rule ids." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "clock-hand", "value": "transform 1s linear", "purpose": "The red hand advances once a second; removed under prefers-reduced-motion." },
+      { "name": "recede", "value": "opacity 200ms cubic-bezier(0.19, 1, 0.22, 1)", "purpose": "Rows dim while a call awaits approval." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Approve Button",
+      "kind": "button",
+      "refersTo": "button-approve",
+      "description": "Primary action in the approval dock.",
+      "html": "<button class=\"ds-approve\">Approve <kbd>⌘↵</kbd></button>",
+      "css": ".ds-approve{background:#15140f;color:#fff;border:2px solid #15140f;border-radius:2px;padding:8px 14px;font:600 14px 'Archivo Variable',system-ui,sans-serif;display:inline-flex;gap:6px;align-items:center;cursor:pointer}.ds-approve kbd{font:500 11px ui-monospace,monospace;color:#ffd92e}.ds-approve:hover{background:#46433a}.ds-approve:focus-visible{outline:2px solid #15140f;outline-offset:2px}"
+    },
+    {
+      "name": "Reject Button",
+      "kind": "button",
+      "refersTo": "button-reject",
+      "description": "Secondary action in the approval dock, outlined.",
+      "html": "<button class=\"ds-reject\">Reject <kbd>Esc</kbd></button>",
+      "css": ".ds-reject{background:#fbfaf5;color:#15140f;border:2px solid #15140f;border-radius:2px;padding:8px 14px;font:600 14px 'Archivo Variable',system-ui,sans-serif;display:inline-flex;gap:6px;align-items:center;cursor:pointer}.ds-reject kbd{font:500 11px ui-monospace,monospace;color:#46433a}.ds-reject:hover{background:#fff}.ds-reject:focus-visible{outline:2px solid #15140f;outline-offset:2px}"
+    },
+    {
+      "name": "Risk Chip (critical)",
+      "kind": "chip",
+      "refersTo": "chip-critical",
+      "description": "Critical risk, filled red.",
+      "html": "<span class=\"ds-chip-critical\">critical</span>",
+      "css": ".ds-chip-critical{background:#d5001c;color:#fff;border-radius:2px;padding:0 6px;font:600 11px/16px 'Archivo Variable',system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em}"
+    },
+    {
+      "name": "Risk Chip (high)",
+      "kind": "chip",
+      "refersTo": "chip-high",
+      "description": "High risk, red outline.",
+      "html": "<span class=\"ds-chip-high\">high</span>",
+      "css": ".ds-chip-high{border:1px solid #d5001c;color:#d5001c;border-radius:2px;padding:0 6px;font:600 11px/16px 'Archivo Variable',system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em}"
+    },
+    {
+      "name": "Held Timetable Row",
+      "kind": "custom",
+      "refersTo": "row-held",
+      "description": "A call waiting for the human: full yellow, rule id and risk on the right.",
+      "html": "<div class=\"ds-row\"><span class=\"ds-time\">22:02:55</span><span class=\"ds-event\"><b>run_shell</b><code>rm -rf ./dist</code></span><span class=\"ds-rule\">rm-recursive</span></div>",
+      "css": ".ds-row{display:grid;grid-template-columns:72px 1fr auto;gap:12px;align-items:center;background:#ffd92e;color:#15140f;padding:8px 16px;border-bottom:1px solid #d9d5c7;font:14px 'Archivo Variable',system-ui,sans-serif}.ds-time{font-variant-numeric:tabular-nums;font-stretch:78%;font-size:13px;color:#46433a}.ds-event b{display:block;font-weight:600}.ds-event code{font:12px ui-monospace,monospace;color:#46433a}.ds-rule{font:12px ui-monospace,monospace}"
+    },
+    {
+      "name": "Underline Tabs",
+      "kind": "nav",
+      "refersTo": "tabs",
+      "description": "Filter and detail tabs: ink underline on the active one.",
+      "html": "<div class=\"ds-tabs\"><button class=\"on\">All</button><button>Tool calls</button><button>Problems</button></div>",
+      "css": ".ds-tabs{display:flex;gap:20px;border-bottom:1px solid #b3ae9c;font:500 14px 'Archivo Variable',system-ui,sans-serif}.ds-tabs button{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:8px 0;color:#46433a;cursor:pointer}.ds-tabs button:hover{color:#15140f}.ds-tabs .on{border-bottom-color:#15140f;color:#15140f}.ds-tabs button:focus-visible{outline:2px solid #15140f;outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Station Timetable",
+    "overview": "The cockpit is a departure board for an agent's actions. A developer glances at it on a second screen while the agent works, so the page reads like Swiss station signage: a warm paper ground, near-black ink, ruled rows, tabular times down the left edge. It lends the world its type, palette, density and one signature move; it does not copy a railway's decoration.\n\nThe signature is the station clock in the approval dock. When a call is held for a human decision, its red second hand makes one full turn over the approval timeout and the remaining time is written beside it. Everything else steps back while a call waits, so the eye lands on the yellow row and the clock.",
+    "keyCharacteristics": [
+      "Light, warm-white ground with ink-black type; one yellow that means \"this is the held or selected row\".",
+      "Red is reserved for what needs the human or was refused.",
+      "Square corners, hairline rules, no shadows; hierarchy by weight and position.",
+      "Dense but ruled: rows are tables, not cards."
+    ],
+    "rules": [
+      { "name": "The One Reserved Colour Rule", "body": "Red appears only where the human must look or something was refused. If red is on screen, something needs attention.", "section": "colors" },
+      { "name": "The Dim-the-Rest Rule", "body": "While any call awaits approval, every other row recedes to 60% opacity; hover and focus restore it.", "section": "colors" },
+      { "name": "The Weight-Not-Icon Rule", "body": "Tool calls are semibold, session and raw rows are regular and grey. Rows do not carry per-kind icons.", "section": "typography" }
+    ],
+    "dos": [
+      "Do keep times and durations in tabular figures.",
+      "Do write remaining time as text next to the clock hand.",
+      "Do let the held row, and only it, carry full yellow.",
+      "Do keep focus visible with the 2px ink outline."
+    ],
+    "donts": [
+      "Don't use red for decoration, hover or branding.",
+      "Don't add shadows, blur or rounded cards.",
+      "Don't colour a status by hue alone; every status also has a glyph or a word.",
+      "Don't put a sparkline or a hero metric on the status strip."
+    ]
+  }
+}

@@ -1,13 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import {
-  Activity,
-  AlertTriangle,
-  Clock,
-  ShieldCheck,
-  Wrench,
-  Search,
-  Download,
-} from "lucide-react";
+import { Download, Search } from "lucide-react";
 import { useSentinel, type Connection } from "./useSentinel";
 import { useConfig } from "./useConfig";
 import { Timeline } from "./Timeline";
@@ -23,7 +15,7 @@ type Filter = "all" | "tools" | "errors" | "raw";
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "tools", label: "Tool calls" },
-  { id: "errors", label: "Errors" },
+  { id: "errors", label: "Problems" },
   { id: "raw", label: "Raw output" },
 ];
 
@@ -90,21 +82,12 @@ export default function App() {
   );
   const pendingRow = awaiting[0] ?? null;
 
-  const stats = useMemo(() => {
-    const tools = rows.filter((r) => r.kind === "tool");
-    const timed = tools.filter((r) => r.durationMs !== undefined);
-    const avg = timed.length
-      ? timed.reduce((s, r) => s + (r.durationMs ?? 0), 0) / timed.length
-      : 0;
-    return {
-      tools: tools.length,
-      errors: rows.filter(
-        (r) => r.status === "error" || r.status === "blocked"
-      ).length,
-      pending: rows.filter((r) => r.status === "pending" || r.status === "awaiting_approval").length,
-      avg: Math.round(avg),
-    };
-  }, [rows]);
+  // A call that needs a decision takes the detail pane, so what is shown
+  // beside the dock is what is being decided.
+  const pendingKey = pendingRow?.key;
+  useEffect(() => {
+    if (pendingKey) setSelectedKey(pendingKey);
+  }, [pendingKey]);
 
   const decide = async (row: Row, approved: boolean, feedback?: string) => {
     if (!row.request) return;
@@ -131,102 +114,70 @@ export default function App() {
   const handleBlock = (row: Row, feedback?: string) => void decide(row, false, feedback);
 
   return (
-    <div className="flex h-full flex-col bg-ink-950 text-ink-100 select-none">
-      {/* Top Header */}
-      <header className="flex items-center gap-5 border-b border-ink-800 bg-ink-900 px-5 py-2.5">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-7 items-center justify-center rounded-lg bg-accent/15 border border-accent/30 text-accent shadow-sm">
-            <ShieldCheck className="size-4" />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-xs tracking-tight text-ink-100">
-              Agent Sentinel
-            </span>
-            <span className="text-[10px] text-ink-400 font-mono">Cockpit v0.1</span>
-          </div>
-        </div>
+    <div className="flex h-full flex-col bg-paper text-ink">
+      <header className="flex items-center gap-4 bg-ink px-4 py-2.5 text-white sm:gap-6 sm:px-6">
+        <span className="whitespace-nowrap text-base font-bold tracking-tight">Agent Sentinel</span>
 
         <ConnectionBadge state={connection} />
 
         {session && (
-          <div className="min-w-0 truncate font-mono text-xs text-ink-400">
-            session <span className="text-accent">{session.id}</span>
+          <div className="hidden min-w-0 truncate font-mono text-xs text-rule-strong md:block">
+            session <span className="text-white">{session.id}</span>
             {session.command && session.command.length > 0 && (
               <>
                 {" · "}
-                <span title={session.command.join(" ")} className="text-ink-300">
-                  {session.command.join(" ")}
-                </span>
+                <span title={session.command.join(" ")}>{session.command.join(" ")}</span>
               </>
             )}
           </div>
         )}
 
-        {/* Global Search / Command Palette Button */}
-        <button
-          onClick={() => setIsCommandPaletteOpen(true)}
-          className="flex items-center gap-2 rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-xs text-ink-400 hover:border-ink-600 hover:text-ink-200 transition-colors"
-        >
-          <Search className="size-3.5" />
-          <span>Search events...</span>
-          <kbd className="ml-2 rounded border border-ink-700 bg-ink-800 px-1.5 py-0.2 font-mono text-[10px] text-ink-400">
-            ⌘K
-          </kbd>
-        </button>
-
-        {/* Header Stats */}
-        <div className="ml-auto flex items-center gap-5">
-          <Stat icon={<Wrench className="size-3.5" />} label="tools" value={stats.tools} />
-          <Stat icon={<Activity className="size-3.5" />} label="pending" value={stats.pending} />
-          <Stat
-            icon={<AlertTriangle className="size-3.5" />}
-            label="errors"
-            value={stats.errors}
-            tone={stats.errors > 0 ? "bad" : undefined}
-          />
-          <Stat icon={<Clock className="size-3.5" />} label="avg" value={`${stats.avg} ms`} />
-
+        <div className="ml-auto flex items-center gap-3">
+          <button
+            onClick={() => setIsCommandPaletteOpen(true)}
+            className="flex items-center gap-2 rounded-sm border border-ink-3 px-3 py-1.5 text-xs text-rule hover:border-white hover:text-white"
+          >
+            <Search className="size-3.5" />
+            <span className="hidden sm:inline">Search events</span>
+            <kbd className="font-mono text-[11px] text-rule-strong">⌘K</kbd>
+          </button>
           <button
             onClick={() => setIsExportModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-800 px-3 py-1.5 text-xs text-ink-200 hover:bg-ink-700 hover:text-ink-100 transition-colors shadow-sm"
+            className="flex items-center gap-1.5 rounded-sm border border-ink-3 px-3 py-1.5 text-xs text-rule hover:border-white hover:text-white"
           >
-            <Download className="size-3.5 text-accent" />
-            <span>Export Deliverable</span>
+            <Download className="size-3.5" />
+            <span className="hidden sm:inline">Export</span>
           </button>
         </div>
       </header>
 
-      {/* LLMOps Metrics Bar */}
       <MetricsBar rows={rows} maxCostUsd={config.maxCostUsd} />
 
-      {/* Filter Toolbar */}
-      <div className="flex items-center gap-1 border-b border-ink-800 bg-ink-900/60 px-5 py-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
-              filter === f.id
-                ? "bg-ink-700 text-ink-100 shadow-sm"
-                : "text-ink-400 hover:bg-ink-800 hover:text-ink-200"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-        <span className="ml-auto font-mono text-xs text-ink-500">
-          {visible.length} events
-        </span>
-      </div>
-
-      {/* Split Main Content Area */}
-      <main className="grid min-h-0 flex-1 grid-cols-[minmax(380px,5fr)_7fr]">
-        <Timeline
-          rows={visible}
-          selectedKey={selectedKey}
-          onSelect={setSelectedKey}
-          follow={connection === "live"}
-        />
+      <main className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,2fr)_minmax(0,3fr)] lg:grid-cols-[minmax(420px,5fr)_7fr] lg:grid-rows-1">
+        <div className="flex min-h-0 flex-col border-r border-rule-strong">
+          <div role="tablist" aria-label="Filter events" className="flex items-center gap-5 border-b border-rule-strong bg-paper px-4">
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                role="tab"
+                aria-selected={filter === f.id}
+                onClick={() => setFilter(f.id)}
+                className={`-mb-px border-b-2 py-2 text-sm font-medium ${
+                  filter === f.id ? "border-ink text-ink" : "border-transparent text-ink-2 hover:text-ink"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+            <span className="fig ml-auto text-xs text-ink-2">{visible.length} events</span>
+          </div>
+          <Timeline
+            rows={visible}
+            selectedKey={selectedKey}
+            onSelect={setSelectedKey}
+            follow={connection === "live"}
+          />
+        </div>
         <Detail row={selected} />
       </main>
 
@@ -236,11 +187,11 @@ export default function App() {
         more={Math.max(0, awaiting.length - 1)}
         busy={approvalBusy}
         error={approvalError}
+        timeoutSec={config.approvalTimeoutSec}
         onApprove={handleApprove}
         onBlock={handleBlock}
       />
 
-      {/* Command Palette Modal */}
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
@@ -249,7 +200,6 @@ export default function App() {
         onExport={() => setIsExportModalOpen(true)}
       />
 
-      {/* Standalone Export Deliverable Modal */}
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
@@ -260,42 +210,18 @@ export default function App() {
   );
 }
 
-function Stat(props: {
-  icon: React.ReactNode;
-  label: string;
-  value: number | string;
-  tone?: "bad";
-}) {
-  return (
-    <div className="flex items-center gap-2 text-xs text-ink-400">
-      <span className={props.tone === "bad" ? "text-rose-400" : "text-ink-500"}>
-        {props.icon}
-      </span>
-      <span
-        className={
-          "font-mono text-xs font-semibold " +
-          (props.tone === "bad" ? "text-rose-400" : "text-ink-100")
-        }
-      >
-        {props.value}
-      </span>
-      <span className="text-[11px]">{props.label}</span>
-    </div>
-  );
-}
-
 function ConnectionBadge({ state }: { state: Connection }) {
   const map: Record<Connection, { text: string; dot: string }> = {
-    connecting: { text: "connecting", dot: "bg-amber-400 animate-pulse" },
-    live: { text: "live", dot: "bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400" },
-    reconnecting: { text: "reconnecting", dot: "bg-amber-400 animate-pulse" },
-    ended: { text: "session ended", dot: "bg-ink-600" },
+    connecting: { text: "Connecting", dot: "border border-white" },
+    live: { text: "Live", dot: "bg-white" },
+    reconnecting: { text: "Reconnecting", dot: "border border-white" },
+    ended: { text: "Session ended", dot: "border border-rule-strong" },
   };
   const { text, dot } = map[state];
   return (
-    <span className="flex items-center gap-2 rounded-full border border-ink-800 bg-ink-850 px-2.5 py-1 text-xs text-ink-300">
-      <span className={`size-2 rounded-full ${dot}`} />
-      <span className="text-[11px] font-medium">{text}</span>
+    <span className="flex items-center gap-2 text-xs font-medium">
+      <span className={`size-2 ${dot}`} />
+      {text}
     </span>
   );
 }

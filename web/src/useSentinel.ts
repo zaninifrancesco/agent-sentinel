@@ -74,7 +74,7 @@ export function buildRows(events: SentinelEvent[]): Row[] {
           key: `req-${e.seq}`,
           kind: isTool ? "tool" : "rpc",
           title: isTool ? e.toolName || "tools/call" : e.method || "request",
-          subtitle: isTool ? (e.rule ? `policy · ${e.rule}` : "tools/call") : undefined,
+          subtitle: isTool ? argSummary(e.payload) : undefined,
           status: e.status,
           risk: e.risk,
           startedAt: e.timestamp,
@@ -134,6 +134,20 @@ export function buildRows(events: SentinelEvent[]): Row[] {
     }
   }
   return rows;
+}
+
+/** First string argument of a tools/call (the command, the path...), on one line. */
+function argSummary(payload: unknown): string | undefined {
+  const args = (payload as { params?: { arguments?: unknown } } | undefined)?.params?.arguments;
+  const first = (v: unknown): string | undefined => {
+    if (typeof v === "string") return v;
+    if (Array.isArray(v)) return v.map(first).find((x) => x !== undefined);
+    if (v && typeof v === "object") return Object.values(v).map(first).find((x) => x !== undefined);
+    return undefined;
+  };
+  const text = first(args)?.replace(/\s+/g, " ").trim();
+  if (!text) return undefined;
+  return text.length > 90 ? text.slice(0, 89) + "…" : text;
 }
 
 function standalone(e: SentinelEvent, kind: Row["kind"], title: string, subtitle?: string): Row {

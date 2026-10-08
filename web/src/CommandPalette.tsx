@@ -45,7 +45,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
         id: "action-export",
         title: "Export Standalone Audit Report",
         subtitle: "Generate self-contained HTML deliverable",
-        icon: <Download className="size-4 text-emerald-400" />,
+        icon: <Download className="size-4 text-ok" />,
         action: () => {
           onExport();
           onClose();
@@ -67,13 +67,13 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
           title: r.title,
           subtitle: `${r.kind} · ${r.status}${r.durationMs ? ` · ${r.durationMs}ms` : ""}`,
           icon: isErr ? (
-            <AlertTriangle className="size-4 text-rose-400" />
+            <AlertTriangle className="size-4 text-signal" />
           ) : r.kind === "tool" ? (
-            <Wrench className="size-4 text-accent" />
+            <Wrench className="size-4 text-ink" />
           ) : r.kind === "raw" ? (
-            <Terminal className="size-4 text-ink-400" />
+            <Terminal className="size-4 text-ink-2" />
           ) : (
-            <Radio className="size-4 text-ink-400" />
+            <Radio className="size-4 text-ink-2" />
           ),
           action: () => {
             onSelectRow(r.key);
@@ -122,14 +122,14 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-24 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink/40 pt-24">
       <div
-        className="w-full max-w-xl overflow-hidden rounded-2xl border border-ink-700 bg-ink-900 shadow-2xl ring-1 ring-white/10"
+        className="w-full max-w-xl overflow-hidden rounded-sm border border-rule-strong bg-sheet"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Input */}
-        <div className="flex items-center gap-3 border-b border-ink-700/80 px-4 py-3">
-          <Search className="size-4 text-ink-400" />
+        <div className="flex items-center gap-3 border-b border-rule-strong/80 px-4 py-3">
+          <Search className="size-4 text-ink-2" />
           <input
             ref={inputRef}
             type="text"
@@ -138,12 +138,12 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
-            placeholder="Type a command or search events... (e.g. read_file, error)"
-            className="w-full bg-transparent font-mono text-sm text-ink-100 placeholder:text-ink-500 focus:outline-none"
+            placeholder="Search events, e.g. read_file"
+            className="w-full bg-transparent font-mono text-sm text-ink placeholder:text-ink-2 focus:outline-none"
           />
           <button
             onClick={onClose}
-            className="rounded p-1 text-ink-400 hover:bg-ink-800 hover:text-ink-200"
+            className="rounded p-1 text-ink-2 hover:bg-paper hover:text-ink"
           >
             <X className="size-4" />
           </button>
@@ -152,7 +152,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
         {/* Results List */}
         <div className="max-h-80 overflow-y-auto p-2">
           {items.length === 0 ? (
-            <div className="py-8 text-center text-xs text-ink-500">
+            <div className="py-8 text-center text-xs text-ink-2">
               No matching events or commands found.
             </div>
           ) : (
@@ -162,22 +162,22 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
                   <button
                     onClick={item.action}
                     onMouseEnter={() => setSelectedIndex(idx)}
-                    className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
+                    className={`flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left ${
                       idx === selectedIndex
-                        ? "bg-accent/15 text-ink-100 ring-1 ring-accent/40"
-                        : "text-ink-300 hover:bg-ink-850"
+                        ? "bg-yellow text-ink"
+                        : "text-ink-2 hover:bg-paper"
                     }`}
                   >
-                    <div className="flex size-7 shrink-0 items-center justify-center rounded-md border border-ink-700 bg-ink-800">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-sm border border-rule-strong bg-paper">
                       {item.icon}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate font-mono text-xs font-medium text-ink-100">
+                      <div className="truncate font-mono text-xs font-medium text-ink">
                         {item.title}
                       </div>
-                      <div className="truncate text-[11px] text-ink-400">{item.subtitle}</div>
+                      <div className="truncate text-[11px] text-ink-2">{item.subtitle}</div>
                     </div>
-                    <span className="text-[10px] uppercase tracking-wider text-ink-500">
+                    <span className="text-[10px] uppercase tracking-wider text-ink-2">
                       {item.category}
                     </span>
                   </button>
@@ -188,26 +188,26 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
         </div>
 
         {/* Footer shortcuts */}
-        <div className="flex items-center justify-between border-t border-ink-800 bg-ink-950 px-4 py-2 text-[11px] text-ink-400">
+        <div className="flex items-center justify-between border-t border-rule bg-paper px-4 py-2 text-[11px] text-ink-2">
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-ink-700 bg-ink-800 px-1 py-0.5 font-mono text-[10px]">
+              <kbd className="rounded border border-rule-strong bg-paper px-1 py-0.5 font-mono text-[10px]">
                 ↑
               </kbd>
-              <kbd className="rounded border border-ink-700 bg-ink-800 px-1 py-0.5 font-mono text-[10px]">
+              <kbd className="rounded border border-rule-strong bg-paper px-1 py-0.5 font-mono text-[10px]">
                 ↓
               </kbd>{" "}
               navigate
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded border border-ink-700 bg-ink-800 px-1.5 py-0.5 font-mono text-[10px]">
+              <kbd className="rounded border border-rule-strong bg-paper px-1.5 py-0.5 font-mono text-[10px]">
                 ↵
               </kbd>{" "}
               select
             </span>
           </div>
           <span className="flex items-center gap-1">
-            <kbd className="rounded border border-ink-700 bg-ink-800 px-1 py-0.5 font-mono text-[10px]">
+            <kbd className="rounded border border-rule-strong bg-paper px-1 py-0.5 font-mono text-[10px]">
               esc
             </kbd>{" "}
             close

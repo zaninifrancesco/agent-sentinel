@@ -111,52 +111,52 @@ export function ExportModal({ isOpen, onClose, session, rows }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-ink-700 bg-ink-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-ink-700 bg-ink-850 px-5 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+      <div className="w-full max-w-lg overflow-hidden rounded-sm border border-rule-strong bg-sheet">
+        <div className="flex items-center justify-between border-b border-rule-strong bg-paper px-5 py-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-accent" />
-            <h3 className="font-semibold text-sm text-ink-100">Export Standalone Audit Deliverable</h3>
+            <Sparkles className="size-4 text-ink" />
+            <h3 className="font-semibold text-sm text-ink">Export Standalone Audit Deliverable</h3>
           </div>
-          <button onClick={onClose} className="text-ink-400 hover:text-ink-200">
+          <button onClick={onClose} className="text-ink-2 hover:text-ink">
             <X className="size-4" />
           </button>
         </div>
 
-        <div className="p-6 text-xs text-ink-300 space-y-4">
+        <div className="p-6 text-xs text-ink-2 space-y-4">
           <p>
             Generates a self-contained, zero-dependency HTML file containing the complete execution timeline,
             tool call metrics, and audit evidence. Perfect for attaching to GitHub Pull Requests or sharing with your engineering team.
           </p>
 
-          <div className="rounded-xl border border-ink-800 bg-ink-950 p-4 space-y-2">
+          <div className="rounded-sm border border-rule bg-paper p-4 space-y-2">
             <div className="flex justify-between">
-              <span className="text-ink-500">Session ID:</span>
-              <span className="font-mono text-ink-100">{session?.id || "active"}</span>
+              <span className="text-ink-2">Session ID:</span>
+              <span className="font-mono text-ink">{session?.id || "active"}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-ink-500">Total Recorded Events:</span>
-              <span className="font-mono text-ink-100">{rows.length}</span>
+              <span className="text-ink-2">Total Recorded Events:</span>
+              <span className="font-mono text-ink">{rows.length}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-ink-500">Format:</span>
-              <span className="font-mono text-emerald-400">Single-File HTML (Portable)</span>
+              <span className="text-ink-2">Format:</span>
+              <span className="font-mono text-ok">Single-File HTML (Portable)</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-ink-800 bg-ink-950 px-6 py-3.5">
+        <div className="flex items-center justify-end gap-3 border-t border-rule bg-paper px-6 py-3.5">
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 rounded-lg border border-ink-700 bg-ink-850 px-3 py-1.5 text-xs text-ink-200 hover:bg-ink-800 transition-colors"
+            className="flex items-center gap-1.5 rounded-sm border border-rule-strong bg-paper px-3 py-1.5 text-xs text-ink hover:bg-paper"
           >
-            {copied ? <Check className="size-3.5 text-emerald-400" /> : <Copy className="size-3.5" />}
+            {copied ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />}
             <span>{copied ? "Copied" : "Copy HTML"}</span>
           </button>
 
           <button
             onClick={handleDownload}
-            className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-1.5 text-xs font-medium text-ink-950 hover:bg-accent/90 transition-all active:scale-95 shadow-md shadow-accent/20"
+            className="flex items-center gap-1.5 rounded-sm border-2 border-ink bg-ink px-4 py-1.5 text-xs font-semibold text-white hover:bg-ink-2"
           >
             <Download className="size-3.5" />
             <span>Download .html</span>

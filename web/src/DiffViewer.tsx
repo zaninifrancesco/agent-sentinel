@@ -104,38 +104,38 @@ export function DiffViewer({ text, filename }: Props) {
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-ink-700 bg-ink-900 shadow-xl">
+    <div className="overflow-hidden rounded-sm border border-rule-strong bg-sheet">
       {/* Diff Header */}
-      <div className="flex items-center justify-between border-b border-ink-700 bg-ink-850 px-4 py-2.5">
+      <div className="flex items-center justify-between border-b border-rule-strong bg-paper px-4 py-2.5">
         <div className="flex items-center gap-2">
-          <FileCode className="size-4 text-accent" />
-          <span className="font-mono text-xs font-medium text-ink-100">
+          <FileCode className="size-4 text-ink" />
+          <span className="font-mono text-xs font-medium text-ink">
             {filename || "diff-preview.patch"}
           </span>
-          <span className="rounded-full bg-ink-700 px-2 py-0.5 font-mono text-[10px] text-ink-300">
+          <span className="rounded-sm bg-rule px-2 py-0.5 font-mono text-[10px] text-ink-2">
             {diffLines.filter((l) => l.type === "add").length} additions,{" "}
             {diffLines.filter((l) => l.type === "del").length} deletions
           </span>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex rounded-md bg-ink-800 p-0.5 text-[11px]">
+          <div className="flex rounded-sm bg-paper p-0.5 text-[11px]">
             <button
               onClick={() => setViewMode("unified")}
-              className={`flex items-center gap-1 rounded px-2 py-1 transition-colors ${
+              className={`flex items-center gap-1 rounded px-2 py-1 ${
                 viewMode === "unified"
-                  ? "bg-ink-700 text-ink-100"
-                  : "text-ink-400 hover:text-ink-200"
+                  ? "bg-rule text-ink"
+                  : "text-ink-2 hover:text-ink"
               }`}
             >
               <Split className="size-3" /> Unified
             </button>
             <button
               onClick={() => setViewMode("raw")}
-              className={`flex items-center gap-1 rounded px-2 py-1 transition-colors ${
+              className={`flex items-center gap-1 rounded px-2 py-1 ${
                 viewMode === "raw"
-                  ? "bg-ink-700 text-ink-100"
-                  : "text-ink-400 hover:text-ink-200"
+                  ? "bg-rule text-ink"
+                  : "text-ink-2 hover:text-ink"
               }`}
             >
               <AlignLeft className="size-3" /> Raw
@@ -144,12 +144,12 @@ export function DiffViewer({ text, filename }: Props) {
 
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1 text-xs text-ink-300 transition-colors hover:bg-ink-700 hover:text-ink-100"
+            className="flex items-center gap-1.5 rounded-sm border border-rule-strong bg-paper px-2.5 py-1 text-xs text-ink-2 hover:bg-yellow-soft hover:text-ink"
           >
             {copied ? (
               <>
-                <Check className="size-3.5 text-emerald-400" />
-                <span className="text-emerald-400">Copied</span>
+                <Check className="size-3.5 text-ok" />
+                <span className="text-ok">Copied</span>
               </>
             ) : (
               <>
@@ -163,7 +163,7 @@ export function DiffViewer({ text, filename }: Props) {
 
       {/* Diff Content */}
       {viewMode === "raw" ? (
-        <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed text-ink-200">
+        <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed text-ink">
           {text}
         </pre>
       ) : (
@@ -175,11 +175,11 @@ export function DiffViewer({ text, filename }: Props) {
                   return (
                     <tr
                       key={idx}
-                      className="border-y border-ink-800 bg-ink-850/80 text-ink-400"
+                      className="border-y border-rule bg-paper text-ink-2"
                     >
                       <td
                         colSpan={3}
-                        className="px-4 py-1 text-[11px] font-semibold text-accent/90"
+                        className="px-4 py-1 text-[11px] font-semibold text-ink"
                       >
                         {line.content}
                       </td>
@@ -195,16 +195,16 @@ export function DiffViewer({ text, filename }: Props) {
                     key={idx}
                     className={`transition-colors ${
                       isAdd
-                        ? "bg-emerald-950/30 text-emerald-200 hover:bg-emerald-950/50"
+                        ? "bg-ok-soft text-ink"
                         : isDel
-                        ? "bg-rose-950/30 text-rose-200 hover:bg-rose-950/50"
-                        : "text-ink-200 hover:bg-ink-800/40"
+                        ? "bg-signal-soft text-ink"
+                        : "text-ink hover:bg-paper"
                     }`}
                   >
-                    <td className="w-12 select-none border-r border-ink-800/50 px-2 py-0.5 text-right text-[11px] text-ink-600">
+                    <td className="w-12 select-none border-r border-rule px-2 py-0.5 text-right text-[11px] text-ink-3">
                       {line.oldLineNumber ?? ""}
                     </td>
-                    <td className="w-12 select-none border-r border-ink-800/50 px-2 py-0.5 text-right text-[11px] text-ink-600">
+                    <td className="w-12 select-none border-r border-rule px-2 py-0.5 text-right text-[11px] text-ink-3">
                       {line.newLineNumber ?? ""}
                     </td>
                     <td className="px-3 py-0.5 whitespace-pre">

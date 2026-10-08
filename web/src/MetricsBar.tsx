@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { DollarSign, Cpu, Gauge, Zap } from "lucide-react";
 import type { Row } from "./types";
 
 interface Props {
@@ -9,120 +8,88 @@ interface Props {
 }
 
 export function MetricsBar({ rows, maxCostUsd }: Props) {
-  const metrics = useMemo(() => {
-    const timedRows = rows.filter((r) => r.durationMs !== undefined && r.durationMs > 0);
-    const durations = timedRows.map((r) => r.durationMs!);
-
-    // Latency calculations
-    durations.sort((a, b) => a - b);
-    const p50 = durations.length ? durations[Math.floor(durations.length * 0.5)] : 0;
-    const p95 = durations.length ? durations[Math.floor(durations.length * 0.95)] : 0;
+  const m = useMemo(() => {
+    const tools = rows.filter((r) => r.kind === "tool");
+    const durations = rows
+      .filter((r) => r.durationMs !== undefined && r.durationMs > 0 && r.status !== "rejected")
+      .map((r) => r.durationMs!)
+      .sort((a, b) => a - b);
+    const at = (q: number) => (durations.length ? durations[Math.min(durations.length - 1, Math.floor(durations.length * q))] : 0);
 
     // Token & cost ESTIMATE from the real size of what crossed the proxy
     // (~4 characters per token). The proxy cannot see the LLM API traffic, so
     // this only covers tool traffic and ignores the conversation context:
     //  - call arguments were written by the model  -> output tokens
     //  - tool results are fed back to the model    -> input tokens
-    const approxTokens = (payload: unknown) =>
-      payload === undefined ? 0 : Math.ceil(JSON.stringify(payload).length / 4);
-    let estimatedInputTokens = 0;
-    let estimatedOutputTokens = 0;
-    for (const r of rows) {
-      if (r.kind !== "tool") continue;
-      estimatedOutputTokens += approxTokens(r.request?.payload);
-      estimatedInputTokens += approxTokens(r.response?.payload);
+    const approx = (payload: unknown) => (payload === undefined ? 0 : Math.ceil(JSON.stringify(payload).length / 4));
+    let tin = 0;
+    let tout = 0;
+    for (const r of tools) {
+      tout += approx(r.request?.payload);
+      tin += approx(r.response?.payload);
     }
-    const totalTokens = estimatedInputTokens + estimatedOutputTokens;
-
-    // Stored cost model: ~$3/M in, $15/M out for high-tier models
-    const estimatedCost = (estimatedInputTokens / 1_000_000) * 3.0 + (estimatedOutputTokens / 1_000_000) * 15.0;
-    const budgetPercent = maxCostUsd > 0 ? Math.min(100, Math.round((estimatedCost / maxCostUsd) * 100)) : 0;
-
-    // Sparkline points
-    const recent = timedRows.slice(-15).map((r) => r.durationMs!);
-    const maxDur = Math.max(...recent, 100);
-    const sparkPoints = recent.map((d, idx) => {
-      const x = (idx / Math.max(1, recent.length - 1)) * 100;
-      const y = 30 - (d / maxDur) * 26;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(" ");
+    const cost = (tin / 1_000_000) * 3 + (tout / 1_000_000) * 15;
 
     return {
-      p50,
-      p95,
-      totalTokens,
-      estimatedCost,
-      budgetPercent,
-      sparkPoints,
-      hasRecent: recent.length > 1,
+      calls: tools.length,
+      waiting: rows.filter((r) => r.status === "awaiting_approval").length,
+      running: rows.filter((r) => r.status === "pending").length,
+      refused: rows.filter((r) => r.status === "blocked" || r.status === "rejected").length,
+      errors: rows.filter((r) => r.status === "error").length,
+      tokens: tin + tout,
+      cost,
+      share: maxCostUsd > 0 ? Math.min(1, cost / maxCostUsd) : 0,
+      p50: at(0.5),
+      p95: at(0.95),
     };
   }, [rows, maxCostUsd]);
 
+  const near = maxCostUsd > 0 && m.share > 0.8;
+
   return (
-    <div className="flex items-center gap-6 border-b border-ink-800 bg-ink-950 px-5 py-2 text-xs">
-      {/* Cost & Budget Meter */}
+    <div className="flex flex-wrap items-center gap-x-7 gap-y-1 border-b border-rule-strong bg-paper px-6 py-2 text-[13px]">
+      <Item label="Calls" value={m.calls} />
+      <Item label="Waiting" value={m.waiting} />
+      <Item label="Running" value={m.running} />
+      <Item label="Refused" value={m.refused} alert={m.refused > 0} />
+      <Item label="Errors" value={m.errors} />
+
       <div
-        className="flex items-center gap-2.5"
+        className="ml-auto flex items-center gap-2.5"
         title="Estimated from the size of tool calls and results (~4 chars/token, $3/M in, $15/M out). Does not include the LLM conversation context."
       >
-        <DollarSign className="size-3.5 text-emerald-400" />
-        <div className="flex flex-col">
-          <div className="flex items-center gap-1.5 font-mono text-[11px]">
-            <span className="font-semibold text-ink-100">~${metrics.estimatedCost.toFixed(3)}</span>
-            <span className="text-ink-500">{maxCostUsd > 0 ? `/ $${maxCostUsd.toFixed(2)} max` : "no budget"}</span>
-          </div>
-          <div className="mt-0.5 h-1 w-24 overflow-hidden rounded-full bg-ink-800">
-            <div
-              className={`h-full transition-all duration-300 ${
-                metrics.budgetPercent > 80 ? "bg-rose-500" : "bg-emerald-400"
-              }`}
-              style={{ width: `${Math.max(4, metrics.budgetPercent)}%` }}
-            />
-          </div>
-        </div>
+        <span className="text-ink-2">Cost (estimate)</span>
+        <span className="fig font-semibold text-ink">~${m.cost.toFixed(3)}</span>
+        {maxCostUsd > 0 && (
+          <>
+            <span
+              role="meter"
+              aria-label="Estimated cost against budget"
+              aria-valuemin={0}
+              aria-valuemax={maxCostUsd}
+              aria-valuenow={Number(m.cost.toFixed(3))}
+              className="relative h-1.5 w-24 bg-rule"
+            >
+              <span
+                className={`absolute inset-y-0 left-0 ${near ? "bg-signal" : "bg-ink"}`}
+                style={{ width: `${Math.max(2, m.share * 100)}%` }}
+              />
+            </span>
+            <span className={`fig ${near ? "font-semibold text-signal" : "text-ink-2"}`}>of ${maxCostUsd.toFixed(2)}</span>
+          </>
+        )}
       </div>
+      <Item label="Tokens (est.)" value={m.tokens > 1000 ? `${(m.tokens / 1000).toFixed(1)}k` : m.tokens} />
+      <Item label="Median / p95" value={`${m.p50} / ${m.p95} ms`} />
+    </div>
+  );
+}
 
-      {/* Token Throughput */}
-      <div className="flex items-center gap-2">
-        <Cpu className="size-3.5 text-accent" />
-        <span className="text-ink-400" title="Estimated from tool traffic size">
-          Tokens (est.):
-        </span>
-        <span className="font-mono text-ink-100">
-          {metrics.totalTokens > 1000
-            ? `${(metrics.totalTokens / 1000).toFixed(1)}k`
-            : metrics.totalTokens}
-        </span>
-      </div>
-
-      {/* Latency Percentiles */}
-      <div className="flex items-center gap-2">
-        <Gauge className="size-3.5 text-amber-400" />
-        <span className="text-ink-400">p50:</span>
-        <span className="font-mono text-ink-200">{metrics.p50}ms</span>
-        <span className="text-ink-500">·</span>
-        <span className="text-ink-400">p95:</span>
-        <span className="font-mono text-ink-200">{metrics.p95}ms</span>
-      </div>
-
-      {/* Latency Sparkline */}
-      {metrics.hasRecent && (
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-[11px] text-ink-500 flex items-center gap-1">
-            <Zap className="size-3 text-accent" /> Latency trend:
-          </span>
-          <svg className="h-6 w-24 overflow-visible" viewBox="0 0 100 30">
-            <polyline
-              fill="none"
-              stroke="#7aa2ff"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={metrics.sparkPoints}
-            />
-          </svg>
-        </div>
-      )}
+function Item({ label, value, alert }: { label: string; value: number | string; alert?: boolean }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="text-ink-2">{label}</span>
+      <span className={`fig font-semibold ${alert ? "text-signal" : "text-ink"}`}>{value}</span>
     </div>
   );
 }

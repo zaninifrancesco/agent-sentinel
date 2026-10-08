@@ -1,16 +1,41 @@
 @import "tailwindcss";
 
+/* Archivo, latin subset only: self-hosted so the cockpit works offline.
+   The width axis gives the timetable its narrow, tabular time column. */
+@font-face {
+  font-family: "Archivo Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  font-stretch: 62% 125%;
+  src: url("../node_modules/@fontsource-variable/archivo/files/archivo-latin-standard-normal.woff2")
+    format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304,
+    U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* Station-timetable palette. Colour has jobs:
+   yellow = selected row / a call held for you,
+   signal red = needs the human or was refused (and nothing else),
+   green / amber-brown = outcome of a finished call. */
 @theme {
-  --color-ink-950: #07090d;
-  --color-ink-900: #0b0e14;
-  --color-ink-850: #10141c;
-  --color-ink-800: #161b25;
-  --color-ink-700: #212837;
-  --color-ink-500: #5b667d;
-  --color-ink-300: #a3adc2;
-  --color-ink-100: #e6e9f2;
-  --color-accent: #7aa2ff;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  --color-paper: #f4f2ea;
+  --color-sheet: #fbfaf5;
+  --color-rule: #d9d5c7;
+  --color-rule-strong: #b3ae9c;
+  --color-ink: #15140f;
+  --color-ink-2: #46433a;
+  --color-ink-3: #6b675b;
+  --color-yellow: #ffd92e;
+  --color-yellow-soft: #fff0a3;
+  --color-signal: #d5001c;
+  --color-signal-soft: #fbe4e4;
+  --color-ok: #1b7040;
+  --color-ok-soft: #e1f0e5;
+  --color-warn: #9a4d00;
+
+  --font-sans: "Archivo Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 }
 
 html,
@@ -19,19 +44,83 @@ body,
   height: 100%;
 }
 
+html {
+  color-scheme: light;
+}
+
 body {
   margin: 0;
-  background: var(--color-ink-950);
-  color: var(--color-ink-100);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Inter", sans-serif;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
 }
 
+/* Timetable figures: narrow, tabular, so times and durations line up in columns. */
+.fig {
+  font-variant-numeric: tabular-nums;
+  font-stretch: 78%;
+  letter-spacing: 0.01em;
+}
+
+/* Browser surfaces carry the design too. */
+::selection {
+  background: var(--color-yellow);
+  color: var(--color-ink);
+}
+input,
+textarea {
+  caret-color: var(--color-signal);
+}
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-paper);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-ink-700);
+  background: var(--color-rule-strong);
+  border: 3px solid var(--color-paper);
   border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-3);
+}
+
+/* The station clock's second hand: one authored motion. It steps once a
+   second like a real station clock, and holds still for reduced-motion users
+   (the remaining time is also written out as text). */
+.clock-hand {
+  transform-origin: 32px 32px;
+  transition: transform 1s linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .clock-hand {
+    transition: none;
+  }
+}
+
+/* Rows that are not the held call step back while a call waits for you. */
+.row-recede {
+  opacity: 0.6;
+  transition: opacity 200ms cubic-bezier(0.19, 1, 0.22, 1);
+}
+.row-recede:hover,
+.row-recede:focus-visible {
+  opacity: 1;
 }

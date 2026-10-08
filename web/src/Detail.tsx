@@ -1,20 +1,25 @@
 import { useState } from "react";
 import type { Row, SentinelEvent } from "./types";
-import { StatusIcon, formatTime } from "./Timeline";
+import { RiskChip, StatusIcon } from "./Timeline";
+import { formatDuration, formatTime } from "./format";
 import { DiffViewer, diffFilename, extractDiff, isDiff } from "./DiffViewer";
-import { Copy, Check, Code, FileText, Layers, ShieldCheck, AlertCircle } from "lucide-react";
+import { Check, Copy } from "lucide-react";
+
+type Tab = "payload" | "diff" | "raw";
 
 export function Detail({ row }: { row: Row | null }) {
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<"payload" | "diff" | "raw">("payload");
+  const [activeTab, setActiveTab] = useState<Tab>("payload");
 
   if (!row) {
     return (
-      <section className="grid place-items-center bg-ink-950 text-sm text-ink-500">
-        <div className="flex flex-col items-center gap-2">
-          <Layers className="size-8 text-ink-700" />
-          <span>Select an event from the timeline to inspect</span>
-          <span className="text-xs text-ink-600">Tip: use ↑ / ↓ or Cmd+K to navigate</span>
+      <section className="grid place-items-center bg-paper p-8 text-sm text-ink-2">
+        <div className="max-w-xs">
+          <p className="font-semibold text-ink">Nothing selected</p>
+          <p className="mt-1">
+            Pick a row in the timetable, or move with <kbd className="font-mono text-xs">J</kbd> /{" "}
+            <kbd className="font-mono text-xs">K</kbd>. <kbd className="font-mono text-xs">⌘K</kbd> searches.
+          </p>
         </div>
       </section>
     );
@@ -33,7 +38,7 @@ export function Detail({ row }: { row: Row | null }) {
       if (diffText === null && isDiff(candidate)) diffText = extractDiff(candidate);
     }
   }
-  const hasDiffContent = diffText !== null;
+  const tab: Tab = activeTab === "diff" && diffText === null ? "payload" : activeTab;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(JSON.stringify(row, null, 2));
@@ -41,159 +46,202 @@ export function Detail({ row }: { row: Row | null }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  return (
-    <section className="flex flex-col h-full overflow-hidden bg-ink-950">
-      {/* Detail Top Header */}
-      <div className="border-b border-ink-800 bg-ink-900/60 p-5">
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div className="flex items-center gap-3">
-            <StatusIcon status={row.status} />
-            <h2 className="font-mono text-base font-semibold text-ink-100">{row.title}</h2>
-            {row.subtitle && <span className="text-xs text-ink-400">{row.subtitle}</span>}
-          </div>
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "payload", label: "Payload" },
+    ...(diffText !== null ? [{ id: "diff" as Tab, label: "Diff" }] : []),
+    { id: "raw", label: "Raw JSON" },
+  ];
 
+  return (
+    <section className="flex min-h-0 flex-col overflow-hidden bg-paper">
+      <div className="border-b border-rule-strong px-6 pb-0 pt-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2.5 truncate text-2xl font-bold leading-tight text-ink">
+              <StatusIcon status={row.status} />
+              <span className="truncate">{row.title}</span>
+            </h2>
+            {row.subtitle && <p className="mt-1 truncate font-mono text-[13px] text-ink-2">{row.subtitle}</p>}
+          </div>
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 rounded-md border border-ink-700 bg-ink-800 px-2.5 py-1 text-xs text-ink-300 transition-colors hover:bg-ink-700 hover:text-ink-100"
+            className="flex shrink-0 items-center gap-1.5 rounded-sm border border-rule-strong bg-sheet px-2.5 py-1 text-xs font-medium text-ink-2 hover:border-ink hover:text-ink"
           >
-            {copied ? (
-              <>
-                <Check className="size-3.5 text-emerald-400" />
-                <span className="text-emerald-400">Copied</span>
-              </>
-            ) : (
-              <>
-                <Copy className="size-3.5" />
-                <span>Copy Event</span>
-              </>
-            )}
+            {copied ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />}
+            {copied ? "Copied" : "Copy event"}
           </button>
         </div>
 
-        {/* Metadata grid */}
-        <div className="grid grid-cols-4 gap-4 rounded-xl border border-ink-800 bg-ink-900/90 p-3 font-mono text-xs">
+        <dl className="mt-4 grid grid-cols-4 gap-6 text-sm">
+          <Field label="Time" value={formatTime(row.startedAt)} figure />
+          <Field label="Took" value={row.durationMs !== undefined ? formatDuration(row.durationMs) : "–"} figure />
+          <Field label="Status" value={statusText(row.status)} />
           <div>
-            <div className="text-[10px] uppercase text-ink-500">Status</div>
-            <div className="text-ink-200 mt-0.5">{row.status}</div>
+            <dt className="text-xs text-ink-2">Risk</dt>
+            <dd className="mt-0.5 flex h-5 items-center">
+              {row.risk === "none" ? <span className="text-ink-2">none</span> : <RiskChip risk={row.risk} />}
+            </dd>
           </div>
-          <div>
-            <div className="text-[10px] uppercase text-ink-500">Started</div>
-            <div className="text-ink-200 mt-0.5">{formatTime(row.startedAt)}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase text-ink-500">Duration</div>
-            <div className="text-ink-200 mt-0.5">{row.durationMs !== undefined ? `${row.durationMs} ms` : "—"}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase text-ink-500">Risk Assessment</div>
-            <div className="text-ink-200 mt-0.5 capitalize flex items-center gap-1">
-              {row.risk === "critical" || row.risk === "high" ? (
-                <AlertCircle className="size-3 text-rose-400" />
-              ) : (
-                <ShieldCheck className="size-3 text-emerald-400" />
-              )}
-              {row.risk}
-            </div>
-          </div>
-        </div>
+        </dl>
 
-        {/* Policy verdict: what rule fired and what the human decided */}
-        {(row.request?.rule || row.resolution) && (
-          <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/10 p-3 text-xs">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">Policy</span>
-              {row.request?.rule && (
-                <span className="rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[10px] text-amber-300">
-                  {row.request.rule}
-                </span>
-              )}
-              {row.request?.decision && (
-                <span className="font-mono text-[10px] uppercase text-ink-400">→ {row.request.decision}</span>
-              )}
-            </div>
-            {row.request?.reason && <p className="mt-1.5 break-words text-ink-300">{row.request.reason}</p>}
-            {row.resolution && (
-              <p className="mt-1.5 text-ink-200">
-                Human verdict: <span className="font-mono font-semibold">{row.resolution.decision}</span>
-                {row.resolution.reason ? <span className="text-ink-400"> — “{row.resolution.reason}”</span> : null}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Tabs */}
-        <div className="flex items-center gap-2 mt-4">
-          <button
-            onClick={() => setActiveTab("payload")}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-              activeTab === "payload"
-                ? "bg-ink-700 text-ink-100"
-                : "text-ink-400 hover:bg-ink-800 hover:text-ink-200"
-            }`}
-          >
-            <Layers className="size-3.5" /> Payload
-          </button>
-
-          {hasDiffContent && (
+        <div role="tablist" className="mt-5 flex gap-5">
+          {tabs.map((t) => (
             <button
-              onClick={() => setActiveTab("diff")}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                activeTab === "diff"
-                  ? "bg-accent/20 text-accent ring-1 ring-accent/40"
-                  : "text-accent/80 hover:bg-ink-800"
+              key={t.id}
+              role="tab"
+              aria-selected={tab === t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`-mb-px border-b-2 pb-2 text-sm font-medium ${
+                tab === t.id ? "border-ink text-ink" : "border-transparent text-ink-2 hover:text-ink"
               }`}
             >
-              <Code className="size-3.5" /> Visual Diff
+              {t.label}
             </button>
-          )}
-
-          <button
-            onClick={() => setActiveTab("raw")}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-              activeTab === "raw"
-                ? "bg-ink-700 text-ink-100"
-                : "text-ink-400 hover:bg-ink-800 hover:text-ink-200"
-            }`}
-          >
-            <FileText className="size-3.5" /> Raw JSON
-          </button>
+          ))}
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-5">
-        {activeTab === "diff" && diffText ? (
+      <div className="min-h-0 flex-1 select-text overflow-y-auto px-6 py-5">
+        {tab === "diff" && diffText ? (
           <DiffViewer text={diffText} filename={diffFilename(diffText)} />
-        ) : activeTab === "raw" ? (
-          <pre className="overflow-x-auto rounded-xl border border-ink-800 bg-ink-900 p-4 font-mono text-xs leading-relaxed text-ink-200">
+        ) : tab === "raw" ? (
+          <pre className="overflow-x-auto rounded-sm border border-rule bg-sheet p-4 font-mono text-xs leading-relaxed text-ink">
             {JSON.stringify(row, null, 2)}
           </pre>
         ) : (
           <div className="space-y-6">
+            {row.kind === "tool" && row.request && <Journey row={row} />}
             {blocks.map(({ label, event }) => (
-              <div key={event.seq} className="overflow-hidden rounded-xl border border-ink-800 bg-ink-900 shadow-md">
-                <div className="flex items-center justify-between border-b border-ink-800 bg-ink-850 px-4 py-2 text-xs">
-                  <div className="flex items-center gap-2 text-ink-300 font-medium">
-                    <span className="uppercase text-[10px] tracking-wider text-ink-500 font-semibold">{label}</span>
-                    <span>·</span>
-                    <span className="font-mono text-[11px]">Seq #{event.seq}</span>
-                  </div>
-                  {event.direction && (
-                    <span className="font-mono text-[10px] text-ink-500">{event.direction}</span>
-                  )}
+              <div key={event.seq} className="overflow-hidden rounded-sm border border-rule bg-sheet">
+                <div className="flex items-center justify-between border-b border-rule bg-paper px-4 py-1.5 text-xs text-ink-2">
+                  <span>
+                    <span className="font-semibold text-ink">{label}</span>
+                    <span className="fig ml-2">#{event.seq}</span>
+                  </span>
+                  {event.direction && <span className="font-mono">{event.direction}</span>}
                 </div>
-
-                <div className="p-4">
-                  <pre className="overflow-x-auto font-mono text-xs leading-relaxed text-ink-200 whitespace-pre-wrap">
-                    {pretty(event.payload)}
-                  </pre>
-                </div>
+                <pre className="overflow-x-auto whitespace-pre-wrap p-4 font-mono text-xs leading-relaxed text-ink">
+                  {pretty(event.payload)}
+                </pre>
               </div>
             ))}
           </div>
         )}
       </div>
     </section>
+  );
+}
+
+function Field({ label, value, figure }: { label: string; value: string; figure?: boolean }) {
+  return (
+    <div>
+      <dt className="text-xs text-ink-2">{label}</dt>
+      <dd className={`mt-0.5 text-base font-semibold text-ink ${figure ? "fig" : ""}`}>{value}</dd>
+    </div>
+  );
+}
+
+function statusText(s: Row["status"]): string {
+  return {
+    pending: "Running",
+    awaiting_approval: "Waiting for you",
+    ok: "Done",
+    error: "Tool error",
+    blocked: "Blocked by policy",
+    rejected: "Rejected",
+  }[s];
+}
+
+type Tone = "done" | "alert" | "held" | "warn" | "quiet";
+
+interface Stop {
+  title: string;
+  at?: string;
+  text: string;
+  detail?: string;
+  tone: Tone;
+}
+
+/** The call as a journey: where it came from, what policy said, who decided, what came back. */
+function Journey({ row }: { row: Row }) {
+  const req = row.request!;
+  const stops: Stop[] = [];
+
+  stops.push({
+    title: "Requested",
+    at: req.timestamp,
+    text: row.subtitle ?? row.title,
+    tone: "done",
+  });
+
+  const decision = req.decision;
+  stops.push({
+    title: "Policy",
+    at: req.timestamp,
+    text: !decision
+      ? "No rule matched"
+      : decision === "block"
+        ? `Blocked by ${req.rule}`
+        : decision === "approve"
+          ? `Needs approval · ${req.rule}`
+          : `Allowed with a warning · ${req.rule}`,
+    detail: req.reason,
+    tone: !decision ? "quiet" : decision === "block" ? "alert" : decision === "approve" ? "held" : "warn",
+  });
+
+  if (row.status === "awaiting_approval") {
+    stops.push({ title: "Human", text: "Waiting for you to approve or reject", tone: "held" });
+  } else if (row.resolution) {
+    const d = row.resolution.decision;
+    const label =
+      d === "approved" ? "Approved" : d === "rejected" ? "Rejected" : d === "timeout" ? "Timed out, refused" : "Cancelled by the agent";
+    stops.push({
+      title: "Human",
+      at: row.resolution.timestamp,
+      text: label,
+      detail: row.resolution.reason ? `Note: ${row.resolution.reason}` : undefined,
+      tone: d === "approved" ? "done" : "alert",
+    });
+  }
+
+  if (row.response) {
+    stops.push({
+      title: "Answered",
+      at: row.response.timestamp,
+      text: row.status === "blocked" || row.status === "rejected" ? "Refusal sent to the agent, nothing ran" : statusText(row.status),
+      detail: row.durationMs !== undefined ? `took ${formatDuration(row.durationMs)}` : undefined,
+      tone: row.status === "ok" ? "done" : row.status === "error" ? "warn" : row.status === "pending" ? "quiet" : "alert",
+    });
+  } else if (row.status === "pending") {
+    stops.push({ title: "Answered", text: "Running…", tone: "quiet" });
+  }
+
+  const dot: Record<Tone, string> = {
+    done: "border-ink bg-ink",
+    alert: "border-signal bg-signal",
+    held: "border-ink bg-yellow",
+    warn: "border-warn bg-warn",
+    quiet: "border-rule-strong bg-sheet",
+  };
+
+  return (
+    <ol className="relative space-y-4 pl-7" aria-label="Journey of this call">
+      <span aria-hidden className="absolute bottom-2 left-[7px] top-2 w-px bg-rule-strong" />
+      {stops.map((s, i) => (
+        <li key={i} className="relative">
+          <span
+            aria-hidden
+            className={`absolute -left-7 top-1 size-[15px] rounded-full border-2 ${dot[s.tone]}`}
+          />
+          <div className="flex items-baseline justify-between gap-4">
+            <span className="text-sm font-semibold text-ink">{s.title}</span>
+            {s.at && <span className="fig text-[13px] text-ink-2">{formatTime(s.at)}</span>}
+          </div>
+          <p className={`text-sm ${s.tone === "alert" ? "font-medium text-signal" : "text-ink"}`}>{s.text}</p>
+          {s.detail && <p className="mt-0.5 break-words text-[13px] text-ink-2">{s.detail}</p>}
+        </li>
+      ))}
+    </ol>
   );
 }
 

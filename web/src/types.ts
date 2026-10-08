@@ -71,4 +71,6 @@ export interface SentinelConfig {
   maxTokens: number;
   policy: string;
   approvals: boolean; // can this session approve held calls?
+  /** Seconds a held call waits for a decision before it is refused. */
+  approvalTimeoutSec: number;
 }

@@ -1,51 +1,41 @@
 import { useEffect, useRef } from "react";
-import { CheckCircle2, CircleDashed, Flag, Radio, Terminal, Wrench, XCircle, Zap, ShieldAlert, ShieldQuestion } from "lucide-react";
+import { Ban, Check, CircleSlash, Loader, OctagonPause, TriangleAlert } from "lucide-react";
 import type { Risk, Row, Status } from "./types";
+import { formatDuration, formatTime } from "./format";
 
-export function formatTime(iso: string): string {
-  const d = new Date(iso);
-  const p = (n: number, w = 2) => String(n).padStart(w, "0");
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
-}
-
-const RISK_STYLE: Record<Risk, string> = {
-  none: "",
-  low: "border-sky-500/40 text-sky-300 bg-sky-950/20",
-  medium: "border-amber-500/40 text-amber-300 bg-amber-950/20",
-  high: "border-orange-500/50 text-orange-300 bg-orange-950/30",
-  critical: "border-red-500/60 text-red-300 bg-red-950/40 animate-pulse",
-};
-
+/** One consistent glyph set, 16px, 2px stroke. Colour only where it means something. */
 export function StatusIcon({ status }: { status: Status }) {
+  const cls = "size-4 shrink-0";
   switch (status) {
     case "ok":
-      return <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />;
+      return <Check aria-label="ok" className={`${cls} text-ok`} strokeWidth={2.5} />;
     case "pending":
-      return <CircleDashed className="size-4 animate-spin text-amber-400 shrink-0" />;
+      return <Loader aria-label="running" className={`${cls} text-ink-2`} />;
     case "awaiting_approval":
-      return <ShieldQuestion className="size-4 animate-pulse text-amber-400 shrink-0" />;
+      return <OctagonPause aria-label="waiting for you" className={`${cls} text-ink`} />;
     case "blocked":
+      return <Ban aria-label="blocked" className={`${cls} text-signal`} />;
     case "rejected":
-      return <ShieldAlert className="size-4 text-rose-400 shrink-0" />;
+      return <CircleSlash aria-label="rejected" className={`${cls} text-signal`} />;
     default:
-      return <XCircle className="size-4 text-rose-400 shrink-0" />;
+      return <TriangleAlert aria-label="error" className={`${cls} text-warn`} />;
   }
 }
 
-function KindIcon({ kind }: { kind: Row["kind"] }) {
-  const cls = "size-4 text-ink-500 shrink-0";
-  switch (kind) {
-    case "tool":
-      return <Wrench className="size-4 text-accent shrink-0" />;
-    case "notification":
-      return <Radio className={cls} />;
-    case "raw":
-      return <Terminal className={cls} />;
-    case "session":
-      return <Flag className={cls} />;
-    default:
-      return <Zap className={cls} />;
-  }
+/** Risk is written as a service mark: critical is filled, high is outlined. */
+export function RiskChip({ risk }: { risk: Risk }) {
+  if (risk === "none") return null;
+  const style: Record<Exclude<Risk, "none">, string> = {
+    critical: "bg-signal text-white",
+    high: "border border-signal text-signal",
+    medium: "border border-ink-3 text-ink-2",
+    low: "border border-rule-strong text-ink-3",
+  };
+  return (
+    <span className={`rounded-sm px-1.5 text-[11px] font-semibold uppercase leading-4 tracking-wide ${style[risk]}`}>
+      {risk}
+    </span>
+  );
 }
 
 interface Props {
@@ -55,17 +45,21 @@ interface Props {
   follow: boolean;
 }
 
+const COLS =
+  "grid-cols-[64px_20px_minmax(0,1fr)_56px] sm:grid-cols-[72px_20px_minmax(0,1fr)_200px_64px]";
+
 export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
 
+  // While any call waits for the human, everything else steps back.
+  const holding = rows.some((r) => r.status === "awaiting_approval");
+
   // Keyboard navigation: j/k or ArrowUp/ArrowDown to navigate rows
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if typing in an input
-      if (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA") {
-        return;
-      }
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
 
       if (e.key === "j" || e.key === "ArrowDown") {
         e.preventDefault();
@@ -84,11 +78,18 @@ export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [rows, selectedKey, onSelect]);
 
-  // Keep newest event in view if follow mode is active
+  // Keep the newest event in view while following a live session.
   useEffect(() => {
     const el = scroller.current;
     if (el && follow && stick.current) el.scrollTop = el.scrollHeight;
   }, [rows, follow]);
+
+  // Keep the selected row in view when moving with the keyboard.
+  useEffect(() => {
+    scroller.current
+      ?.querySelector<HTMLElement>('[aria-current="true"]')
+      ?.scrollIntoView({ block: "nearest" });
+  }, [selectedKey]);
 
   return (
     <div
@@ -97,53 +98,67 @@ export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
         const el = e.currentTarget;
         stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
       }}
-      className="overflow-y-auto border-r border-ink-800 bg-ink-900/70"
+      className="min-h-0 flex-1 overflow-y-auto bg-sheet"
     >
+      <div
+        className={`sticky top-0 z-10 grid ${COLS} items-center gap-x-3 border-b border-rule-strong bg-paper px-4 py-1.5 text-xs font-medium text-ink-2`}
+      >
+        <span>Time</span>
+        <span aria-hidden />
+        <span>Event</span>
+        <span className="hidden text-right sm:block">Policy</span>
+        <span className="text-right">Took</span>
+      </div>
+
       {rows.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-12 text-center text-ink-500">
-          <Terminal className="size-8 text-ink-700 mb-2" />
-          <p className="text-xs">Waiting for agent activity...</p>
+        <div className="px-4 py-10 text-sm text-ink-2">
+          <p className="font-semibold text-ink">No calls yet</p>
+          <p className="mt-1 max-w-sm text-ink-2">
+            Start your agent through <code className="font-mono text-xs">sentinel mcp -- &lt;server&gt;</code>. Every
+            call it makes appears here as a row.
+          </p>
         </div>
       ) : (
-        <ul className="divide-y divide-ink-800/60">
+        <ul>
           {rows.map((row) => {
             const isSelected = selectedKey === row.key;
+            const isHeld = row.status === "awaiting_approval";
+            const bg = isHeld ? "bg-yellow" : isSelected ? "bg-yellow-soft" : "hover:bg-paper";
+            const recede = holding && !isHeld && !isSelected ? "row-recede" : "";
+            const strong = row.kind === "tool";
+            const refused = row.status === "blocked" || row.status === "rejected";
             return (
-              <li key={row.key}>
+              <li key={row.key} className="border-b border-rule">
                 <button
                   onClick={() => onSelect(row.key)}
-                  className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-all ${
-                    isSelected
-                      ? "bg-accent/10 border-l-2 border-accent pl-[14px]"
-                      : "hover:bg-ink-850/80"
+                  aria-current={isSelected ? "true" : undefined}
+                  className={`grid w-full ${COLS} items-center gap-x-3 px-4 py-2 text-left ${bg} ${recede} ${
+                    isHeld && isSelected ? "outline-2 -outline-offset-2 outline-ink" : ""
                   }`}
                 >
+                  <span className="fig text-[13px] text-ink-2">{formatTime(row.startedAt)}</span>
                   <StatusIcon status={row.status} />
-                  <KindIcon kind={row.kind} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className={`truncate font-mono text-xs font-medium ${isSelected ? "text-accent" : "text-ink-100"}`}>
-                        {row.title}
-                      </span>
-                      {row.risk !== "none" && (
-                        <span className={`rounded border px-1.5 py-0.2 text-[9px] font-semibold uppercase tracking-wider ${RISK_STYLE[row.risk]}`}>
-                          {row.risk}
-                        </span>
-                      )}
-                    </div>
+                  <span className="min-w-0">
+                    <span
+                      className={`block truncate text-sm ${
+                        strong ? "font-semibold text-ink" : row.kind === "session" ? "text-ink-3" : "text-ink-2"
+                      } ${refused ? "line-through decoration-signal decoration-2" : ""}`}
+                    >
+                      {row.title}
+                    </span>
                     {row.subtitle && (
-                      <div className="truncate text-[11px] text-ink-400 mt-0.5">{row.subtitle}</div>
+                      <span className="block truncate font-mono text-xs text-ink-2">{row.subtitle}</span>
                     )}
-                  </div>
-
-                  <div className="flex flex-col items-end gap-1 shrink-0 font-mono text-[10px]">
-                    {row.durationMs !== undefined && (
-                      <span className="rounded bg-ink-800 px-1.5 py-0.5 text-ink-300">
-                        {row.durationMs}ms
-                      </span>
+                  </span>
+                  <span className="hidden min-w-0 items-center justify-end gap-2 sm:flex">
+                    {row.request?.rule && (
+                      <span className="min-w-0 truncate font-mono text-xs text-ink-2">{row.request.rule}</span>
                     )}
-                    <span className="text-ink-500">{formatTime(row.startedAt)}</span>
-                  </div>
+                    <RiskChip risk={row.risk} />
+                  </span>
+                  <span className="fig text-right text-[13px] text-ink-2">
+                    {row.durationMs !== undefined ? formatDuration(row.durationMs) : ""}
+                  </span>
                 </button>
               </li>
             );
