@@ -90,8 +90,10 @@ export function buildRows(events: SentinelEvent[]): Row[] {
         if (row) {
           row.response = e;
           row.status = e.status;
-          // The server omits 0; a matched response always has a duration.
-          row.durationMs = e.durationMs ?? 0;
+          // The server omits 0, so a real response without the field took
+          // under 1 ms. Blocked/rejected answers are synthesised by Sentinel:
+          // no tool ran, so there is no duration to show.
+          row.durationMs = e.status === "blocked" || e.status === "rejected" ? undefined : (e.durationMs ?? 0);
           if (e.risk !== "none") row.risk = e.risk;
           open.delete(e.rpcId!);
         } else {

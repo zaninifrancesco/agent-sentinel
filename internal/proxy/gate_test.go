@@ -191,12 +191,17 @@ func TestGateApprovalRejected(t *testing.T) {
 
 func TestGateApprovalTimeoutFailsClosed(t *testing.T) {
 	p := &StdioProxy{Policy: newEngine(t), Approvals: policy.NewBroker(), ApprovalTimeout: 80 * time.Millisecond}
+	var resp recorder.Event
 	out := runGate(t, p, func(rec *recorder.Recorder, w io.Writer) {
 		io.WriteString(w, call(5, "shell", "sudo rm file"))
-		waitFor(t, rec, "response 5", responseTo(rec, "5"))
+		resp = waitFor(t, rec, "response 5", responseTo(rec, "5"))
 	})
 	if strings.Contains(out, "SERVER-RAN") || !strings.Contains(out, "No human approved") {
 		t.Fatalf("timeout must refuse the call: %q", out)
+	}
+	// The wait for the human is not tool latency: nothing ran, so no duration.
+	if resp.DurationMs != 0 {
+		t.Fatalf("a refused call must not report the approval wait as duration, got %dms", resp.DurationMs)
 	}
 }
 

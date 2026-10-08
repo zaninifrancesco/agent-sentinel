@@ -194,6 +194,9 @@ func (g *Gate) deny(msg *protocol.Message, frame []byte, tool string, res policy
 
 // reply sends a synthetic tool result (isError) to the agent and records it.
 // The text is what the model reads, so it says what happened and why.
+//
+// No DurationMs is recorded: no tool ran, and the time a call spent waiting
+// for a human (up to the approval timeout) is not tool latency.
 func (g *Gate) reply(req recorder.Event, status recorder.Status, text string) {
 	result, _ := json.Marshal(protocol.CallToolResult{
 		Content: []protocol.Content{{Type: "text", Text: text}},
@@ -205,18 +208,17 @@ func (g *Gate) reply(req recorder.Event, status recorder.Status, text string) {
 	payload, _ := out.Marshal()
 
 	g.rec.Record(recorder.Event{
-		Type:       recorder.EventToolCallResponse,
-		Direction:  recorder.ServerToClient,
-		Method:     req.Method,
-		ToolName:   req.ToolName,
-		RPCID:      req.RPCID,
-		Risk:       req.Risk,
-		Status:     status,
-		Decision:   req.Decision,
-		Rule:       req.Rule,
-		Reason:     req.Reason,
-		DurationMs: time.Since(req.Timestamp).Milliseconds(),
-		Payload:    payload,
+		Type:      recorder.EventToolCallResponse,
+		Direction: recorder.ServerToClient,
+		Method:    req.Method,
+		ToolName:  req.ToolName,
+		RPCID:     req.RPCID,
+		Risk:      req.Risk,
+		Status:    status,
+		Decision:  req.Decision,
+		Rule:      req.Rule,
+		Reason:    req.Reason,
+		Payload:   payload,
 	})
 	_, _ = g.toClient.Write(append(payload, '\n'))
 }
