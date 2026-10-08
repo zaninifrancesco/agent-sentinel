@@ -56,6 +56,9 @@ type Config struct {
 	MaxTokens  int64   `json:"maxTokens"`
 	Policy     string  `json:"policy"`    // "default", a file path or "off"
 	Approvals  bool    `json:"approvals"` // can this session approve held calls?
+	// ApprovalTimeoutSec is how long a held call waits before it is refused;
+	// the cockpit draws its countdown from it. 0 when nothing can be held.
+	ApprovalTimeoutSec int `json:"approvalTimeoutSec"`
 }
 
 func New(rec *recorder.Recorder, assets fs.FS) *Server {

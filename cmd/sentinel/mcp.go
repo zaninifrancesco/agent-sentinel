@@ -79,7 +79,11 @@ func runMCP(args []string) int {
 	var broker *policy.Broker
 	if *withUI {
 		broker = policy.NewBroker()
-		cfg := serverpkg.Config{Policy: policyName}
+		wait := *approvalTimeout
+		if wait <= 0 {
+			wait = proxy.DefaultApprovalTimeout // the proxy applies the same fallback
+		}
+		cfg := serverpkg.Config{Policy: policyName, ApprovalTimeoutSec: int(wait.Seconds())}
 		if budget != nil {
 			cfg.MaxCostUSD = budget.MaxCostUSD()
 		}
