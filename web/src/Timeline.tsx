@@ -123,7 +123,7 @@ export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
           {rows.map((row) => {
             const isSelected = selectedKey === row.key;
             const isHeld = row.status === "awaiting_approval";
-            const bg = isHeld ? "bg-yellow" : isSelected ? "bg-yellow-soft" : "hover:bg-paper";
+            const bg = isHeld ? "light-scope bg-yellow text-ink" : isSelected ? "bg-yellow-soft" : "hover:bg-paper";
             const recede = holding && !isHeld && !isSelected ? "row-recede" : "";
             const strong = row.kind === "tool";
             const refused = row.status === "blocked" || row.status === "rejected";

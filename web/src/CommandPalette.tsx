@@ -122,7 +122,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-ink/40 pt-24">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#15140f]/60 pt-24">
       <div
         className="w-full max-w-xl overflow-hidden rounded-sm border border-rule-strong bg-sheet"
         onClick={(e) => e.stopPropagation()}
@@ -164,7 +164,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left ${
                       idx === selectedIndex
-                        ? "bg-yellow text-ink"
+                        ? "light-scope bg-yellow text-ink"
                         : "text-ink-2 hover:bg-paper"
                     }`}
                   >

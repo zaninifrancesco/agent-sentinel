@@ -1,7 +1,8 @@
 import { useMemo, useState, useEffect } from "react";
-import { Download, Search } from "lucide-react";
+import { Download, Moon, Search, Sun } from "lucide-react";
 import { useSentinel, type Connection } from "./useSentinel";
 import { useConfig } from "./useConfig";
+import { useTheme } from "./theme";
 import { Timeline } from "./Timeline";
 import { Detail } from "./Detail";
 import { CommandPalette } from "./CommandPalette";
@@ -39,6 +40,7 @@ function matches(row: Row, f: Filter): boolean {
 export default function App() {
   const { session, rows, connection } = useSentinel();
   const config = useConfig();
+  const [theme, toggleTheme] = useTheme();
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
@@ -115,7 +117,7 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col bg-paper text-ink">
-      <header className="flex items-center gap-4 bg-ink px-4 py-2.5 text-white sm:gap-6 sm:px-6">
+      <header className="light-scope flex items-center gap-4 bg-ink px-4 py-2.5 text-white sm:gap-6 sm:px-6">
         <span className="whitespace-nowrap text-base font-bold tracking-tight">Agent Sentinel</span>
 
         <ConnectionBadge state={connection} />
@@ -140,6 +142,14 @@ export default function App() {
             <Search className="size-3.5" />
             <span className="hidden sm:inline">Search events</span>
             <kbd className="font-mono text-[11px] text-rule-strong">⌘K</kbd>
+          </button>
+          <button
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+            title={theme === "dark" ? "Light theme" : "Dark theme"}
+            className="flex items-center rounded-sm border border-ink-3 p-1.5 text-rule hover:border-white hover:text-white"
+          >
+            {theme === "dark" ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
           </button>
           <button
             onClick={() => setIsExportModalOpen(true)}

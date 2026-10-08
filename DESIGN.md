@@ -96,7 +96,7 @@ The cockpit is a departure board for an agent's actions. A developer glances at 
 The signature is the station clock in the approval dock. When a call is held for a human decision, its red second hand makes one full turn over the approval timeout and the remaining time is written beside it. Everything else steps back while a call waits, so the eye lands on the yellow row and the clock.
 
 **Key Characteristics:**
-- Light, warm-white ground with ink-black type; one yellow that means "this is the held or selected row".
+- Light by default with a warm dark variant; one yellow that means "this is the held or selected row".
 - Red is reserved for what needs the human or was refused.
 - Square corners, hairline rules, no shadows; hierarchy by weight and position.
 - Dense but ruled: rows are tables, not cards.
@@ -120,7 +120,11 @@ A paper-and-ink palette with two signal colours, each with exactly one job.
 - **Rule / Rule Strong** (#d9d5c7 / #b3ae9c): row hairlines and pane dividers.
 - **Go Green** (#1b7040) and **Amber Ink** (#9a4d00): completed check marks and tool errors; diff additions sit on its soft tint (#e1f0e5).
 
+### Dark variant
+The same timetable after dark, chosen by the switch in the top bar (first visit follows the system). Ground is a warm near-black, not blue slate: paper (#12110b), sheet (#1a1912), rules (#2b2920 / #4a4637), ink (#efede3 / #c4c0b0 / #8f8b7b), selected row (#3b3310). Yellow is unchanged. Red lifts to #ec2c43, green to #4cc38a, amber to #f0a040 so they still read on dark. The frontmatter tokens above are the light values; the dark values live in `web/src/index.css` under `data-theme="dark"`.
+
 ### Named Rules
+**The Light-Scope Rule.** The top bar, the held row and the approval dock always use the light palette, in both themes, so ink stays dark on yellow. They are marked with the `light-scope` class, which resets the colour tokens for their subtree.
 **The One Reserved Colour Rule.** Red appears only where the human must look or something was refused. If red is on screen, something needs attention.
 **The Dim-the-Rest Rule.** While any call awaits approval, every other row recedes to 60% opacity; hover and focus restore it.
 

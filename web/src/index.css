@@ -38,6 +38,47 @@
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
 }
 
+/* Dark variant: the same timetable after dark. Warm near-black ground (not
+   blue slate), paper-coloured ink, the same yellow. Red is lifted a little so
+   it still reads on a dark ground. Chosen by the switch in the top bar;
+   first visit follows the system. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-paper: #12110b;
+  --color-sheet: #1a1912;
+  --color-rule: #2b2920;
+  --color-rule-strong: #4a4637;
+  --color-ink: #efede3;
+  --color-ink-2: #c4c0b0;
+  --color-ink-3: #8f8b7b;
+  --color-yellow-soft: #3b3310;
+  --color-signal: #ec2c43;
+  --color-signal-soft: #3a1419;
+  --color-ok: #4cc38a;
+  --color-ok-soft: #12301f;
+  --color-warn: #f0a040;
+}
+
+/* Surfaces that are always light-on-dark or dark-on-yellow (top bar, the held
+   row, the approval dock) take the light palette in both themes, so ink on
+   yellow stays ink. */
+.light-scope {
+  color-scheme: light;
+  --color-paper: #f4f2ea;
+  --color-sheet: #fbfaf5;
+  --color-rule: #d9d5c7;
+  --color-rule-strong: #b3ae9c;
+  --color-ink: #15140f;
+  --color-ink-2: #46433a;
+  --color-ink-3: #6b675b;
+  --color-yellow-soft: #fff0a3;
+  --color-signal: #d5001c;
+  --color-signal-soft: #fbe4e4;
+  --color-ok: #1b7040;
+  --color-ok-soft: #e1f0e5;
+  --color-warn: #9a4d00;
+}
+
 html,
 body,
 #root {
@@ -46,6 +87,9 @@ body,
 
 html {
   color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
@@ -69,7 +113,7 @@ body {
 /* Browser surfaces carry the design too. */
 ::selection {
   background: var(--color-yellow);
-  color: var(--color-ink);
+  color: #15140f;
 }
 input,
 textarea {

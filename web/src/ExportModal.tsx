@@ -111,7 +111,7 @@ export function ExportModal({ isOpen, onClose, session, rows }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#15140f]/60 p-4">
       <div className="w-full max-w-lg overflow-hidden rounded-sm border border-rule-strong bg-sheet">
         <div className="flex items-center justify-between border-b border-rule-strong bg-paper px-5 py-4">
           <div className="flex items-center gap-2">
@@ -156,7 +156,7 @@ export function ExportModal({ isOpen, onClose, session, rows }: Props) {
 
           <button
             onClick={handleDownload}
-            className="flex items-center gap-1.5 rounded-sm border-2 border-ink bg-ink px-4 py-1.5 text-xs font-semibold text-white hover:bg-ink-2"
+            className="flex items-center gap-1.5 rounded-sm border-2 border-ink bg-ink px-4 py-1.5 text-xs font-semibold text-sheet hover:bg-ink-2"
           >
             <Download className="size-3.5" />
             <span>Download .html</span>

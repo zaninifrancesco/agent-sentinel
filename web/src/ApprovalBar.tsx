@@ -68,7 +68,7 @@ export function ApprovalBar({ pendingRow, more, busy, error, timeoutSec, onAppro
   return (
     <section
       aria-label="A call is waiting for your decision"
-      className="shrink-0 border-t-2 border-ink bg-yellow px-6 py-3"
+      className="light-scope shrink-0 text-ink border-t-2 border-ink bg-yellow px-6 py-3"
     >
       <div className="mx-auto grid max-w-5xl grid-cols-[auto_minmax(0,1fr)] items-center gap-x-5 gap-y-3 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
         <StationClock turn={turn} left={left} />
