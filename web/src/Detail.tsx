@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { Row, SentinelEvent } from "./types";
 import { StatusIcon, formatTime } from "./Timeline";
-import { DiffViewer, isDiff } from "./DiffViewer";
+import { DiffViewer, diffFilename, extractDiff, isDiff } from "./DiffViewer";
 import { Copy, Check, Code, FileText, Layers, ShieldCheck, AlertCircle } from "lucide-react";
 
 export function Detail({ row }: { row: Row | null }) {
@@ -25,9 +25,15 @@ export function Detail({ row }: { row: Row | null }) {
   if (row.response) blocks.push({ label: "Response", event: row.response });
   if (row.event) blocks.push({ label: "Payload", event: row.event });
 
-  // Detect if any payload contains a diff/patch
-  const rawPayloadText = blocks.map((b) => extractStringContent(b.event.payload)).join("\n");
-  const hasDiffContent = isDiff(rawPayloadText);
+  // Look for a real patch in the text a tool produced or was given, not in
+  // the JSON-RPC envelope around it.
+  let diffText: string | null = null;
+  for (const { event } of blocks) {
+    for (const candidate of textCandidates(event.payload)) {
+      if (diffText === null && isDiff(candidate)) diffText = extractDiff(candidate);
+    }
+  }
+  const hasDiffContent = diffText !== null;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(JSON.stringify(row, null, 2));
@@ -132,8 +138,8 @@ export function Detail({ row }: { row: Row | null }) {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-5">
-        {activeTab === "diff" && hasDiffContent ? (
-          <DiffViewer text={rawPayloadText} />
+        {activeTab === "diff" && diffText ? (
+          <DiffViewer text={diffText} filename={diffFilename(diffText)} />
         ) : activeTab === "raw" ? (
           <pre className="overflow-x-auto rounded-xl border border-ink-800 bg-ink-900 p-4 font-mono text-xs leading-relaxed text-ink-200">
             {JSON.stringify(row, null, 2)}
@@ -167,17 +173,31 @@ export function Detail({ row }: { row: Row | null }) {
   );
 }
 
-function extractStringContent(payload: unknown): string {
-  if (typeof payload === "string") return payload;
-  if (!payload || typeof payload !== "object") return "";
-  const obj = payload as Record<string, unknown>;
-  if (obj.result && typeof obj.result === "object") {
-    const res = obj.result as Record<string, unknown>;
-    if (Array.isArray(res.content)) {
-      return res.content.map((c) => (typeof c === "object" && c && "text" in c ? String((c as { text: unknown }).text) : "")).join("\n");
+/** Free-text strings of a JSON-RPC frame: tool result texts and call arguments. */
+function textCandidates(payload: unknown): string[] {
+  if (typeof payload === "string") return [payload];
+  if (!payload || typeof payload !== "object") return [];
+  const obj = payload as {
+    result?: { content?: unknown };
+    params?: { arguments?: unknown };
+  };
+  const out: string[] = [];
+  const content = obj.result?.content;
+  if (Array.isArray(content)) {
+    for (const c of content) {
+      if (c && typeof c === "object" && typeof (c as { text?: unknown }).text === "string") {
+        out.push((c as { text: string }).text);
+      }
     }
   }
-  return JSON.stringify(payload);
+  collectStrings(obj.params?.arguments, out);
+  return out;
+}
+
+function collectStrings(v: unknown, out: string[]): void {
+  if (typeof v === "string") out.push(v);
+  else if (Array.isArray(v)) v.forEach((x) => collectStrings(x, out));
+  else if (v && typeof v === "object") Object.values(v).forEach((x) => collectStrings(x, out));
 }
 
 function pretty(payload: unknown): string {

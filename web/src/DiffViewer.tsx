@@ -13,45 +13,69 @@ interface DiffLine {
   content: string;
 }
 
+// A unified diff starts with one of these lines. Anything weaker (a line that
+// merely begins with "-" or "+", a markdown "- item", a "--- " rule) is NOT a diff.
+const HUNK_RE = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
+const DIFF_START_RE = /^(diff --git |@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@|--- \S.*\n\+\+\+ \S)/m;
+
+/** True only when the text contains a real unified diff / git patch. */
 export function isDiff(text: string): boolean {
-  if (!text || typeof text !== "string") return false;
-  return (
-    text.includes("--- ") ||
-    text.includes("+++ ") ||
-    text.includes("@@ -") ||
-    /^[+-][^+-]/m.test(text)
-  );
+  return typeof text === "string" && DIFF_START_RE.test(text);
 }
+
+/**
+ * Returns just the patch inside `text` (dropping any prose or JSON before it),
+ * or null if there is none.
+ */
+export function extractDiff(text: string): string | null {
+  if (typeof text !== "string") return null;
+  const m = DIFF_START_RE.exec(text);
+  if (!m) return null;
+  return text.slice(m.index).replace(/\s+$/, "") + "\n";
+}
+
+/** File name from the `+++ b/path` header, if present. */
+export function diffFilename(text: string): string | undefined {
+  const m = /^\+\+\+ (?:b\/)?(\S+)/m.exec(text);
+  return m && m[1] !== "/dev/null" ? m[1] : undefined;
+}
+
+const META_RE = /^(diff |index |new file mode|deleted file mode|old mode|new mode|similarity index|rename |copy |Binary files)/;
 
 export function parseDiff(text: string): DiffLine[] {
   const lines = text.split("\n");
+  if (lines[lines.length - 1] === "") lines.pop(); // trailing newline is not a line
   const result: DiffLine[] = [];
   let oldLine = 1;
   let newLine = 1;
+  // Lines still expected in the current hunk. While > 0 a line starting with
+  // "---"/"+++" is content (e.g. a removed SQL comment), not a file header.
+  let oldLeft = 0;
+  let newLeft = 0;
 
   for (const line of lines) {
-    if (line.startsWith("@@")) {
-      // Chunk header e.g. @@ -1,5 +1,6 @@
-      const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-      if (match) {
-        oldLine = parseInt(match[1], 10);
-        newLine = parseInt(match[2], 10);
-      }
+    const hunk = HUNK_RE.exec(line);
+    if (hunk) {
+      oldLine = parseInt(hunk[1], 10);
+      newLine = parseInt(hunk[3], 10);
+      oldLeft = hunk[2] === undefined ? 1 : parseInt(hunk[2], 10);
+      newLeft = hunk[4] === undefined ? 1 : parseInt(hunk[4], 10);
       result.push({ type: "header", content: line });
-    } else if (line.startsWith("---") || line.startsWith("+++")) {
+      continue;
+    }
+
+    const inHunk = oldLeft > 0 || newLeft > 0;
+    if (!inHunk && (META_RE.test(line) || line.startsWith("--- ") || line.startsWith("+++ "))) {
+      result.push({ type: "header", content: line });
+    } else if (line.startsWith("\\")) {
+      // "\ No newline at end of file"
       result.push({ type: "header", content: line });
     } else if (line.startsWith("+")) {
-      result.push({
-        type: "add",
-        newLineNumber: newLine++,
-        content: line.slice(1),
-      });
+      result.push({ type: "add", newLineNumber: newLine++, content: line.slice(1) });
+      newLeft--;
     } else if (line.startsWith("-")) {
-      result.push({
-        type: "del",
-        oldLineNumber: oldLine++,
-        content: line.slice(1),
-      });
+      result.push({ type: "del", oldLineNumber: oldLine++, content: line.slice(1) });
+      oldLeft--;
     } else {
       result.push({
         type: "normal",
@@ -59,6 +83,8 @@ export function parseDiff(text: string): DiffLine[] {
         newLineNumber: newLine++,
         content: line.startsWith(" ") ? line.slice(1) : line,
       });
+      oldLeft--;
+      newLeft--;
     }
   }
 
