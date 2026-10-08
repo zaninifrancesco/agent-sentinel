@@ -63,18 +63,19 @@ For the full architectural breakdown, threat model, and event schema, see the [A
 ## 💻 CLI Usage Preview
 
 ```bash
-# Supervise an agent run with live cockpit
-sentinel run claude
+# Supervise the Cursor agent: shell commands, MCP calls and file edits.
+sentinel hook install     # adds Sentinel to .cursor/hooks.json (other hooks stay)
+sentinel serve --open     # cockpit + policy + budget; Cursor waits for your verdict
 
-# Run as an MCP proxy middleware for Cursor / Claude Desktop
-sentinel mcp --port 8848
+# Put Sentinel in front of one MCP server (Cursor, Claude Desktop, ...)
+sentinel mcp --ui -- npx -y @modelcontextprotocol/server-filesystem .
 
-# Open cockpit to inspect past sessions
+# Replay a recorded session
 sentinel ui
-
-# Export the latest session as an audit report
-sentinel export --format html -o ./audit-report.html
 ```
+
+The audit report is exported from the cockpit (Export). `sentinel export` and
+`sentinel run` (a PTY wrapper for terminal agents) are planned, not built yet.
 
 ---
 

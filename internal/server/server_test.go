@@ -293,3 +293,64 @@ func TestBudgetEndpointWithoutBudget(t *testing.T) {
 		t.Fatalf("a replayed session must not accept budget changes, got %d", resp.StatusCode)
 	}
 }
+
+func TestHookEndpointDefences(t *testing.T) {
+	calls := 0
+	srv := New(recorder.New(nil, nil), nil)
+	srv.Hook = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		w.Write([]byte(`{"permission":"allow"}`))
+	})
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	post := func(contentType, origin, host string) int {
+		req, _ := http.NewRequest("POST", ts.URL+"/api/hook", strings.NewReader(`{"hook_event_name":"beforeShellExecution"}`))
+		if contentType != "" {
+			req.Header.Set("Content-Type", contentType)
+		}
+		if origin != "" {
+			req.Header.Set("Origin", origin)
+		}
+		if host != "" {
+			req.Host = host
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	for name, code := range map[string]int{
+		"foreign origin":  post("application/json", "https://evil.example", ""),
+		"form content":    post("text/plain", "", ""),
+		"no content type": post("", "", ""),
+		"rebinding host":  post("application/json", "", "evil.example:8848"),
+	} {
+		if code < 400 {
+			t.Errorf("%s was accepted (%d)", name, code)
+		}
+	}
+	if calls != 0 {
+		t.Fatalf("a refused request reached the hook handler %d times", calls)
+	}
+	// `sentinel hook` is not a browser: no Origin, JSON content type.
+	if code := post("application/json", "", ""); code != http.StatusOK || calls != 1 {
+		t.Fatalf("legit hook got %d (handler calls: %d)", code, calls)
+	}
+}
+
+func TestHookEndpointWithoutHandler(t *testing.T) {
+	ts := httptest.NewServer(New(recorder.New(nil, nil), nil).Handler())
+	defer ts.Close()
+	resp, err := http.Post(ts.URL+"/api/hook", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("got %d, want 404", resp.StatusCode)
+	}
+}

@@ -114,8 +114,9 @@ export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
         <div className="px-4 py-10 text-sm text-ink-2">
           <p className="font-semibold text-ink">No calls yet</p>
           <p className="mt-1 max-w-sm text-ink-2">
-            Start your agent through <code className="font-mono text-xs">sentinel mcp -- &lt;server&gt;</code>. Every
-            call it makes appears here as a row.
+            Put an MCP server behind <code className="font-mono text-xs">sentinel mcp -- &lt;server&gt;</code>, or let
+            Cursor report here with <code className="font-mono text-xs">sentinel hook install</code>. Every call
+            appears as a row.
           </p>
         </div>
       ) : (

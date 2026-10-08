@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 )
@@ -36,16 +35,15 @@ func main() {
 		os.Exit(runMCP(os.Args[2:]))
 	case "ui":
 		os.Exit(runUI(os.Args[2:]))
+	case "serve":
+		os.Exit(runServe(os.Args[2:]))
+	case "hook":
+		os.Exit(runHook(os.Args[2:]))
 	case "run":
-		runCmd := flag.NewFlagSet("run", flag.ExitOnError)
-		runCmd.Parse(os.Args[2:])
-		targetArgs := runCmd.Args()
-		if len(targetArgs) == 0 {
-			fmt.Println("Error: specify a command to supervise (e.g., sentinel run claude)")
-			os.Exit(1)
-		}
-		fmt.Printf("Supervising command: %v\n", targetArgs)
-		// Milestone 1: PTY runner will be attached here
+		// The PTY wrapper is not built yet. Say so instead of pretending.
+		fmt.Fprintln(os.Stderr, "sentinel run is not implemented yet.")
+		fmt.Fprintln(os.Stderr, "To supervise the Cursor agent: `sentinel hook install`, then `sentinel serve`.")
+		os.Exit(2)
 	default:
 		fmt.Printf("Unknown command: %s\n\n", command)
 		printHelp()
@@ -57,7 +55,13 @@ func printHelp() {
 	fmt.Print(Banner)
 	fmt.Printf("Agent Sentinel v%s\n\n", Version)
 	fmt.Println("Usage:")
-	fmt.Println("  sentinel run <agent-command>  Supervise an AI coding agent process (e.g. sentinel run claude)")
+	fmt.Println("  sentinel serve [--port N] [--policy FILE|off] [--max-cost USD]")
+	fmt.Println("                                Run the cockpit for the Cursor agent: Cursor hooks report here and")
+	fmt.Println("                                wait for the verdict (policy, budget, your approval)")
+	fmt.Println("  sentinel hook install [--user] [--mcp] [--dry-run]")
+	fmt.Println("                                Add Sentinel to Cursor's hooks.json (uninstall removes it again)")
+	fmt.Println("  sentinel hook                 What Cursor runs per agent step (reads JSON on stdin)")
+	fmt.Println("  sentinel run <agent-command>  Not implemented yet (PTY wrapper)")
 	fmt.Println("  sentinel mcp [--ui] [--port N] [--log FILE|-] -- <server-cmd> [args]")
 	fmt.Println("                                Wrap an MCP stdio server, recording every JSON-RPC frame")
 	fmt.Println("                                and enforcing the policy (block / ask a human / warn):")

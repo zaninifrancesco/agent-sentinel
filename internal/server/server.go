@@ -48,6 +48,10 @@ type Server struct {
 	// replaying a recorded session: there is nothing left to approve.
 	Approvals *policy.Broker
 
+	// Hook receives Cursor hook events (POST /api/hook) and answers with the
+	// permission Cursor should apply. Nil when no hook integration is served.
+	Hook http.Handler
+
 	// Budget is the session's spending circuit breaker. When set, the cockpit
 	// can read and change its limits; /api/config reports the live values.
 	// Nil when replaying a recorded session.
@@ -85,6 +89,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/config", s.handleConfig)
 	mux.HandleFunc("POST /api/approvals/{seq}", s.handleApproval)
 	mux.HandleFunc("POST /api/budget", s.handleBudget)
+	mux.HandleFunc("POST /api/hook", s.handleHook)
 	mux.HandleFunc("GET /ws", s.handleWS)
 	mux.Handle("/", s.spa())
 	return s.loopbackOnly(mux)
@@ -180,6 +185,22 @@ func (s *Server) guardMutation(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	return true
+}
+
+// handleHook passes a Cursor hook event to the hook handler. A hook decides
+// whether the agent may run a command, so it gets the defences of an approval:
+// loopback Host, no foreign Origin, JSON content type. The client is
+// `sentinel hook`, which sends none of the browser headers.
+func (s *Server) handleHook(w http.ResponseWriter, r *http.Request) {
+	if s.Hook == nil {
+		http.Error(w, "this session serves no hooks", http.StatusNotFound)
+		return
+	}
+	if !s.guardMutation(w, r) {
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 8<<20)
+	s.Hook.ServeHTTP(w, r)
 }
 
 type budgetRequest struct {

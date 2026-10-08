@@ -90,7 +90,7 @@ func runMCP(args []string) int {
 			budget = policy.NewBudget(0, 0)
 		}
 		cfg := serverpkg.Config{Policy: policyName, ApprovalTimeoutSec: int(wait.Seconds())}
-		url, err := startCockpit(ctx, rec, *port, *dev, broker, budget, cfg)
+		url, err := startCockpit(ctx, rec, *port, *dev, broker, budget, nil, cfg)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
 			return 1

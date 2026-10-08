@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -25,7 +26,7 @@ import (
 //
 // With dev=true the Vite dev server origin may also open the WebSocket, so
 // `npm run dev` (hot reload) can talk to a real Sentinel.
-func startCockpit(ctx context.Context, rec *recorder.Recorder, port int, dev bool, broker *policy.Broker, budget *policy.Budget, cfg server.Config) (string, error) {
+func startCockpit(ctx context.Context, rec *recorder.Recorder, port int, dev bool, broker *policy.Broker, budget *policy.Budget, hook http.Handler, cfg server.Config) (string, error) {
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
 		return "", fmt.Errorf("cannot listen on port %d (use --port): %w", port, err)
@@ -33,6 +34,7 @@ func startCockpit(ctx context.Context, rec *recorder.Recorder, port int, dev boo
 	srv := server.New(rec, ui.Assets())
 	srv.Approvals = broker
 	srv.Budget = budget
+	srv.Hook = hook
 	srv.Config = cfg
 	if dev {
 		srv.AllowedOrigins = server.DevOrigins
@@ -83,7 +85,7 @@ func runUI(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	url, err := startCockpit(ctx, rec, *port, *dev, nil, nil, server.Config{Policy: "replay"})
+	url, err := startCockpit(ctx, rec, *port, *dev, nil, nil, nil, server.Config{Policy: "replay"})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "sentinel ui: %v\n", err)
 		return 1

@@ -33,6 +33,7 @@ It is on the wire, not beside it: because it proxies the protocol it can stop a 
 
 - Timeline of events (tool calls merged with their responses, notifications, raw output), a detail panel with payload, raw JSON and a visual diff when a patch is present, a metrics bar, a command palette, an approval dock.
 - Policy verdicts shown per call: rule id, reason, risk level (none to critical), decision (allow, warn, approve, block) and the human verdict.
+- The Cursor agent is supervised through Cursor's hooks: `sentinel serve` runs the cockpit and `sentinel hook` (installed with `sentinel hook install`) reports each shell command, MCP call and file edit to it. A shell or MCP call is judged by the same policy and budget as an MCP proxy call and can be held for approval; a file edit is recorded with its diff and can only be flagged, because it has already happened. If Sentinel is not running the hook answers "ask", so Cursor asks the user instead of silently allowing.
 - The session budget (cost and token limits) can be set, raised or removed from the cockpit's status strip while a session is live. Every change is written to the session log as a "Budget changed" row, so the audit shows who moved the ceiling and from what.
 - Cost and tokens are estimates from tool traffic size only (the proxy cannot see the LLM API); the UI must label them as estimates.
 - The UI is a React + Vite + Tailwind SPA built into `internal/ui/dist` and embedded in the Go binary with `go:embed`. It must work offline, with no CDN assets or external fonts.
