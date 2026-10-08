@@ -9,6 +9,7 @@ import {
   Download,
 } from "lucide-react";
 import { useSentinel, type Connection } from "./useSentinel";
+import { useConfig } from "./useConfig";
 import { Timeline } from "./Timeline";
 import { Detail } from "./Detail";
 import { CommandPalette } from "./CommandPalette";
@@ -45,6 +46,9 @@ function matches(row: Row, f: Filter): boolean {
 
 export default function App() {
   const { session, rows, connection } = useSentinel();
+  const config = useConfig();
+  const [approvalBusy, setApprovalBusy] = useState(false);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -77,15 +81,14 @@ export default function App() {
 
   const selected = rows.find((r) => r.key === selectedKey) ?? null;
 
-  // Human-in-the-Loop: only a still-open, high-risk call in a LIVE session needs
-  // a decision. Every call is "pending" while it is in flight, and a finished
-  // (replayed) session has nothing left to approve.
-  const pendingRow = useMemo(() => {
-    if (connection !== "live") return null;
-    return (
-      rows.find((r) => r.status === "pending" && (r.risk === "high" || r.risk === "critical")) ?? null
-    );
-  }, [rows, connection]);
+  // Human-in-the-Loop: the proxy itself holds a call and marks it
+  // "awaiting_approval"; the cockpit only has to show those, oldest first.
+  // A finished (replayed) session has nothing left to approve.
+  const awaiting = useMemo(
+    () => (connection === "live" && config.approvals ? rows.filter((r) => r.status === "awaiting_approval") : []),
+    [rows, connection, config.approvals]
+  );
+  const pendingRow = awaiting[0] ?? null;
 
   const stats = useMemo(() => {
     const tools = rows.filter((r) => r.kind === "tool");
@@ -98,20 +101,34 @@ export default function App() {
       errors: rows.filter(
         (r) => r.status === "error" || r.status === "blocked"
       ).length,
-      pending: rows.filter((r) => r.status === "pending").length,
+      pending: rows.filter((r) => r.status === "pending" || r.status === "awaiting_approval").length,
       avg: Math.round(avg),
     };
   }, [rows]);
 
-  const handleApprove = (key: string, feedback?: string) => {
-    console.log("Approved action:", key, "with feedback:", feedback);
-    // In live mode with backend approval hook, sends POST to /api/approve
+  const decide = async (row: Row, approved: boolean, feedback?: string) => {
+    if (!row.request) return;
+    setApprovalBusy(true);
+    setApprovalError(null);
+    try {
+      const res = await fetch(`/api/approvals/${row.request.seq}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approved, feedback: feedback ?? "" }),
+      });
+      // 409 = already settled (timed out or cancelled by the agent): the
+      // timeline updates by itself, so there is nothing to show.
+      if (!res.ok && res.status !== 409) {
+        setApprovalError(`Sentinel refused the answer (${res.status}): ${(await res.text()).trim()}`);
+      }
+    } catch (err) {
+      setApprovalError(`Could not reach Sentinel: ${String(err)}`);
+    } finally {
+      setApprovalBusy(false);
+    }
   };
-
-  const handleBlock = (key: string) => {
-    console.log("Blocked action:", key);
-    // In live mode with backend approval hook, sends POST to /api/block
-  };
+  const handleApprove = (row: Row, feedback?: string) => void decide(row, true, feedback);
+  const handleBlock = (row: Row, feedback?: string) => void decide(row, false, feedback);
 
   return (
     <div className="flex h-full flex-col bg-ink-950 text-ink-100 select-none">
@@ -180,7 +197,7 @@ export default function App() {
       </header>
 
       {/* LLMOps Metrics Bar */}
-      <MetricsBar rows={rows} />
+      <MetricsBar rows={rows} maxCostUsd={config.maxCostUsd} />
 
       {/* Filter Toolbar */}
       <div className="flex items-center gap-1 border-b border-ink-800 bg-ink-900/60 px-5 py-2">
@@ -216,6 +233,9 @@ export default function App() {
       {/* Floating Human-in-the-Loop Approval Bar */}
       <ApprovalBar
         pendingRow={pendingRow}
+        more={Math.max(0, awaiting.length - 1)}
+        busy={approvalBusy}
+        error={approvalError}
         onApprove={handleApprove}
         onBlock={handleBlock}
       />

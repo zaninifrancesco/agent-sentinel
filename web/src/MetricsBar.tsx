@@ -4,9 +4,11 @@ import type { Row } from "./types";
 
 interface Props {
   rows: Row[];
+  /** Session budget in USD from the running Sentinel; 0 = none. */
+  maxCostUsd: number;
 }
 
-export function MetricsBar({ rows }: Props) {
+export function MetricsBar({ rows, maxCostUsd }: Props) {
   const metrics = useMemo(() => {
     const timedRows = rows.filter((r) => r.durationMs !== undefined && r.durationMs > 0);
     const durations = timedRows.map((r) => r.durationMs!);
@@ -34,8 +36,7 @@ export function MetricsBar({ rows }: Props) {
 
     // Stored cost model: ~$3/M in, $15/M out for high-tier models
     const estimatedCost = (estimatedInputTokens / 1_000_000) * 3.0 + (estimatedOutputTokens / 1_000_000) * 15.0;
-    const budgetLimit = 2.0; // $2.00 threshold
-    const budgetPercent = Math.min(100, Math.round((estimatedCost / budgetLimit) * 100));
+    const budgetPercent = maxCostUsd > 0 ? Math.min(100, Math.round((estimatedCost / maxCostUsd) * 100)) : 0;
 
     // Sparkline points
     const recent = timedRows.slice(-15).map((r) => r.durationMs!);
@@ -55,7 +56,7 @@ export function MetricsBar({ rows }: Props) {
       sparkPoints,
       hasRecent: recent.length > 1,
     };
-  }, [rows]);
+  }, [rows, maxCostUsd]);
 
   return (
     <div className="flex items-center gap-6 border-b border-ink-800 bg-ink-950 px-5 py-2 text-xs">
@@ -68,7 +69,7 @@ export function MetricsBar({ rows }: Props) {
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5 font-mono text-[11px]">
             <span className="font-semibold text-ink-100">~${metrics.estimatedCost.toFixed(3)}</span>
-            <span className="text-ink-500">/ $2.00 max</span>
+            <span className="text-ink-500">{maxCostUsd > 0 ? `/ $${maxCostUsd.toFixed(2)} max` : "no budget"}</span>
           </div>
           <div className="mt-0.5 h-1 w-24 overflow-hidden rounded-full bg-ink-800">
             <div

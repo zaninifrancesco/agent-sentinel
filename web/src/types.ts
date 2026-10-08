@@ -8,9 +8,16 @@ export type EventType =
   | "Notification"
   | "ToolCallRequest"
   | "ToolCallResponse"
-  | "RawOutput";
+  | "RawOutput"
+  | "ApprovalResolved";
 
-export type Status = "pending" | "ok" | "error" | "blocked" | "rejected";
+export type Status =
+  | "pending"
+  | "awaiting_approval"
+  | "ok"
+  | "error"
+  | "blocked"
+  | "rejected";
 export type Risk = "none" | "low" | "medium" | "high" | "critical";
 
 export interface SentinelEvent {
@@ -23,6 +30,9 @@ export interface SentinelEvent {
   toolName?: string;
   rpcId?: string;
   risk: Risk;
+  decision?: string; // policy outcome: allow | warn | approve | block (or the human verdict on ApprovalResolved)
+  rule?: string; // id of the rule that fired
+  reason?: string; // why
   status: Status;
   durationMs?: number;
   payload?: unknown;
@@ -51,5 +61,14 @@ export interface Row {
   durationMs?: number;
   request?: SentinelEvent;
   response?: SentinelEvent;
+  resolution?: SentinelEvent; // how a held call was settled (ApprovalResolved)
   event?: SentinelEvent; // standalone
+}
+
+/** Served at /api/config. */
+export interface SentinelConfig {
+  maxCostUsd: number; // 0 = no budget
+  maxTokens: number;
+  policy: string;
+  approvals: boolean; // can this session approve held calls?
 }

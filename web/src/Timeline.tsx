@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { CheckCircle2, CircleDashed, Flag, Radio, Terminal, Wrench, XCircle, Zap, ShieldAlert } from "lucide-react";
+import { CheckCircle2, CircleDashed, Flag, Radio, Terminal, Wrench, XCircle, Zap, ShieldAlert, ShieldQuestion } from "lucide-react";
 import type { Risk, Row, Status } from "./types";
 
 export function formatTime(iso: string): string {
@@ -22,6 +22,8 @@ export function StatusIcon({ status }: { status: Status }) {
       return <CheckCircle2 className="size-4 text-emerald-400 shrink-0" />;
     case "pending":
       return <CircleDashed className="size-4 animate-spin text-amber-400 shrink-0" />;
+    case "awaiting_approval":
+      return <ShieldQuestion className="size-4 animate-pulse text-amber-400 shrink-0" />;
     case "blocked":
     case "rejected":
       return <ShieldAlert className="size-4 text-rose-400 shrink-0" />;

@@ -74,7 +74,7 @@ export function buildRows(events: SentinelEvent[]): Row[] {
           key: `req-${e.seq}`,
           kind: isTool ? "tool" : "rpc",
           title: isTool ? e.toolName || "tools/call" : e.method || "request",
-          subtitle: isTool ? "tools/call" : undefined,
+          subtitle: isTool ? (e.rule ? `policy · ${e.rule}` : "tools/call") : undefined,
           status: e.status,
           risk: e.risk,
           startedAt: e.timestamp,
@@ -105,6 +105,16 @@ export function buildRows(events: SentinelEvent[]): Row[] {
             durationMs: e.durationMs,
             response: e,
           });
+        }
+        break;
+      }
+      case "ApprovalResolved": {
+        // Settles a held call: it either runs now (still "pending" until the
+        // response arrives) or is rejected.
+        const row = e.rpcId ? open.get(e.rpcId) : undefined;
+        if (row) {
+          row.resolution = e;
+          row.status = e.status;
         }
         break;
       }

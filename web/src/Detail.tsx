@@ -97,6 +97,30 @@ export function Detail({ row }: { row: Row | null }) {
           </div>
         </div>
 
+        {/* Policy verdict: what rule fired and what the human decided */}
+        {(row.request?.rule || row.resolution) && (
+          <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/10 p-3 text-xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">Policy</span>
+              {row.request?.rule && (
+                <span className="rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[10px] text-amber-300">
+                  {row.request.rule}
+                </span>
+              )}
+              {row.request?.decision && (
+                <span className="font-mono text-[10px] uppercase text-ink-400">→ {row.request.decision}</span>
+              )}
+            </div>
+            {row.request?.reason && <p className="mt-1.5 break-words text-ink-300">{row.request.reason}</p>}
+            {row.resolution && (
+              <p className="mt-1.5 text-ink-200">
+                Human verdict: <span className="font-mono font-semibold">{row.resolution.decision}</span>
+                {row.resolution.reason ? <span className="text-ink-400"> — “{row.resolution.reason}”</span> : null}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="flex items-center gap-2 mt-4">
           <button
