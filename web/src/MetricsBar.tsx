@@ -16,10 +16,20 @@ export function MetricsBar({ rows }: Props) {
     const p50 = durations.length ? durations[Math.floor(durations.length * 0.5)] : 0;
     const p95 = durations.length ? durations[Math.floor(durations.length * 0.95)] : 0;
 
-    // Approximate token & cost estimation (based on standard coding agent telemetry)
-    const toolCount = rows.filter((r) => r.kind === "tool").length;
-    const estimatedInputTokens = toolCount * 1250;
-    const estimatedOutputTokens = toolCount * 320;
+    // Token & cost ESTIMATE from the real size of what crossed the proxy
+    // (~4 characters per token). The proxy cannot see the LLM API traffic, so
+    // this only covers tool traffic and ignores the conversation context:
+    //  - call arguments were written by the model  -> output tokens
+    //  - tool results are fed back to the model    -> input tokens
+    const approxTokens = (payload: unknown) =>
+      payload === undefined ? 0 : Math.ceil(JSON.stringify(payload).length / 4);
+    let estimatedInputTokens = 0;
+    let estimatedOutputTokens = 0;
+    for (const r of rows) {
+      if (r.kind !== "tool") continue;
+      estimatedOutputTokens += approxTokens(r.request?.payload);
+      estimatedInputTokens += approxTokens(r.response?.payload);
+    }
     const totalTokens = estimatedInputTokens + estimatedOutputTokens;
 
     // Stored cost model: ~$3/M in, $15/M out for high-tier models
@@ -50,11 +60,14 @@ export function MetricsBar({ rows }: Props) {
   return (
     <div className="flex items-center gap-6 border-b border-ink-800 bg-ink-950 px-5 py-2 text-xs">
       {/* Cost & Budget Meter */}
-      <div className="flex items-center gap-2.5">
+      <div
+        className="flex items-center gap-2.5"
+        title="Estimated from the size of tool calls and results (~4 chars/token, $3/M in, $15/M out). Does not include the LLM conversation context."
+      >
         <DollarSign className="size-3.5 text-emerald-400" />
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5 font-mono text-[11px]">
-            <span className="font-semibold text-ink-100">${metrics.estimatedCost.toFixed(3)}</span>
+            <span className="font-semibold text-ink-100">~${metrics.estimatedCost.toFixed(3)}</span>
             <span className="text-ink-500">/ $2.00 max</span>
           </div>
           <div className="mt-0.5 h-1 w-24 overflow-hidden rounded-full bg-ink-800">
@@ -71,7 +84,9 @@ export function MetricsBar({ rows }: Props) {
       {/* Token Throughput */}
       <div className="flex items-center gap-2">
         <Cpu className="size-3.5 text-accent" />
-        <span className="text-ink-400">Tokens:</span>
+        <span className="text-ink-400" title="Estimated from tool traffic size">
+          Tokens (est.):
+        </span>
         <span className="font-mono text-ink-100">
           {metrics.totalTokens > 1000
             ? `${(metrics.totalTokens / 1000).toFixed(1)}k`
