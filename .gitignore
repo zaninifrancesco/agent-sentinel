@@ -1,6 +1,6 @@
 # Binaries
 bin/
-dist/
+/dist/
 *.exe
 *.exe~
 *.dll
@@ -17,6 +17,9 @@ vendor/
 # Node / Web artifacts
 node_modules/
 web/dist/
+# Built cockpit embedded in the binary (keep the placeholder so go:embed compiles)
+internal/ui/dist/*
+!internal/ui/dist/.gitkeep
 web/build/
 .npm
 .yarn/
