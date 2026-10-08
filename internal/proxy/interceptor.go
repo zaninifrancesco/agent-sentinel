@@ -35,7 +35,19 @@ func NewInterceptor(rec *recorder.Recorder) *Interceptor {
 	}
 }
 
-// Observe is the proxy Observer: it classifies the line and records it.
+// annotation carries what the policy decided about a tools/call request, so
+// it is stored on the very same event that records the request.
+type annotation struct {
+	decision string
+	rule     string
+	reason   string
+	risk     recorder.RiskLevel
+	status   recorder.Status // overrides the default "pending"
+	track    bool            // register for latency/response correlation
+	hook     func(recorder.Event)
+}
+
+// Observe classifies the line and records it. It never alters traffic.
 func (i *Interceptor) Observe(dir recorder.Direction, line []byte) {
 	frame := bytes.TrimRight(line, "\r\n")
 	if len(bytes.TrimSpace(frame)) == 0 {
@@ -58,7 +70,7 @@ func (i *Interceptor) Observe(dir recorder.Direction, line []byte) {
 
 	switch msg.Kind() {
 	case protocol.KindRequest:
-		i.onRequest(dir, msg, frame)
+		i.onRequest(dir, msg, frame, nil)
 	case protocol.KindNotification:
 		i.rec.Record(recorder.Event{
 			Type:      recorder.EventNotification,
@@ -72,7 +84,7 @@ func (i *Interceptor) Observe(dir recorder.Direction, line []byte) {
 	}
 }
 
-func (i *Interceptor) onRequest(dir recorder.Direction, msg *protocol.Message, frame []byte) {
+func (i *Interceptor) onRequest(dir recorder.Direction, msg *protocol.Message, frame []byte, ann *annotation) recorder.Event {
 	ev := recorder.Event{
 		Type:      recorder.EventRequest,
 		Direction: dir,
@@ -91,11 +103,41 @@ func (i *Interceptor) onRequest(dir recorder.Direction, msg *protocol.Message, f
 		}
 	}
 
-	i.mu.Lock()
-	i.pending[ev.RPCID] = call
-	i.mu.Unlock()
+	var hook func(recorder.Event)
+	if ann != nil {
+		ev.Decision, ev.Rule, ev.Reason = ann.decision, ann.rule, ann.reason
+		if ann.risk != "" {
+			ev.Risk = ann.risk
+		}
+		if ann.status != "" {
+			ev.Status = ann.status
+		}
+		hook = ann.hook
+	}
+	if ann == nil || ann.track {
+		i.track(ev.RPCID, call)
+	}
+	return i.rec.RecordHook(ev, hook)
+}
 
-	i.rec.Record(ev)
+// track starts correlating the response to request id; the latency clock
+// starts now. Calls held for approval are tracked only once released, so
+// their latency does not include the time spent waiting for the human.
+func (i *Interceptor) track(id string, call pendingCall) {
+	if call.started.IsZero() {
+		call.started = i.now()
+	}
+	i.mu.Lock()
+	i.pending[id] = call
+	i.mu.Unlock()
+}
+
+// peek returns the in-flight call for id without consuming it.
+func (i *Interceptor) peek(id string) (pendingCall, bool) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	c, ok := i.pending[id]
+	return c, ok
 }
 
 func (i *Interceptor) onResponse(dir recorder.Direction, msg *protocol.Message, frame []byte) {

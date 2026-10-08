@@ -49,7 +49,15 @@ func (r *Recorder) Session() Session {
 
 // Record appends an event, filling Seq, SessionID, Timestamp and defaults.
 // It returns the stored event. Safe for concurrent use.
-func (r *Recorder) Record(e Event) Event {
+func (r *Recorder) Record(e Event) Event { return r.RecordHook(e, nil) }
+
+// RecordHook is Record, but calls hook with the final event (Seq assigned)
+// before the event becomes visible to subscribers, the sink or Events().
+// The approval flow uses it to register a pending approval under that Seq, so
+// the cockpit can never answer a request the proxy does not know about yet.
+// hook runs under the recorder lock: it must be quick and must not call back
+// into the recorder.
+func (r *Recorder) RecordHook(e Event, hook func(Event)) Event {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -61,6 +69,9 @@ func (r *Recorder) Record(e Event) Event {
 	}
 	if e.Risk == "" {
 		e.Risk = RiskNone
+	}
+	if hook != nil {
+		hook(e)
 	}
 	r.events = append(r.events, e)
 

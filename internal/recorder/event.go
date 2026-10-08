@@ -19,6 +19,7 @@ const (
 	EventToolCallRequest  EventType = "ToolCallRequest"  // tools/call
 	EventToolCallResponse EventType = "ToolCallResponse" // result of tools/call
 	EventRawOutput        EventType = "RawOutput"        // non JSON-RPC line seen on the wire
+	EventApprovalResolved EventType = "ApprovalResolved" // a held call was approved, rejected or timed out
 )
 
 // Direction is the way a frame travelled through the proxy.
@@ -46,10 +47,11 @@ type Status string
 
 const (
 	StatusPending  Status = "pending"
+	StatusAwaiting Status = "awaiting_approval" // held by the policy, waiting for a human
 	StatusOK       Status = "ok"
 	StatusError    Status = "error"
-	StatusBlocked  Status = "blocked"
-	StatusRejected Status = "rejected"
+	StatusBlocked  Status = "blocked"  // refused by policy
+	StatusRejected Status = "rejected" // a human said no (or the approval timed out)
 )
 
 // Event is the immutable record of one thing that happened in a session.
@@ -63,6 +65,9 @@ type Event struct {
 	ToolName   string          `json:"toolName,omitempty"`
 	RPCID      string          `json:"rpcId,omitempty"`
 	Risk       RiskLevel       `json:"risk"`
+	Decision   string          `json:"decision,omitempty"` // policy outcome: allow|warn|approve|block
+	Rule       string          `json:"rule,omitempty"`     // id of the rule that fired
+	Reason     string          `json:"reason,omitempty"`   // human-readable why
 	Status     Status          `json:"status"`
 	DurationMs int64           `json:"durationMs,omitempty"` // set on responses
 	Payload    json.RawMessage `json:"payload,omitempty"`    // raw frame, or JSON string for RawOutput

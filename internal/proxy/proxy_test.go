@@ -17,8 +17,12 @@ import (
 // TestMain doubles as a fake MCP server: when re-executed with
 // SENTINEL_FAKE_SERVER=1 the test binary speaks just enough MCP over stdio.
 func TestMain(m *testing.M) {
-	if os.Getenv("SENTINEL_FAKE_SERVER") == "1" {
+	switch os.Getenv("SENTINEL_FAKE_SERVER") {
+	case "1":
 		runFakeServer()
+		return
+	case "2":
+		runEchoServer()
 		return
 	}
 	os.Exit(m.Run())
@@ -51,7 +55,7 @@ func TestPumpForwardsVerbatim(t *testing.T) {
 	input := "{\"a\":1}\nplain text\n\n" + strings.Repeat("x", 200_000) + "\nlast-without-newline"
 	var out bytes.Buffer
 	var seen int
-	err := pump(&out, strings.NewReader(input), recorder.ClientToServer, func(recorder.Direction, []byte) { seen++ })
+	err := pump(&out, strings.NewReader(input), func(l []byte) []byte { seen++; return l })
 	if err != nil {
 		t.Fatal(err)
 	}

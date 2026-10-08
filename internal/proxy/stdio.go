@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/zaninifrancesco/agent-sentinel/internal/policy"
 	"github.com/zaninifrancesco/agent-sentinel/internal/recorder"
 )
 
@@ -23,6 +24,12 @@ type StdioProxy struct {
 	Out     io.Writer // proxy -> client (normally os.Stdout)
 	Stderr  io.Writer // server stderr passthrough (normally os.Stderr)
 	Rec     *recorder.Recorder
+
+	// Execution boundary (all optional; with none set the proxy only records).
+	Policy          *policy.Engine
+	Budget          *policy.Budget
+	Approvals       *policy.Broker // nil: calls needing approval are refused
+	ApprovalTimeout time.Duration  // 0 = DefaultApprovalTimeout
 }
 
 // Run blocks until the server has exited and all of its output was relayed
@@ -31,8 +38,6 @@ func (p *StdioProxy) Run(ctx context.Context) error {
 	if len(p.Command) == 0 {
 		return errors.New("no server command given")
 	}
-	icpt := NewInterceptor(p.Rec)
-
 	cmd := exec.CommandContext(ctx, p.Command[0], p.Command[1:]...)
 	cmd.Stderr = p.Stderr
 	cmd.WaitDelay = 3 * time.Second
@@ -50,12 +55,16 @@ func (p *StdioProxy) Run(ctx context.Context) error {
 		return fmt.Errorf("starting %q: %w", p.Command[0], err)
 	}
 
+	gate := newGate(ctx, p, &syncWriter{w: serverIn}, &syncWriter{w: p.Out})
+	defer gate.Shutdown()
+
 	// client -> server. When the client hangs up, close the server's stdin so
 	// well-behaved servers shut down on their own. This goroutine is not
 	// awaited: it may be blocked reading the client's stdin, and it ends by
 	// itself on EOF or on the first failed write once the server is gone.
 	go func() {
-		_ = pump(serverIn, p.In, recorder.ClientToServer, icpt.Observe)
+		_ = pump(gate.toServer, p.In, gate.FromClient)
+		gate.Shutdown() // the client is gone: stop waiting for approvals
 		_ = serverIn.Close()
 	}()
 
@@ -64,7 +73,7 @@ func (p *StdioProxy) Run(ctx context.Context) error {
 	outDone := make(chan struct{})
 	go func() {
 		defer close(outDone)
-		_ = pump(p.Out, serverOut, recorder.ServerToClient, icpt.Observe)
+		_ = pump(gate.toClient, serverOut, gate.FromServer)
 	}()
 	<-outDone
 
