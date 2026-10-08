@@ -19,7 +19,24 @@ It works with the **Cursor agent** (through Cursor's hooks) and with **any MCP s
 
 ## Install
 
-There is no packaged release yet. Build from source. You need Go 1.27+ and Node.js 20.19+ (or 22.12+), because the cockpit is built with Vite and embedded in the binary.
+### Prebuilt binary (macOS and Linux)
+
+Download the archive for your system from the [latest release](https://github.com/zaninifrancesco/agent-sentinel/releases), check it against `checksums.txt`, and put the binary somewhere it will stay:
+
+```bash
+shasum -a 256 -c checksums.txt --ignore-missing
+tar -xzf sentinel_*_darwin_arm64.tar.gz          # or linux_amd64, linux_arm64, darwin_amd64
+mkdir -p ~/.sentinel/bin
+mv sentinel_*/sentinel ~/.sentinel/bin/
+```
+
+The binaries are not signed or notarized. If macOS refuses one that a browser downloaded, run `xattr -d com.apple.quarantine ~/.sentinel/bin/sentinel`.
+
+Keep the binary where it is once you use it with Cursor: `hooks.json` stores its absolute path.
+
+### From source
+
+You need Go 1.27+ and Node.js 20.19+ (or 22.12+), because the cockpit is built with Vite and embedded in the binary.
 
 ```bash
 git clone https://github.com/zaninifrancesco/agent-sentinel
@@ -28,7 +45,7 @@ make build                 # builds the cockpit, then bin/sentinel
 make install               # copies it to ~/.sentinel/bin/sentinel
 ```
 
-Keep the binary where it is once you use it with Cursor: `hooks.json` stores its absolute path.
+`make dist` builds the release archives, and pushing a tag such as `v0.1.0` publishes them.
 
 ## Use it with the Cursor agent
 
@@ -144,7 +161,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [PRODUCT.md](PRODUCT.md) and [
 - [x] Policy engine, human approvals and the session budget
 - [x] Diff viewer and the standalone HTML audit report
 - [x] Supervision of the Cursor agent through its hooks
-- [ ] Packaged releases for macOS and Linux
+- [x] Packaged releases for macOS and Linux (`v0.1.0-alpha`)
 - [ ] `sentinel run`, a PTY wrapper for terminal agents
 - [ ] Frontend tests
 
