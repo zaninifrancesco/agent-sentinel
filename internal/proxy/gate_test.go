@@ -262,3 +262,45 @@ func TestGateBudgetBreaker(t *testing.T) {
 		t.Fatalf("over-budget call must not run when rejected: %q", out)
 	}
 }
+
+// A budget created with no limits (as with --ui) lets everything through until
+// a human sets one; from then on the next call is held.
+func TestGateBudgetLimitSetMidSession(t *testing.T) {
+	b := policy.NewBroker()
+	budget := policy.NewBudget(0, 0)
+	p := &StdioProxy{Policy: newEngine(t), Approvals: b, Budget: budget}
+	out := runGate(t, p, func(rec *recorder.Recorder, w io.Writer) {
+		io.WriteString(w, call(1, "shell", "ls"))
+		waitFor(t, rec, "response 1", responseTo(rec, "1"))
+
+		if err := budget.SetLimits(0.0001, 0); err != nil {
+			t.Error(err)
+		}
+		io.WriteString(w, call(2, "shell", strings.Repeat("a", 2000)))
+		ev := waitFor(t, rec, "budget hold", func(e recorder.Event) bool { return e.Status == recorder.StatusAwaiting })
+		if ev.Rule != "budget" {
+			t.Errorf("rule = %q, want budget", ev.Rule)
+		}
+		b.Resolve(ev.Seq, policy.Verdict{Approved: false})
+		waitFor(t, rec, "response 2", responseTo(rec, "2"))
+	})
+	if !strings.Contains(out, "SERVER-RAN shell") {
+		t.Fatalf("the call before the limit must have run: %q", out)
+	}
+	if strings.Count(out, "SERVER-RAN") != 1 {
+		t.Fatalf("the over-budget call must not run when rejected: %q", out)
+	}
+}
+
+// A limitless budget must not change what passes: record-only mode stays
+// record-only, batches included.
+func TestGateEmptyBudgetDoesNotGate(t *testing.T) {
+	p := &StdioProxy{Budget: policy.NewBudget(0, 0)}
+	out := runGate(t, p, func(rec *recorder.Recorder, w io.Writer) {
+		io.WriteString(w, call(1, "shell", "sudo rm file"))
+		waitFor(t, rec, "response 1", responseTo(rec, "1"))
+	})
+	if !strings.Contains(out, "SERVER-RAN") {
+		t.Fatalf("with no policy and no limit the call must pass: %q", out)
+	}
+}

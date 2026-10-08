@@ -66,6 +66,48 @@ func (b *Budget) MaxCostUSD() float64 {
 	return b.maxCost
 }
 
+// Limits returns the current cost and token limits (0 = none).
+func (b *Budget) Limits() (costUSD float64, tokens int64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.maxCost, b.maxTokens
+}
+
+// Enabled reports whether any limit is set. Safe on a nil Budget.
+func (b *Budget) Enabled() bool {
+	if b == nil {
+		return false
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.maxCost > 0 || b.maxTokens > 0
+}
+
+// Upper bounds for a limit typed by a human; far above any real session, they
+// only keep absurd or non-finite values out.
+const (
+	MaxLimitCostUSD = 1_000_000.0
+	MaxLimitTokens  = int64(1_000_000_000_000)
+)
+
+// SetLimits replaces both limits (0 = no limit) and makes them the new step
+// for later extensions. Spend so far is kept, so a limit below it holds the
+// very next call for a human.
+func (b *Budget) SetLimits(costUSD float64, tokens int64) error {
+	// !(x >= 0) also rejects NaN.
+	if !(costUSD >= 0) || costUSD > MaxLimitCostUSD {
+		return fmt.Errorf("cost limit must be between 0 and %.0f USD", MaxLimitCostUSD)
+	}
+	if tokens < 0 || tokens > MaxLimitTokens {
+		return fmt.Errorf("token limit must be between 0 and %d", MaxLimitTokens)
+	}
+	b.mu.Lock()
+	b.maxCost, b.step = costUSD, costUSD
+	b.maxTokens, b.stepTok = tokens, tokens
+	b.mu.Unlock()
+	return nil
+}
+
 // Exceeded reports whether a limit is crossed, with a human-readable reason.
 func (b *Budget) Exceeded() (bool, string) {
 	b.mu.Lock()

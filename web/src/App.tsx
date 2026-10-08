@@ -9,6 +9,8 @@ import { CommandPalette } from "./CommandPalette";
 import { ApprovalBar } from "./ApprovalBar";
 import { MetricsBar } from "./MetricsBar";
 import { ExportModal } from "./ExportModal";
+import { BudgetModal } from "./BudgetModal";
+import { computeMetrics } from "./metrics";
 import type { Row } from "./types";
 
 type Filter = "all" | "tools" | "errors" | "raw";
@@ -39,7 +41,7 @@ function matches(row: Row, f: Filter): boolean {
 
 export default function App() {
   const { session, rows, connection } = useSentinel();
-  const config = useConfig();
+  const { config, apply: applyConfig, reload: reloadConfig } = useConfig();
   const [theme, toggleTheme] = useTheme();
   const [approvalBusy, setApprovalBusy] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
@@ -47,6 +49,7 @@ export default function App() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isBudgetOpen, setIsBudgetOpen] = useState(false);
 
   // Global shortcut for Cmd+K / Ctrl+K
   useEffect(() => {
@@ -60,6 +63,15 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  const metrics = useMemo(() => computeMetrics(rows), [rows]);
+
+  // The limits move when a human approves a call that went over the budget
+  // (the next limit is one step higher), so read them again after any decision.
+  const decisions = useMemo(() => rows.filter((r) => r.resolution).length, [rows]);
+  useEffect(() => {
+    if (decisions > 0) reloadConfig();
+  }, [decisions, reloadConfig]);
 
   const visible = useMemo(
     () => rows.filter((r) => matches(r, filter)),
@@ -161,7 +173,13 @@ export default function App() {
         </div>
       </header>
 
-      <MetricsBar rows={rows} maxCostUsd={config.maxCostUsd} />
+      <MetricsBar
+        metrics={metrics}
+        maxCostUsd={config.maxCostUsd}
+        maxTokens={config.maxTokens}
+        editable={config.budgetEditable && connection === "live"}
+        onEditBudget={() => setIsBudgetOpen(true)}
+      />
 
       <main className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,2fr)_minmax(0,3fr)] lg:grid-cols-[minmax(420px,5fr)_7fr] lg:grid-rows-1">
         <div className="flex min-h-0 flex-col border-r border-rule-strong">
@@ -208,6 +226,14 @@ export default function App() {
         rows={rows}
         onSelectRow={(key) => setSelectedKey(key)}
         onExport={() => setIsExportModalOpen(true)}
+      />
+
+      <BudgetModal
+        isOpen={isBudgetOpen}
+        onClose={() => setIsBudgetOpen(false)}
+        config={config}
+        spent={{ cost: metrics.cost, tokens: metrics.tokens }}
+        onSaved={applyConfig}
       />
 
       <ExportModal

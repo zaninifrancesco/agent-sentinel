@@ -83,11 +83,14 @@ func runMCP(args []string) int {
 		if wait <= 0 {
 			wait = proxy.DefaultApprovalTimeout // the proxy applies the same fallback
 		}
-		cfg := serverpkg.Config{Policy: policyName, ApprovalTimeoutSec: int(wait.Seconds())}
-		if budget != nil {
-			cfg.MaxCostUSD = budget.MaxCostUSD()
+		// With a cockpit the budget always exists, even with no limits yet, so
+		// a human can set one from the browser. /api/config reports its live
+		// limits; the cockpit server owns changing them.
+		if budget == nil {
+			budget = policy.NewBudget(0, 0)
 		}
-		url, err := startCockpit(ctx, rec, *port, *dev, broker, cfg)
+		cfg := serverpkg.Config{Policy: policyName, ApprovalTimeoutSec: int(wait.Seconds())}
+		url, err := startCockpit(ctx, rec, *port, *dev, broker, budget, cfg)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
 			return 1

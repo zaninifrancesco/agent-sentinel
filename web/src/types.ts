@@ -9,7 +9,8 @@ export type EventType =
   | "ToolCallRequest"
   | "ToolCallResponse"
   | "RawOutput"
-  | "ApprovalResolved";
+  | "ApprovalResolved"
+  | "BudgetChanged";
 
 export type Status =
   | "pending"
@@ -71,6 +72,8 @@ export interface SentinelConfig {
   maxTokens: number;
   policy: string;
   approvals: boolean; // can this session approve held calls?
+  /** Can the limits be changed from the cockpit? False when replaying. */
+  budgetEditable: boolean;
   /** Seconds a held call waits for a decision before it is refused. */
   approvalTimeoutSec: number;
 }

@@ -1,5 +1,5 @@
 import type { Risk, Row, Session, SentinelConfig, Status } from "./types";
-import { formatDuration, formatTime } from "./format";
+import { formatDuration, formatTime, formatTokens } from "./format";
 import { computeMetrics, COST_NOTE } from "./metrics";
 import { journeyStops, type Stop, type Tone } from "./journey";
 
@@ -268,6 +268,7 @@ export function buildReportHtml({ session, rows, config, exportedAt }: ReportInp
   // "replay" and "unknown" describe the viewer, not the recorded session.
   const policy = config?.policy && config.policy !== "unknown" && config.policy !== "replay" ? config.policy : undefined;
   const budget = config && config.maxCostUsd > 0 ? `$${config.maxCostUsd.toFixed(2)}` : undefined;
+  const tokenBudget = config && config.maxTokens > 0 ? formatTokens(config.maxTokens) : undefined;
 
   const facts = [
     fact("Command", session?.command?.length ? `<span class="cmd">${esc(session.command.join(" "))}</span>` : "–"),
@@ -281,7 +282,7 @@ export function buildReportHtml({ session, rows, config, exportedAt }: ReportInp
     fact("Median / p95", `${m.p50} / ${m.p95} ms`),
     fact(
       "Cost (estimate)",
-      `~$${m.cost.toFixed(3)}${budget ? ` of ${esc(budget)} budget` : ""} · ~${m.tokens > 1000 ? `${(m.tokens / 1000).toFixed(1)}k` : m.tokens} tokens`,
+      `~$${m.cost.toFixed(3)}${budget ? ` of ${esc(budget)} budget` : ""} · ~${formatTokens(m.tokens)} tokens${tokenBudget ? ` of ${esc(tokenBudget)}` : ""}`,
     ),
   ].join("");
 

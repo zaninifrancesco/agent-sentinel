@@ -20,6 +20,7 @@ const (
 	EventToolCallResponse EventType = "ToolCallResponse" // result of tools/call
 	EventRawOutput        EventType = "RawOutput"        // non JSON-RPC line seen on the wire
 	EventApprovalResolved EventType = "ApprovalResolved" // a held call was approved, rejected or timed out
+	EventBudgetChanged    EventType = "BudgetChanged"    // a human changed the session budget from the cockpit
 )
 
 // Direction is the way a frame travelled through the proxy.

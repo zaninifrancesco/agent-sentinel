@@ -33,6 +33,7 @@ It is on the wire, not beside it: because it proxies the protocol it can stop a 
 
 - Timeline of events (tool calls merged with their responses, notifications, raw output), a detail panel with payload, raw JSON and a visual diff when a patch is present, a metrics bar, a command palette, an approval dock.
 - Policy verdicts shown per call: rule id, reason, risk level (none to critical), decision (allow, warn, approve, block) and the human verdict.
+- The session budget (cost and token limits) can be set, raised or removed from the cockpit's status strip while a session is live. Every change is written to the session log as a "Budget changed" row, so the audit shows who moved the ceiling and from what.
 - Cost and tokens are estimates from tool traffic size only (the proxy cannot see the LLM API); the UI must label them as estimates.
 - The UI is a React + Vite + Tailwind SPA built into `internal/ui/dist` and embedded in the Go binary with `go:embed`. It must work offline, with no CDN assets or external fonts.
 - Statuses the UI must express: pending, awaiting approval, ok, error, blocked (by policy), rejected (by a human or timeout).

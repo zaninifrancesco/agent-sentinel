@@ -105,8 +105,12 @@ func (g *Gate) FromClient(line []byte) []byte {
 	trimmed := bytes.TrimSpace(frame)
 
 	// A JSON-RPC batch could smuggle a tools/call past the per-message
-	// inspection below. MCP no longer uses batches, so refuse them.
-	if len(trimmed) > 0 && trimmed[0] == '[' && bytes.Contains(trimmed, []byte(`"tools/call"`)) {
+	// inspection below. MCP no longer uses batches, so refuse them whenever
+	// there is a policy or a budget limit to enforce. (A budget without limits
+	// only exists so one can be set from the cockpit; it does not change what
+	// passes.)
+	if (g.engine != nil || g.budget.Enabled()) &&
+		len(trimmed) > 0 && trimmed[0] == '[' && bytes.Contains(trimmed, []byte(`"tools/call"`)) {
 		g.refuseBatch(trimmed)
 		return nil
 	}
@@ -224,7 +228,7 @@ func (g *Gate) reply(req recorder.Event, status recorder.Status, text string) {
 }
 
 func (g *Gate) refuseBatch(batch []byte) {
-	reason := "JSON-RPC batches containing tools/call are not allowed while a policy is active"
+	reason := "JSON-RPC batches containing tools/call are not allowed while a policy or budget is active"
 	payload, _ := json.Marshal(string(batch))
 	g.rec.Record(recorder.Event{
 		Type:      recorder.EventRawOutput,

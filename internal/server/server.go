@@ -6,7 +6,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -46,6 +48,11 @@ type Server struct {
 	// replaying a recorded session: there is nothing left to approve.
 	Approvals *policy.Broker
 
+	// Budget is the session's spending circuit breaker. When set, the cockpit
+	// can read and change its limits; /api/config reports the live values.
+	// Nil when replaying a recorded session.
+	Budget *policy.Budget
+
 	// Config is what the cockpit needs to know about the running session.
 	Config Config
 }
@@ -56,6 +63,8 @@ type Config struct {
 	MaxTokens  int64   `json:"maxTokens"`
 	Policy     string  `json:"policy"`    // "default", a file path or "off"
 	Approvals  bool    `json:"approvals"` // can this session approve held calls?
+	// BudgetEditable is true when the limits can be changed from the cockpit.
+	BudgetEditable bool `json:"budgetEditable"`
 	// ApprovalTimeoutSec is how long a held call waits before it is refused;
 	// the cockpit draws its countdown from it. 0 when nothing can be held.
 	ApprovalTimeoutSec int `json:"approvalTimeoutSec"`
@@ -75,6 +84,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("GET /api/config", s.handleConfig)
 	mux.HandleFunc("POST /api/approvals/{seq}", s.handleApproval)
+	mux.HandleFunc("POST /api/budget", s.handleBudget)
 	mux.HandleFunc("GET /ws", s.handleWS)
 	mux.Handle("/", s.spa())
 	return s.loopbackOnly(mux)
@@ -100,9 +110,19 @@ func (s *Server) loopbackOnly(next http.Handler) http.Handler {
 }
 
 func (s *Server) handleConfig(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, s.currentConfig())
+}
+
+// currentConfig is the static config with the budget limits as they are now:
+// they change when a human raises them or approves going past them.
+func (s *Server) currentConfig() Config {
 	cfg := s.Config
 	cfg.Approvals = s.Approvals != nil
-	writeJSON(w, cfg)
+	cfg.BudgetEditable = s.Budget != nil
+	if s.Budget != nil {
+		cfg.MaxCostUSD, cfg.MaxTokens = s.Budget.Limits()
+	}
+	return cfg
 }
 
 type approvalRequest struct {
@@ -121,12 +141,7 @@ func (s *Server) handleApproval(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "this session has nothing to approve", http.StatusNotFound)
 		return
 	}
-	if !s.originOK(r) {
-		http.Error(w, "cross-origin request refused", http.StatusForbidden)
-		return
-	}
-	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(strings.ToLower(ct), "application/json") {
-		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+	if !s.guardMutation(w, r) {
 		return
 	}
 	seq, err := strconv.ParseUint(r.PathValue("seq"), 10, 64)
@@ -148,6 +163,87 @@ func (s *Server) handleApproval(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// guardMutation applies the defences every state-changing endpoint shares, and
+// writes the refusal itself when one fails (the loopback Host check already ran):
+//   - the Origin, if the browser sends one, must be our own (or the dev server);
+//   - Content-Type must be application/json, which a cross-origin page cannot
+//     send without a CORS preflight that we never grant.
+func (s *Server) guardMutation(w http.ResponseWriter, r *http.Request) bool {
+	if !s.originOK(r) {
+		http.Error(w, "cross-origin request refused", http.StatusForbidden)
+		return false
+	}
+	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(strings.ToLower(ct), "application/json") {
+		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		return false
+	}
+	return true
+}
+
+type budgetRequest struct {
+	MaxCostUSD float64 `json:"maxCostUsd"` // 0 = no cost limit
+	MaxTokens  int64   `json:"maxTokens"`  // 0 = no token limit
+}
+
+// handleBudget changes the session budget. Raising or removing the limit lets
+// the agent spend more without asking, so it gets the same defences as an
+// approval, and every change is written to the session log.
+func (s *Server) handleBudget(w http.ResponseWriter, r *http.Request) {
+	if s.Budget == nil {
+		http.Error(w, "this session has no budget to change", http.StatusNotFound)
+		return
+	}
+	if !s.guardMutation(w, r) {
+		return
+	}
+	var req budgetRequest
+	dec := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&req); err != nil {
+		http.Error(w, "bad body", http.StatusBadRequest)
+		return
+	}
+	if math.IsNaN(req.MaxCostUSD) || math.IsInf(req.MaxCostUSD, 0) {
+		http.Error(w, "cost limit must be a number", http.StatusBadRequest)
+		return
+	}
+	// Whole cents: the cockpit shows dollars with two decimals.
+	req.MaxCostUSD = math.Round(req.MaxCostUSD*100) / 100
+
+	prevCost, prevTokens := s.Budget.Limits()
+	if err := s.Budget.SetLimits(req.MaxCostUSD, req.MaxTokens); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	payload, _ := json.Marshal(map[string]any{
+		"maxCostUsd": req.MaxCostUSD, "maxTokens": req.MaxTokens,
+		"previousMaxCostUsd": prevCost, "previousMaxTokens": prevTokens,
+	})
+	s.rec.Record(recorder.Event{
+		Type:      recorder.EventBudgetChanged,
+		Direction: recorder.ClientToServer,
+		Risk:      recorder.RiskNone,
+		Status:    recorder.StatusOK,
+		Decision:  "budget",
+		Rule:      "budget",
+		Reason:    fmt.Sprintf("budget changed from the cockpit: %s -> %s", describeLimits(prevCost, prevTokens), describeLimits(req.MaxCostUSD, req.MaxTokens)),
+		Payload:   payload,
+	})
+	writeJSON(w, s.currentConfig())
+}
+
+func describeLimits(cost float64, tokens int64) string {
+	c, t := "no cost limit", "no token limit"
+	if cost > 0 {
+		c = fmt.Sprintf("$%.2f", cost)
+	}
+	if tokens > 0 {
+		t = fmt.Sprintf("%d tokens", tokens)
+	}
+	return c + ", " + t
 }
 
 func (s *Server) originOK(r *http.Request) bool {

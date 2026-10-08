@@ -2,6 +2,7 @@ package policy
 
 import (
 	"context"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -171,5 +172,53 @@ func TestBroker(t *testing.T) {
 	}
 	if err := b.Resolve(8, Verdict{}); err != ErrNotPending {
 		t.Fatalf("expired request must not be resolvable, got %v", err)
+	}
+}
+
+func TestBudgetSetLimits(t *testing.T) {
+	b := NewBudget(0, 0)
+	if b.Enabled() {
+		t.Fatal("a budget with no limits must not count as enabled")
+	}
+	var none *Budget
+	if none.Enabled() {
+		t.Fatal("a nil budget must not count as enabled")
+	}
+
+	if err := b.SetLimits(2.5, 100_000); err != nil {
+		t.Fatal(err)
+	}
+	if c, tk := b.Limits(); c != 2.5 || tk != 100_000 || !b.Enabled() {
+		t.Fatalf("limits = %v / %v", c, tk)
+	}
+
+	for name, args := range map[string]struct {
+		cost   float64
+		tokens int64
+	}{
+		"negative cost":   {-1, 0},
+		"NaN cost":        {math.NaN(), 0},
+		"infinite cost":   {math.Inf(1), 0},
+		"huge cost":       {MaxLimitCostUSD + 1, 0},
+		"negative tokens": {0, -5},
+		"huge tokens":     {0, MaxLimitTokens + 1},
+	} {
+		if err := b.SetLimits(args.cost, args.tokens); err == nil {
+			t.Errorf("%s was accepted", name)
+		}
+	}
+	// A refused change leaves the limits as they were.
+	if c, tk := b.Limits(); c != 2.5 || tk != 100_000 {
+		t.Fatalf("a refused change altered the limits: %v / %v", c, tk)
+	}
+
+	// Zero removes a limit; the new values become the extension step.
+	if err := b.SetLimits(0, 0); err != nil || b.Enabled() {
+		t.Fatalf("zero must disable the budget (%v)", err)
+	}
+	b.SetLimits(1, 0)
+	b.Extend()
+	if c, _ := b.Limits(); c != 2 {
+		t.Fatalf("extension step = %v, want 1 on top of 1", c-1)
 	}
 }

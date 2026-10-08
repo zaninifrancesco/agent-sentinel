@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Row, SentinelEvent, ServerMessage, Session } from "./types";
+import { describeBudget } from "./format";
 
 export type Connection = "connecting" | "live" | "ended" | "reconnecting";
 
@@ -133,6 +134,20 @@ export function buildRows(events: SentinelEvent[]): Row[] {
       case "SessionCompleted":
         rows.push(standalone(e, "session", "Session completed"));
         break;
+      case "BudgetChanged": {
+        const p = e.payload as
+          | { maxCostUsd?: number; maxTokens?: number; previousMaxCostUsd?: number; previousMaxTokens?: number }
+          | undefined;
+        rows.push(
+          standalone(
+            e,
+            "session",
+            "Budget changed",
+            p ? `${describeBudget(p.previousMaxCostUsd ?? 0, p.previousMaxTokens ?? 0)} → ${describeBudget(p.maxCostUsd ?? 0, p.maxTokens ?? 0)}` : e.reason,
+          ),
+        );
+        break;
+      }
     }
   }
   return rows;
