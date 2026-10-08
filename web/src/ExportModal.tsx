@@ -1,6 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Download, Copy, Check, X, Sparkles } from "lucide-react";
 import type { Session, Row } from "./types";
+
+/**
+ * Everything in the report that originates from the agent or an MCP server
+ * (tool names, methods, ids...) is untrusted: a malicious server could name a
+ * tool `<script>...</script>`. Escape it before it is put into HTML.
+ */
+function esc(value: unknown): string {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 interface Props {
   isOpen: boolean;
@@ -12,6 +26,21 @@ interface Props {
 export function ExportModal({ isOpen, onClose, session, rows }: Props) {
   const [copied, setCopied] = useState(false);
 
+  // Esc closes the modal. Capture phase + stopPropagation so it does not also
+  // reach the approval dock, where Esc means "block".
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const totalTools = rows.filter((r) => r.kind === "tool").length;
@@ -22,7 +51,9 @@ export function ExportModal({ isOpen, onClose, session, rows }: Props) {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Agent Sentinel Audit Report - ${session?.id || "session"}</title>
+  <!-- Defense in depth: the report is static, so no script or network access at all. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'" />
+  <title>Agent Sentinel Audit Report - ${esc(session?.id || "session")}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; background: #0b0e14; color: #e6e9f2; margin: 40px auto; max-width: 900px; padding: 0 20px; }
     h1 { font-size: 24px; color: #7aa2ff; margin-bottom: 4px; }
@@ -37,7 +68,7 @@ export function ExportModal({ isOpen, onClose, session, rows }: Props) {
 </head>
 <body>
   <h1>🛡️ Agent Sentinel Session Audit</h1>
-  <div class="badge">Session ID: ${session?.id || "unknown"}</div>
+  <div class="badge">Session ID: ${esc(session?.id || "unknown")}</div>
   <div class="badge">Exported: ${new Date().toISOString()}</div>
 
   <div class="card">
@@ -53,8 +84,8 @@ export function ExportModal({ isOpen, onClose, session, rows }: Props) {
     <h3>Activity Timeline</h3>
     ${rows.map((r) => `
       <div class="event-row">
-        <span>${r.title} ${r.subtitle ? `<small style="color:#5b667d">(${r.subtitle})</small>` : ""}</span>
-        <span class="${r.status === "ok" ? "event-ok" : "event-err"}">${r.status.toUpperCase()} ${r.durationMs ? `(${r.durationMs}ms)` : ""}</span>
+        <span>${esc(r.title)} ${r.subtitle ? `<small style="color:#5b667d">(${esc(r.subtitle)})</small>` : ""}</span>
+        <span class="${r.status === "ok" ? "event-ok" : "event-err"}">${esc(r.status.toUpperCase())} ${r.durationMs ? `(${esc(r.durationMs)}ms)` : ""}</span>
       </div>
     `).join("")}
   </div>
