@@ -33,6 +33,11 @@ web/build/
 ehthumbs.db
 Thumbs.db
 
+# Local agent tooling, not part of the product
+.codex/
+.cursor/
+.impeccable/questions/
+
 # IDE & Editors
 .vscode/
 .idea/
