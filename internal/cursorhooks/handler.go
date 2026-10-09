@@ -39,6 +39,7 @@ const (
 	EventBeforeMCP   = "beforeMCPExecution"
 	EventAfterMCP    = "afterMCPExecution"
 	EventAfterEdit   = "afterFileEdit"
+	EventStop        = "stop" // the agent's turn ended; it never answers with a decision
 )
 
 // Handler serves POST bodies that are Cursor hook inputs.
@@ -83,6 +84,7 @@ type input struct {
 	FilePath       string          `json:"file_path"`
 	Content        string          `json:"content"`       // beforeReadFile: never stored
 	ContentBytes   int             `json:"content_bytes"` // set by `sentinel hook` when it shortened Content
+	StopStatus     string          `json:"status"`        // stop: completed | aborted | error
 	Edits          []struct {
 		Old string `json:"old_string"`
 		New string `json:"new_string"`
@@ -124,6 +126,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.afterMCP(in)
 	case EventAfterEdit:
 		h.afterEdit(in)
+	case EventStop:
+		h.stop(in)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -433,6 +437,36 @@ func (h *Handler) complete(in input, key, tool string, args map[string]any, text
 		Method: "tools/call", ToolName: c.tool, RPCID: c.id, Status: status, DurationMs: durationMs,
 		Payload: resultPayload(c.id, truncate(text), status == recorder.StatusError),
 	})
+}
+
+// stop closes every call of this conversation that never got its "after" hook.
+// Cursor sends no "after" when the user skips a command or stops the agent, so
+// without this the row would stay "Running" for the rest of the session.
+func (h *Handler) stop(in input) {
+	prefix := in.ConversationID + "\x00"
+	h.mu.Lock()
+	var left []openCall
+	for k, q := range h.open {
+		if strings.HasPrefix(k, prefix) {
+			left = append(left, q...)
+			delete(h.open, k)
+		}
+	}
+	h.mu.Unlock()
+
+	why := "Cursor ended the turn"
+	if in.StopStatus != "" {
+		why += " (" + in.StopStatus + ")"
+	}
+	text := why + " before reporting a result for this call. It may have been skipped, cancelled or interrupted."
+	for _, c := range left {
+		h.Rec.Record(recorder.Event{
+			Type: recorder.EventToolCallResponse, Direction: recorder.ServerToClient,
+			Method: "tools/call", ToolName: c.tool, RPCID: c.id, Status: recorder.StatusError,
+			DurationMs: time.Since(c.started).Milliseconds(),
+			Payload:    resultPayload(c.id, text, true),
+		})
+	}
 }
 
 func (h *Handler) afterShell(in input) {

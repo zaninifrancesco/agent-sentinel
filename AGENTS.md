@@ -6,7 +6,7 @@ Follow this when a user asks you to install Agent Sentinel, set it up, or "make 
 
 1. `~/.sentinel/bin/sentinel version` prints a version.
 2. `sentinel serve` is running, and `http://127.0.0.1:8848/api/config` returns JSON with `"approvals": true`.
-3. The target project's `.cursor/hooks.json` lists Sentinel on `beforeShellExecution`, `afterShellExecution`, `beforeReadFile` and `afterFileEdit`, and every hook that was already there is unchanged.
+3. The target project's `.cursor/hooks.json` lists Sentinel on `beforeShellExecution`, `afterShellExecution`, `beforeReadFile`, `afterFileEdit` and `stop`, and every hook that was already there is unchanged.
 4. A synthetic hook call is allowed and shows up in the cockpit.
 
 ## Do not
@@ -67,7 +67,7 @@ If the port is taken, curl it. A JSON config means Sentinel is already running: 
 ~/.sentinel/bin/sentinel hook install --dir "<target>"
 ```
 
-Check that `<target>/.cursor/hooks.json` contains exactly one `"sentinel hook"` command for each of `beforeShellExecution`, `afterShellExecution`, `beforeReadFile` and `afterFileEdit`, and that every pre-existing hook is still there. Run it again if you need to; a second install replaces Sentinel's own entries instead of duplicating them.
+Check that `<target>/.cursor/hooks.json` contains exactly one `"sentinel hook"` command for each of `beforeShellExecution`, `afterShellExecution`, `beforeReadFile`, `afterFileEdit` and `stop`, and that every pre-existing hook is still there. Run it again if you need to; a second install replaces Sentinel's own entries instead of duplicating them.
 
 Cursor reloads `hooks.json` when it changes. If the user has Cursor open on that project, tell them to look at Cursor Settings, Hooks tab. An empty list means Cursor has not loaded the file yet: reopen the project.
 

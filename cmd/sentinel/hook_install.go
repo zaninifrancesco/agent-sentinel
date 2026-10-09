@@ -17,11 +17,12 @@ import (
 	"github.com/zaninifrancesco/agent-sentinel/internal/proxy"
 )
 
-// Cursor hook events Sentinel listens to. Shell, file reads and file edits are
+// Cursor hook events Sentinel listens to. Shell, file reads, file edits and the
+// end of a turn (it closes the calls Cursor never reported back on) are
 // always installed; the MCP pair is opt-in because an MCP server that already
 // goes through `sentinel mcp` would be judged twice.
 var (
-	coreEvents = []string{cursorhooks.EventBeforeShell, cursorhooks.EventAfterShell, cursorhooks.EventBeforeRead, cursorhooks.EventAfterEdit}
+	coreEvents = []string{cursorhooks.EventBeforeShell, cursorhooks.EventAfterShell, cursorhooks.EventBeforeRead, cursorhooks.EventAfterEdit, cursorhooks.EventStop}
 	mcpEvents  = []string{cursorhooks.EventBeforeMCP, cursorhooks.EventAfterMCP}
 )
 

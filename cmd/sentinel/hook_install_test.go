@@ -75,8 +75,8 @@ func TestInstallKeepsOtherHooksAndIsIdempotent(t *testing.T) {
 func TestUninstallRemovesOnlyOurs(t *testing.T) {
 	f, _ := parseHooksFile([]byte(existing))
 	f.installOurs("/opt/sentinel dev/sentinel", append(append([]string{}, coreEvents...), mcpEvents...), 135, "deny")
-	if n := f.removeOurs(); n != 6 {
-		t.Fatalf("removed %d entries, want 6 (quoted path and a flag included)", n)
+	if n := f.removeOurs(); n != 7 {
+		t.Fatalf("removed %d entries, want 7 (quoted path and a flag included)", n)
 	}
 	if _, ok := f.Hooks["beforeShellExecution"]; ok {
 		t.Fatal("empty events must be dropped")

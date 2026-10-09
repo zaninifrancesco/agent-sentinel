@@ -317,9 +317,83 @@ func TestFileEditIsRecordedWithItsDiffAndFlaggedAfterTheFact(t *testing.T) {
 	}
 }
 
+func stopHook(conversation, status string) map[string]any {
+	return map[string]any{"hook_event_name": EventStop, "conversation_id": conversation, "status": status}
+}
+
+func responses(rec *recorder.Recorder) []recorder.Event {
+	var out []recorder.Event
+	for _, e := range rec.Events() {
+		if e.Type == recorder.EventToolCallResponse {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+func TestStopClosesACommandThatNeverReportedBack(t *testing.T) {
+	h := newHandler(t, policy.NewBroker(), time.Second)
+	ctx := context.Background()
+
+	// The user pressed Skip: Cursor sent the "before" and will never send the "after".
+	post(t, h, ctx, shell("sleep 600"))
+	if n := len(responses(h.Rec)); n != 0 {
+		t.Fatalf("a running command has no response yet, got %d", n)
+	}
+	if r := post(t, h, ctx, stopHook("c1", "aborted")); r != (Response{}) {
+		t.Fatalf("stop must answer with an empty object, got %+v", r)
+	}
+
+	req := waitEvent(t, h.Rec, "request", ofType(recorder.EventToolCallRequest))
+	res := waitEvent(t, h.Rec, "response", ofType(recorder.EventToolCallResponse))
+	if res.RPCID != req.RPCID || res.Status != recorder.StatusError {
+		t.Fatalf("the row must be closed with an error, got %+v", res)
+	}
+	if !strings.Contains(string(res.Payload), "aborted") {
+		t.Fatalf("the response should say why: %s", res.Payload)
+	}
+
+	// A second stop has nothing left to close.
+	post(t, h, ctx, stopHook("c1", "completed"))
+	if n := len(responses(h.Rec)); n != 1 {
+		t.Fatalf("stop closed a call twice: %d responses", n)
+	}
+}
+
+func TestStopOnlyClosesItsOwnConversation(t *testing.T) {
+	h := newHandler(t, policy.NewBroker(), time.Second)
+	ctx := context.Background()
+
+	post(t, h, ctx, shell("sleep 600")) // conversation c1
+	other := shell("sleep 700")
+	other["conversation_id"] = "c2"
+	post(t, h, ctx, other)
+
+	post(t, h, ctx, stopHook("c2", "completed"))
+	if got := responses(h.Rec); len(got) != 1 || !strings.Contains(string(got[0].Payload), "completed") {
+		t.Fatalf("only c2 should be closed, got %+v", got)
+	}
+	// c1's command is still in flight and finishes normally.
+	post(t, h, ctx, after("sleep 600", "", 5))
+	if got := responses(h.Rec); len(got) != 2 || got[1].Status != recorder.StatusOK {
+		t.Fatalf("c1 must still be answerable after c2's stop, got %+v", got)
+	}
+}
+
+func TestStopAfterNormalCompletionAddsNothing(t *testing.T) {
+	h := newHandler(t, policy.NewBroker(), time.Second)
+	ctx := context.Background()
+	post(t, h, ctx, shell("ls"))
+	post(t, h, ctx, after("ls", "x", 1))
+	post(t, h, ctx, stopHook("c1", "completed"))
+	if got := responses(h.Rec); len(got) != 1 || got[0].Status != recorder.StatusOK {
+		t.Fatalf("stop must not touch finished calls, got %+v", got)
+	}
+}
+
 func TestUnknownEventsAndBadInput(t *testing.T) {
 	h := newHandler(t, policy.NewBroker(), time.Second)
-	if r := post(t, h, context.Background(), map[string]any{"hook_event_name": "stop"}); r != (Response{}) {
+	if r := post(t, h, context.Background(), map[string]any{"hook_event_name": "sessionStart"}); r != (Response{}) {
 		t.Fatalf("unknown events get an empty answer, got %+v", r)
 	}
 	rr := httptest.NewRecorder()
