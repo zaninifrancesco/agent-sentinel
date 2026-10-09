@@ -34,6 +34,7 @@ const STATUS_MARK: Record<Status, { glyph: string; word: string; tone: Tone }> =
   error: { glyph: "▲", word: "ERROR", tone: "warn" },
   blocked: { glyph: "⊘", word: "BLOCKED", tone: "alert" },
   rejected: { glyph: "✕", word: "REJECTED", tone: "alert" },
+  interrupted: { glyph: "◌", word: "INTERRUPTED", tone: "warn" },
 };
 
 /** How a policy decision ended, in one phrase. Undefined when policy had nothing to say. */
@@ -279,6 +280,7 @@ export function buildReportHtml({ session, rows, config, exportedAt }: ReportInp
     fact("Refused", `<span${m.refused > 0 ? ' class="alert"' : ""}>${m.refused}</span>`),
     fact("Held for a human", esc(heldText)),
     fact("Tool errors", String(m.errors)),
+    ...(m.interrupted > 0 ? [fact("Interrupted (no result reported)", String(m.interrupted))] : []),
     fact("Median / p95", `${m.p50} / ${m.p95} ms`),
     fact(
       "Cost (estimate)",

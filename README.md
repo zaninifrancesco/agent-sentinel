@@ -70,6 +70,8 @@ If `sentinel serve` is not running, Cursor asks you to confirm each command inst
 
 `sentinel hook install --user` installs for every project, `--dry-run` shows the result without writing, and `sentinel hook uninstall` removes only Sentinel's entries.
 
+A command Cursor never reports back on (skipped, for example) shows as "Running" until the turn ends, then as **Interrupted**. `sentinel serve` prints a line each time Cursor ends a turn, so you can see the hook is wired.
+
 ## Use it with Claude Code
 
 ```bash
@@ -94,7 +96,7 @@ Two things work differently from Cursor:
 - **Sentinel only objects.** A call the policy has no problem with gets no answer from Sentinel, so Claude Code's own permission rules still decide whether to ask you. An explicit "allow" would switch them off. Sentinel says "allow" only when you approved the call in the cockpit.
 - **A call you rejected or the policy blocked never runs**, and Claude reads the reason (and your note) as the tool's result.
 
-If `sentinel serve` is not running, Claude Code asks you to confirm each call (`--offline deny` refuses instead). A call that is interrupted with Esc, or that you decline in Claude Code's own prompt, sends no result; Sentinel closes it as an error when the turn ends or the session closes. `sentinel hook uninstall --agent claude` removes only Sentinel's entries.
+If `sentinel serve` is not running, Claude Code asks you to confirm each call (`--offline deny` refuses instead). A call that is interrupted with Esc, or that you decline in Claude Code's own prompt, sends no result; Sentinel closes it as **interrupted** when the turn ends or the session closes. `sentinel hook uninstall --agent claude` removes only Sentinel's entries.
 
 ## Use it in front of an MCP server
 
@@ -167,6 +169,7 @@ Common flags: `--port N`, `--open`, `--policy`, `--max-cost`, `--approval-timeou
 - **It cannot undo or stop a file edit** made through Cursor's hooks, only record and flag it. Claude Code reports an edit before it happens, so there it can stop it.
 - **It sees only what the agents' hooks and MCP report.** Anything an agent does outside them is not covered. A file the Claude Code user attaches with `@` is added to the prompt without any tool call, so no hook sees it.
 - **Claude Code support is tested against its documented hook format, not yet against a live Claude Code.** Treat the first real session as the test, and open an issue for anything it does differently.
+- **A command you stop in Cursor still shows as done.** Cursor then sends the "finished" event as if it had completed, with whatever output it had, so Sentinel cannot tell. Claude Code does say so, and the row shows as interrupted.
 - **Cost figures are estimates**, as above.
 - **One session per `sentinel serve`.** Switching projects does not start a new one.
 - **There is no authentication.** The cockpit listens on `127.0.0.1` only and checks the Host and Origin of every request, but anything running as you on this machine can reach it.

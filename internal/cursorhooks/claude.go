@@ -200,13 +200,13 @@ func (h *Handler) claudeAfter(in input, failed bool) {
 	case failed:
 		status, text, size = recorder.StatusError, in.Error, len(in.Error)
 		if in.IsInterrupt {
-			text = "Interrupted: " + text
+			status, text = recorder.StatusInterrupted, "Interrupted: "+text
 		}
 	case tool == "shell":
 		var interrupted bool
 		text, interrupted = bashResult(in.ToolResponse)
 		if interrupted {
-			status = recorder.StatusError
+			status = recorder.StatusInterrupted
 		}
 	case tool == "read_file":
 		// The file went to the model; its content must not go to the log.

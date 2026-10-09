@@ -105,7 +105,7 @@ Il core engine supporta due modalità di intercettazione non invasiva:
    | Chiamata senza obiezioni | `permission: allow` | nessuna risposta, così valgono le regole di Claude Code (un `allow` esplicito salterebbe la sua richiesta di conferma) |
    | Sentinel non raggiungibile | `ask` | `ask` |
 
-   Le chiamate che l'agente non chiude (comando saltato o interrotto) restano "Running" finché non arriva `stop`/`Stop`/`SessionEnd`, che le chiude con un errore.
+   Le chiamate che l'agente non chiude (comando saltato, rifiutato dall'utente nella conferma dell'agente o interrotto) restano "Running" finché non arriva `stop`/`Stop`/`SessionEnd`, che le chiude con lo stato `interrupted`. Questo stato non è un errore dello strumento: il cockpit lo mostra con un'icona propria, la barra delle metriche e il report lo contano a parte, e la sua durata non entra nelle latenze (mediana e p95). Un comando interrotto che l'agente stesso riporta come finito (Cursor manda l'evento "dopo" comunque) resta `ok`, perché Sentinel non ha modo di saperlo; Claude Code invece segnala `interrupted` nella risposta dello strumento e Sentinel lo registra.
 
 Una modalità **PTY** (Sentinel lancia l'agente in uno pseudoterminale) era prevista in origine e non è più il piano: dal testo di un terminale non si ricavano in modo affidabile i singoli comandi, mentre gli hook li consegnano già strutturati. `sentinel run claude` sarà un avvio di Claude Code con gli hook di Sentinel attivi solo per quella sessione (`claude --settings`), non un PTY.
 

@@ -509,7 +509,7 @@ func (h *Handler) closeOpen(conversation, why string) int {
 	for _, c := range left {
 		h.Rec.Record(recorder.Event{
 			Type: recorder.EventToolCallResponse, Direction: recorder.ServerToClient,
-			Method: "tools/call", ToolName: c.tool, RPCID: c.id, Status: recorder.StatusError,
+			Method: "tools/call", ToolName: c.tool, RPCID: c.id, Status: recorder.StatusInterrupted,
 			DurationMs: time.Since(c.started).Milliseconds(),
 			Payload:    resultPayload(c.id, text, true),
 		})

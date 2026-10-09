@@ -77,6 +77,7 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
             <Line label="Events" value={String(rows.length)} />
             <Line label="Tool calls" value={String(m.calls)} />
             <Line label="Refused" value={String(m.refused)} alert={m.refused > 0} />
+            {m.interrupted > 0 && <Line label="Interrupted" value={String(m.interrupted)} />}
             {m.waiting > 0 && <Line label="Still waiting for a human" value={String(m.waiting)} />}
           </div>
 

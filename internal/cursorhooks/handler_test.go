@@ -381,8 +381,8 @@ func TestStopClosesACommandThatNeverReportedBack(t *testing.T) {
 
 	req := waitEvent(t, h.Rec, "request", ofType(recorder.EventToolCallRequest))
 	res := waitEvent(t, h.Rec, "response", ofType(recorder.EventToolCallResponse))
-	if res.RPCID != req.RPCID || res.Status != recorder.StatusError {
-		t.Fatalf("the row must be closed with an error, got %+v", res)
+	if res.RPCID != req.RPCID || res.Status != recorder.StatusInterrupted {
+		t.Fatalf("the row must be closed as interrupted, got %+v", res)
 	}
 	if !strings.Contains(string(res.Payload), "aborted") {
 		t.Fatalf("the response should say why: %s", res.Payload)

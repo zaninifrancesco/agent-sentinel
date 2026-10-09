@@ -10,6 +10,7 @@ export function statusText(s: Row["status"]): string {
     error: "Tool error",
     blocked: "Blocked by policy",
     rejected: "Rejected",
+    interrupted: "Interrupted",
   }[s];
 }
 
@@ -75,9 +76,26 @@ export function journeyStops(row: Row): Stop[] {
     stops.push({
       title: "Answered",
       at: row.response.timestamp,
-      text: row.status === "blocked" || row.status === "rejected" ? "Refusal sent to the agent, nothing ran" : statusText(row.status),
-      detail: row.durationMs !== undefined ? `took ${formatDuration(row.durationMs)}` : undefined,
-      tone: row.status === "ok" ? "done" : row.status === "error" ? "warn" : row.status === "pending" ? "quiet" : "alert",
+      text:
+        row.status === "blocked" || row.status === "rejected"
+          ? "Refusal sent to the agent, nothing ran"
+          : row.status === "interrupted"
+            ? "Interrupted before it finished"
+            : statusText(row.status),
+      detail:
+        row.durationMs !== undefined
+          ? row.status === "interrupted"
+            ? `after ${formatDuration(row.durationMs)}`
+            : `took ${formatDuration(row.durationMs)}`
+          : undefined,
+      tone:
+        row.status === "ok"
+          ? "done"
+          : row.status === "error" || row.status === "interrupted"
+            ? "warn"
+            : row.status === "pending"
+              ? "quiet"
+              : "alert",
     });
   } else if (row.status === "pending") {
     stops.push({ title: "Answered", text: "Running…", tone: "quiet" });

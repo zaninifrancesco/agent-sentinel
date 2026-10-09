@@ -30,7 +30,8 @@ function matches(row: Row, f: Filter): boolean {
       return (
         row.status === "error" ||
         row.status === "blocked" ||
-        row.status === "rejected"
+        row.status === "rejected" ||
+        row.status === "interrupted"
       );
     case "raw":
       return row.kind === "raw";

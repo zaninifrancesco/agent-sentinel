@@ -53,6 +53,10 @@ const (
 	StatusError    Status = "error"
 	StatusBlocked  Status = "blocked"  // refused by policy
 	StatusRejected Status = "rejected" // a human said no (or the approval timed out)
+
+	// StatusInterrupted: the call started and never reported a result, because it
+	// was skipped, declined, cancelled or cut short. Not a failure of the tool.
+	StatusInterrupted Status = "interrupted"
 )
 
 // Event is the immutable record of one thing that happened in a session.

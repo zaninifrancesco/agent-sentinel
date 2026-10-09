@@ -7,6 +7,8 @@ export interface Metrics {
   /** Blocked by policy or rejected by a human (or a timeout). Nothing ran. */
   refused: number;
   errors: number;
+  /** Calls that never reported a result (skipped, declined, cancelled or cut short). Not tool errors. */
+  interrupted: number;
   tokens: number;
   /** Estimated USD. See `computeMetrics`. */
   cost: number;
@@ -27,7 +29,8 @@ export interface Metrics {
 export function computeMetrics(rows: Row[]): Metrics {
   const tools = rows.filter((r) => r.kind === "tool");
   const durations = rows
-    .filter((r) => r.durationMs !== undefined && r.durationMs > 0 && r.status !== "rejected")
+    // An interrupted call's duration is how long Sentinel waited to close it, not the tool's latency.
+    .filter((r) => r.durationMs !== undefined && r.durationMs > 0 && r.status !== "rejected" && r.status !== "interrupted")
     .map((r) => r.durationMs!)
     .sort((a, b) => a - b);
   const at = (q: number) => (durations.length ? durations[Math.min(durations.length - 1, Math.floor(durations.length * q))] : 0);
@@ -46,6 +49,7 @@ export function computeMetrics(rows: Row[]): Metrics {
     running: rows.filter((r) => r.status === "pending").length,
     refused: rows.filter((r) => r.status === "blocked" || r.status === "rejected").length,
     errors: rows.filter((r) => r.status === "error").length,
+    interrupted: rows.filter((r) => r.status === "interrupted").length,
     tokens: tin + tout,
     cost: (tin / 1_000_000) * 3 + (tout / 1_000_000) * 15,
     p50: at(0.5),

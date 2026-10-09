@@ -176,6 +176,51 @@ func TestBroker(t *testing.T) {
 	}
 }
 
+// The cockpit can answer as soon as the request is visible, which is before the
+// goroutine that holds the call has started waiting for it. That answer must
+// not be lost (it used to turn an approval or a rejection into "cancelled").
+func TestBrokerAnswerBeforeWaitIsDelivered(t *testing.T) {
+	b := NewBroker()
+	b.Open(1)
+	if err := b.Resolve(1, Verdict{Approved: true, Feedback: "early"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := b.Pending(); len(got) != 0 {
+		t.Fatalf("an answered request is no longer pending, got %v", got)
+	}
+	if err := b.Resolve(1, Verdict{Approved: false}); err != ErrNotPending {
+		t.Fatalf("a second answer must fail even before Wait ran, got %v", err)
+	}
+	v, err := b.Wait(context.Background(), 1)
+	if err != nil || !v.Approved || v.Feedback != "early" {
+		t.Fatalf("the early answer was lost: %+v, %v", v, err)
+	}
+	if _, err := b.Wait(context.Background(), 1); err != ErrNotPending {
+		t.Fatalf("a request is waited for once, got %v", err)
+	}
+}
+
+// An answer that lands just as the wait expires is either delivered or refused,
+// never acknowledged and then dropped.
+func TestBrokerAnswerAndTimeoutNeverDisagree(t *testing.T) {
+	for i := 0; i < 500; i++ {
+		b := NewBroker()
+		b.Open(1)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(i%50)*10*time.Microsecond)
+		resolved := make(chan error, 1)
+		go func() { resolved <- b.Resolve(1, Verdict{Approved: true}) }()
+		v, err := b.Wait(ctx, 1)
+		cancel()
+		rerr := <-resolved
+		switch {
+		case rerr == nil && !(err == nil && v.Approved):
+			t.Fatalf("Resolve said yes but Wait returned %+v, %v", v, err)
+		case rerr != nil && err == nil:
+			t.Fatalf("Resolve said no (%v) but Wait delivered %+v", rerr, v)
+		}
+	}
+}
+
 func TestBudgetSetLimits(t *testing.T) {
 	b := NewBudget(0, 0)
 	if b.Enabled() {

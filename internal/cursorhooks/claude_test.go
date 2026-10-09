@@ -240,8 +240,16 @@ func TestClaudeFailuresAndInterruptsAreErrors(t *testing.T) {
 	postClaude(t, h, ctx, pre("Bash", "f2", bash("sleep 100")))
 	postClaude(t, h, ctx, claudePost("Bash", "f2", bash("sleep 100"), map[string]any{"stdout": "", "interrupted": true}))
 
+	// A failure is an error; a command cut short is not the tool's fault.
+	postClaude(t, h, ctx, pre("Bash", "f3", bash("sleep 100")))
+	cut := claudePost("Bash", "f3", bash("sleep 100"), nil)
+	cut["hook_event_name"] = EventClaudePostFailure
+	delete(cut, "tool_response")
+	cut["error"], cut["is_interrupt"] = "The user doesn't want to proceed", true
+	postClaude(t, h, ctx, cut)
+
 	got := responses(h.Rec)
-	if len(got) != 2 || got[0].Status != recorder.StatusError || got[1].Status != recorder.StatusError {
+	if len(got) != 3 || got[0].Status != recorder.StatusError || got[1].Status != recorder.StatusInterrupted || got[2].Status != recorder.StatusInterrupted {
 		t.Fatalf("got %+v", got)
 	}
 	if !strings.Contains(string(got[0].Payload), "Cannot find module") || !strings.Contains(string(got[1].Payload), "interrupted") {
@@ -274,7 +282,7 @@ func TestClaudeStopAndSessionEndCloseWhatInterruptsLeftOpen(t *testing.T) {
 
 	postClaude(t, h, ctx, map[string]any{"hook_event_name": EventClaudeStop, "session_id": "s1", "stop_hook_active": false})
 	got := responses(h.Rec)
-	if len(got) != 1 || got[0].Status != recorder.StatusError || !strings.Contains(string(got[0].Payload), "ended the turn") {
+	if len(got) != 1 || got[0].Status != recorder.StatusInterrupted || !strings.Contains(string(got[0].Payload), "ended the turn") {
 		t.Fatalf("Stop must close s1's call only, got %+v", got)
 	}
 

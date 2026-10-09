@@ -18,7 +18,8 @@ export type Status =
   | "ok"
   | "error"
   | "blocked"
-  | "rejected";
+  | "rejected"
+  | "interrupted";
 export type Risk = "none" | "low" | "medium" | "high" | "critical";
 
 export interface SentinelEvent {

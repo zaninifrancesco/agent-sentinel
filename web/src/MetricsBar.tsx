@@ -28,6 +28,7 @@ export function MetricsBar({ metrics: m, maxCostUsd, maxTokens, editable, onEdit
       <Item label="Running" value={m.running} />
       <Item label="Refused" value={m.refused} alert={m.refused > 0} />
       <Item label="Errors" value={m.errors} />
+      {m.interrupted > 0 && <Item label="Interrupted" value={m.interrupted} />}
 
       <div className="ml-auto flex flex-wrap items-center gap-x-5 gap-y-1" title={COST_NOTE}>
         <div className="flex items-baseline gap-2">
