@@ -2,6 +2,13 @@
 
 > **The Local-First Flight Recorder, Execution Boundary & Cockpit for AI Coding Agents**
 
+> **Stato del documento.** Questa è la specifica di visione scritta all'inizio del progetto; descrive anche cose che oggi non esistono. Per ciò che funziona davvero, vedi il [README](README.md) e [PRODUCT.md](PRODUCT.md). Differenze principali:
+> - **Storage:** gli eventi stanno in memoria e sono scritti in un file JSONL per sessione (`~/.sentinel/sessions/`), non in SQLite.
+> - **Streaming:** solo WebSocket; non c'è SSE.
+> - **PTY:** non è più il piano. Cursor e Claude Code si supervisionano con i loro hook, gli altri strumenti via proxy MCP.
+> - **`sentinel run` e `sentinel export`** non sono implementati (il report si esporta dal bottone nel cockpit).
+> - **Diagrammi Mermaid nel report, metriche di "file modificati" e "pensieri dell'agente"**: non presenti.
+
 ---
 
 ## 1. Executive Summary & Vision

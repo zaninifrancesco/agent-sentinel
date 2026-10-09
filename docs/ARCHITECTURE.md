@@ -2,6 +2,13 @@
 
 > **The Local-First Flight Recorder, Execution Boundary & Cockpit for AI Coding Agents**
 
+> **Stato del documento.** Questa è la specifica di visione scritta all'inizio del progetto; descrive anche cose che oggi non esistono. Per ciò che funziona davvero, vedi il [README](../README.md) e [PRODUCT.md](../PRODUCT.md). Differenze principali:
+> - **Storage:** gli eventi stanno in memoria e sono scritti in un file JSONL per sessione (`~/.sentinel/sessions/`), non in SQLite.
+> - **Streaming:** solo WebSocket; non c'è SSE.
+> - **PTY:** non è più il piano. Cursor e Claude Code si supervisionano con i loro hook, gli altri strumenti via proxy MCP.
+> - **`sentinel run` e `sentinel export`** non sono implementati (il report si esporta dal bottone nel cockpit).
+> - **Diagrammi Mermaid nel report, metriche di "file modificati" e "pensieri dell'agente"**: non presenti.
+
 ---
 
 ## 1. Executive Summary & Product Vision
@@ -51,10 +58,10 @@ flowchart TD
 
     subgraph SentinelCore["2. Sentinel Core Engine (Go)"]
         direction TB
-        Proxy["MCP / JSON-RPC & CLI Proxy"]
+        Proxy["MCP Proxy & Agent Hooks\n(Cursor, Claude Code)"]
         PolicyEngine["Policy & Boundary Engine\n(Cost Limits, Secret Leak, Dangerous Commands)"]
-        Recorder["Flight Recorder & State Store\n(In-memory / SQLite event log)"]
-        WSServer["WebSocket & SSE Streaming Server"]
+        Recorder["Flight Recorder & State Store\n(In-memory + JSONL session log)"]
+        WSServer["WebSocket Streaming Server"]
         
         Proxy --> PolicyEngine
         PolicyEngine --> Recorder
@@ -63,7 +70,7 @@ flowchart TD
 
     subgraph Downstream["3. Execution & Upstream"]
         LocalFS["Local Workspace / Git Worktrees"]
-        UpstreamMCP["Upstream MCP Servers / Shell PTY"]
+        UpstreamMCP["Upstream MCP Servers / agent tools"]
         LLMProviders["LLM Providers (Anthropic, OpenAI, etc.)"]
         
         PolicyEngine -->|If Approved| UpstreamMCP
@@ -150,7 +157,7 @@ Gli eventi registrati da Sentinel seguono uno schema canonico immutabile:
 * **Visual Diff Viewer:** Integrazione di un visualizzatore di diff (side-by-side e unified) con sintassi evidenziata per ispezionare le modifiche ai file prima dell'applicazione.
 
 ### 4.5 Standalone Report Generator (Deliverable Hub)
-A fine sessione (o su comando `sentinel export`), il motore genera un singolo file HTML autonomo:
+A fine sessione, dal bottone Export del cockpit (il comando `sentinel export` non esiste ancora), il motore genera un singolo file HTML autonomo:
 - Zero dipendenze esterne (CSS e JS inline).
 - Diagrammi Mermaid renderizzati.
 - Timeline interattiva espandibile.
@@ -175,8 +182,8 @@ sentinel mcp --port 8848
 # 3. Aprire il cockpit web su una sessione passata
 sentinel ui --session sess_01j7x9k2
 
-# 4. Esportare il report standalone dell'ultima sessione
-sentinel export --format html -o ./audit-report.html
+# 4. Esportare il report standalone: bottone Export nel cockpit
+# (non ancora implementato) sentinel export --format html -o ./audit-report.html
 ```
 
 ---

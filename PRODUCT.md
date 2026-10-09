@@ -38,7 +38,7 @@ It is on the wire, not beside it: because it proxies the protocol it can stop a 
 - The session budget (cost and token limits) can be set, raised or removed from the cockpit's status strip while a session is live. Every change is written to the session log as a "Budget changed" row, so the audit shows who moved the ceiling and from what.
 - Cost and tokens are estimates from tool traffic size only (the proxy cannot see the LLM API); the UI must label them as estimates.
 - The UI is a React + Vite + Tailwind SPA built into `internal/ui/dist` and embedded in the Go binary with `go:embed`. It must work offline, with no CDN assets or external fonts.
-- Statuses the UI must express: pending, awaiting approval, ok, error, blocked (by policy), rejected (by a human or timeout).
+- Statuses the UI must express: pending, awaiting approval, ok, error, blocked (by policy), rejected (by a human or timeout), interrupted (the call never reported a result: skipped, declined, cancelled or cut short). Interrupted is not an error of the tool, so it has its own glyph (a dashed circle), its own count, and its duration stays out of the latency figures.
 - The standalone HTML report (Export button) is built in the browser from the timeline rows: summary facts, every policy and human decision with its rule and reason, and the timetable with each call's journey. It is one offline file with no script, follows the reader's light or dark theme, and leaves payloads out. It is a secondary surface; do not design the cockpit around it. A `sentinel export` command does not exist yet.
 - Undecided: light theme, multi-session views, mobile layout.
 
