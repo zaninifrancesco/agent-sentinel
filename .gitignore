@@ -34,6 +34,7 @@ ehthumbs.db
 Thumbs.db
 
 # Local agent tooling, not part of the product
+.claude/
 .codex/
 .cursor/
 .impeccable/questions/

@@ -90,10 +90,24 @@ flowchart TD
 
 ## 4. Specifiche Tecniche dei Componenti Core
 
-### 4.1 Interception Engine (MCP Proxy & PTY Supervisor)
+### 4.1 Interception Engine (MCP Proxy & Agent Hooks)
 Il core engine supporta due modalità di intercettazione non invasiva:
 1. **MCP Proxy Mode:** Si registra come server/middleware MCP. Quando l'agente esegue chiamate a tool (es. `execute_command`, `write_file`, `search_files`), la richiesta passa attraverso Sentinel via JSON-RPC 2.0.
-2. **CLI Supervisor / PTY Mode:** Sentinel lancia l'agente come sotto-processo all'interno di uno pseudoterminale (PTY). Questo permette di catturare sia stdout/stderr in streaming che i comandi eseguiti, mantenendo l'interattività da terminale per l'utente.
+2. **Agent Hooks Mode (Cursor, Claude Code):** l'agente stesso comunica a Sentinel ogni passo, tramite i suoi hook, e legge la decisione di Sentinel prima di eseguirlo. `sentinel hook` è il comando che l'agente lancia a ogni passo: inoltra il JSON a `sentinel serve` e restituisce la risposta nello schema dell'agente. Ogni agente ha il suo adattatore (`internal/cursorhooks`), che traduce gli eventi in chiamate `tools/call` e li passa allo stesso motore di policy, approvazioni e budget del proxy MCP.
+
+   | | Cursor | Claude Code |
+   | :--- | :--- | :--- |
+   | Dove si installano | `.cursor/hooks.json` | `.claude/settings.local.json` (o `~/.claude/settings.json`) |
+   | Prima del passo | `beforeShellExecution`, `beforeReadFile`, `beforeMCPExecution` | `PreToolUse` (ogni tool, anche le modifiche ai file) |
+   | Dopo il passo | `afterShellExecution`, `afterFileEdit`, `afterMCPExecution` | `PostToolUse`, `PostToolUseFailure` |
+   | Fine turno | `stop` | `Stop`, `SessionEnd` |
+   | Modifica di un file | solo registrata dopo il fatto | giudicata e bloccabile prima |
+   | Chiamata senza obiezioni | `permission: allow` | nessuna risposta, così valgono le regole di Claude Code (un `allow` esplicito salterebbe la sua richiesta di conferma) |
+   | Sentinel non raggiungibile | `ask` | `ask` |
+
+   Le chiamate che l'agente non chiude (comando saltato o interrotto) restano "Running" finché non arriva `stop`/`Stop`/`SessionEnd`, che le chiude con un errore.
+
+Una modalità **PTY** (Sentinel lancia l'agente in uno pseudoterminale) era prevista in origine e non è più il piano: dal testo di un terminale non si ricavano in modo affidabile i singoli comandi, mentre gli hook li consegnano già strutturati. `sentinel run claude` sarà un avvio di Claude Code con gli hook di Sentinel attivi solo per quella sessione (`claude --settings`), non un PTY.
 
 ### 4.2 Policy & Guardrail Engine (Security Boundary)
 Il motore di regole valuta ogni azione prima che venga inoltrata al sistema:
@@ -147,9 +161,13 @@ A fine sessione (o su comando `sentinel export`), il motore genera un singolo fi
 ## 5. Modalità d'Uso & CLI UX
 
 ```bash
-# 1. Avviare un agente sotto la supervisione di Sentinel
-sentinel run claude
-sentinel run aider --model gpt-4.1
+# 1. Supervisionare Cursor o Claude Code tramite i loro hook
+sentinel serve --open
+sentinel hook install                  # Cursor: .cursor/hooks.json
+sentinel hook install --agent claude   # Claude Code: .claude/settings.local.json
+
+# (non ancora implementato) avviare Claude Code con gli hook attivi solo per quella sessione
+# sentinel run claude
 
 # 2. Avviare solo come proxy MCP per client come Cursor o Claude Desktop
 sentinel mcp --port 8848

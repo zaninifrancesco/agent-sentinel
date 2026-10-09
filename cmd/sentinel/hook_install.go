@@ -143,9 +143,10 @@ func runHookInstall(args []string, install bool) int {
 	}
 	fs := flag.NewFlagSet("hook "+name, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	user := fs.Bool("user", false, "use ~/.cursor/hooks.json (every project) instead of this project's .cursor/hooks.json")
+	agent := fs.String("agent", "cursor", "which agent to supervise: cursor (.cursor/hooks.json) or claude (.claude/settings.local.json)")
+	user := fs.Bool("user", false, "use the agent's user-level file (~/.cursor/hooks.json, ~/.claude/settings.json: every project) instead of this project's")
 	dir := fs.String("dir", ".", "project directory (ignored with --user)")
-	mcp := fs.Bool("mcp", false, "also gate MCP tool calls made through Cursor (skip it for servers already behind `sentinel mcp`)")
+	mcp := fs.Bool("mcp", false, "also gate MCP tool calls made through the agent (skip it for servers already behind `sentinel mcp`)")
 	offline := fs.String("offline", "ask", "what the hook answers when Sentinel is not running: ask, deny or allow")
 	approvalTimeout := fs.Duration("approval-timeout", proxy.DefaultApprovalTimeout, "the --approval-timeout you run `sentinel serve` with")
 	dry := fs.Bool("dry-run", false, "print the resulting file and write nothing")
@@ -157,6 +158,15 @@ func runHookInstall(args []string, install bool) int {
 	}
 	if *offline != "ask" && *offline != "deny" && *offline != "allow" {
 		fmt.Fprintf(os.Stderr, "sentinel hook %s: --offline must be ask, deny or allow\n", name)
+		return 2
+	}
+
+	switch *agent {
+	case "cursor":
+	case "claude":
+		return runClaudeHookInstall(install, *user, *dir, *offline, *approvalTimeout, *mcp, *dry)
+	default:
+		fmt.Fprintf(os.Stderr, "sentinel hook %s: --agent must be cursor or claude, not %q\n", name, *agent)
 		return 2
 	}
 

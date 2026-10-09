@@ -10,6 +10,8 @@ import (
 	"os"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/zaninifrancesco/agent-sentinel/internal/cursorhooks"
 )
 
 const defaultServePort = 8848
@@ -136,6 +138,9 @@ func offlineAnswer(input []byte, mode string) []byte {
 		Event string `json:"hook_event_name"`
 	}
 	_ = json.Unmarshal(input, &in)
+	if in.Event == cursorhooks.EventClaudePre {
+		return claudeOfflineAnswer(mode)
+	}
 	if !strings.HasPrefix(in.Event, "before") {
 		return []byte("{}\n")
 	}
@@ -155,5 +160,23 @@ func offlineAnswer(input []byte, mode string) []byte {
 		resp["agent_message"] = "Refused: Agent Sentinel is not running and the hook is set to fail closed. The call was NOT executed."
 	}
 	b, _ := json.Marshal(resp)
+	return append(b, '\n')
+}
+
+// claudeOfflineAnswer is what Claude Code is told when Sentinel could not decide
+// about a tool call. Silence would let the call through unchecked and unnoticed,
+// so by default Claude Code is told to ask the user, which it does even in a
+// mode that would otherwise approve the call by itself.
+func claudeOfflineAnswer(mode string) []byte {
+	if mode == "allow" {
+		return []byte("{}\n")
+	}
+	d := map[string]string{"hookEventName": cursorhooks.EventClaudePre, "permissionDecision": mode}
+	if mode == "deny" {
+		d["permissionDecisionReason"] = "Agent Sentinel is not running and the hook is set to fail closed. The call was NOT executed."
+	} else {
+		d["permissionDecisionReason"] = "Agent Sentinel could not be reached, so nothing checked this call."
+	}
+	b, _ := json.Marshal(map[string]any{"hookSpecificOutput": d})
 	return append(b, '\n')
 }

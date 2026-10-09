@@ -86,10 +86,23 @@ type input struct {
 	Content        string          `json:"content"`       // beforeReadFile: never stored
 	ContentBytes   int             `json:"content_bytes"` // set by `sentinel hook` when it shortened Content
 	StopStatus     string          `json:"status"`        // stop: completed | aborted | error
-	Edits          []struct {
-		Old string `json:"old_string"`
-		New string `json:"new_string"`
-	} `json:"edits"`
+	Edits          []fileEdit      `json:"edits"`
+
+	// Claude Code (see claude.go). Its tool events carry the tool's input and
+	// result as JSON, and name the conversation session_id.
+	SessionID    string          `json:"session_id"`
+	ToolUseID    string          `json:"tool_use_id"`
+	ToolResponse json.RawMessage `json:"tool_response"`
+	Error        string          `json:"error"`
+	IsInterrupt  bool            `json:"is_interrupt"`
+	DurationMS   float64         `json:"duration_ms"`
+	EndReason    string          `json:"reason"` // SessionEnd
+}
+
+// fileEdit is one search/replace in a file.
+type fileEdit struct {
+	Old string `json:"old_string"`
+	New string `json:"new_string"`
 }
 
 // Response is what Cursor reads back from the hook.
@@ -97,6 +110,11 @@ type Response struct {
 	Permission   string `json:"permission,omitempty"` // allow | deny | ask
 	UserMessage  string `json:"user_message,omitempty"`
 	AgentMessage string `json:"agent_message,omitempty"`
+
+	// approved marks an allow that a human gave in the cockpit (as opposed to
+	// one nothing objected to). Cursor does not care; Claude Code does, because
+	// there an explicit allow skips its own permission prompt.
+	approved bool
 }
 
 func allow() Response { return Response{Permission: "allow"} }
@@ -107,6 +125,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var in input
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		http.Error(w, "bad hook input", http.StatusBadRequest)
+		return
+	}
+	if isClaudeEvent(in.Event) {
+		h.serveClaude(w, r, in)
 		return
 	}
 	var resp Response
@@ -244,12 +266,19 @@ func resultPayload(id, text string, isError bool) json.RawMessage {
 // before is the gate: it records the call, applies the policy and the budget,
 // holds it for a human when needed, and returns Cursor's permission.
 func (h *Handler) before(ctx context.Context, in input, tool string, args map[string]any, key string) Response {
+	return h.gate(ctx, in, tool, args, key, policy.NewCall(tool, args))
+}
+
+// gate is before with the call the policy judges given by the caller, for the
+// tools whose arguments hold more than what should be inspected (an edit's old
+// text is not what the model is about to write).
+func (h *Handler) gate(ctx context.Context, in input, tool string, args map[string]any, key string, call policy.Call) Response {
 	id := h.newID()
 	payload := requestPayload(id, tool, args)
 
 	res := policy.Result{Decision: policy.Allow, Risk: recorder.RiskNone}
 	if h.Engine != nil {
-		res = h.Engine.Evaluate(policy.NewCall(tool, args))
+		res = h.Engine.Evaluate(call)
 	}
 	isRead := in.Event == EventBeforeRead
 	if isRead && res.Decision == policy.Allow {
@@ -340,6 +369,7 @@ func (h *Handler) hold(ctx context.Context, in input, req recorder.Event, key st
 			h.trackOpen(in, key, req.RPCID, req.ToolName)
 		}
 		r := allow()
+		r.approved = true
 		if verdict.Feedback != "" {
 			r.AgentMessage = "[Agent Sentinel] The operator approved this call with a note: " + verdict.Feedback
 		}
@@ -421,6 +451,13 @@ func (h *Handler) takeOpen(in input, key string) (openCall, bool) {
 // (the hook was installed mid-command, or the daemon restarted) it records the
 // request too, so the call still appears as one row.
 func (h *Handler) complete(in input, key, tool string, args map[string]any, text string, status recorder.Status, durationMs int64) {
+	h.completeSized(in, key, tool, args, text, len(text), status, durationMs)
+}
+
+// completeSized is complete for a result whose stored text is not what went
+// back to the model: a file read goes to the model whole, but its content must
+// not land in the session log. resultBytes is what the budget counts.
+func (h *Handler) completeSized(in input, key, tool string, args map[string]any, text string, resultBytes int, status recorder.Status, durationMs int64) {
 	c, ok := h.takeOpen(in, key)
 	if !ok {
 		c = openCall{id: h.newID(), tool: tool}
@@ -431,7 +468,7 @@ func (h *Handler) complete(in input, key, tool string, args map[string]any, text
 		})
 	}
 	if h.Budget != nil {
-		h.Budget.AddInput(len(text))
+		h.Budget.AddInput(resultBytes)
 	}
 	h.Rec.Record(recorder.Event{
 		Type: recorder.EventToolCallResponse, Direction: recorder.ServerToClient,
@@ -444,7 +481,20 @@ func (h *Handler) complete(in input, key, tool string, args map[string]any, text
 // Cursor sends no "after" when the user skips a command or stops the agent, so
 // without this the row would stay "Running" for the rest of the session.
 func (h *Handler) stop(in input) {
-	prefix := in.ConversationID + "\x00"
+	why := "Cursor ended the turn"
+	if in.StopStatus != "" {
+		why += " (" + in.StopStatus + ")"
+	}
+	n := h.closeOpen(in.ConversationID, why)
+	if h.Logf != nil {
+		h.Logf("Cursor sent stop (%s) for conversation %s; closed %d unfinished call(s)", in.StopStatus, in.ConversationID, n)
+	}
+}
+
+// closeOpen answers every call of the conversation that is still waiting for
+// its result, with an error that says why it never came, and returns how many.
+func (h *Handler) closeOpen(conversation, why string) int {
+	prefix := conversation + "\x00"
 	h.mu.Lock()
 	var left []openCall
 	for k, q := range h.open {
@@ -455,14 +505,7 @@ func (h *Handler) stop(in input) {
 	}
 	h.mu.Unlock()
 
-	if h.Logf != nil {
-		h.Logf("Cursor sent stop (%s) for conversation %s; closed %d unfinished call(s)", in.StopStatus, in.ConversationID, len(left))
-	}
-	why := "Cursor ended the turn"
-	if in.StopStatus != "" {
-		why += " (" + in.StopStatus + ")"
-	}
-	text := why + " before reporting a result for this call. It may have been skipped, cancelled or interrupted."
+	text := why + " before reporting a result for this call. It may have been skipped, declined, cancelled or interrupted."
 	for _, c := range left {
 		h.Rec.Record(recorder.Event{
 			Type: recorder.EventToolCallResponse, Direction: recorder.ServerToClient,
@@ -471,6 +514,7 @@ func (h *Handler) stop(in input) {
 			Payload:    resultPayload(c.id, text, true),
 		})
 	}
+	return len(left)
 }
 
 func (h *Handler) afterShell(in input) {
@@ -524,10 +568,12 @@ func (h *Handler) afterEdit(in input) {
 
 // editDiff renders Cursor's search/replace edits as a unified diff the cockpit
 // can show. Line numbers are unknown, so each hunk starts at line 1.
-func editDiff(in input) string {
+func editDiff(in input) string { return renderDiff(in.FilePath, in.Edits) }
+
+func renderDiff(path string, edits []fileEdit) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "--- a/%s\n+++ b/%s\n", strings.TrimPrefix(in.FilePath, "/"), strings.TrimPrefix(in.FilePath, "/"))
-	for _, e := range in.Edits {
+	fmt.Fprintf(&b, "--- a/%s\n+++ b/%s\n", strings.TrimPrefix(path, "/"), strings.TrimPrefix(path, "/"))
+	for _, e := range edits {
 		oldLines, newLines := splitLines(e.Old), splitLines(e.New)
 		fmt.Fprintf(&b, "@@ -%s +%s @@\n", hunkRange(len(oldLines)), hunkRange(len(newLines)))
 		for _, l := range oldLines {
