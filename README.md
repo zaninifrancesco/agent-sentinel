@@ -12,6 +12,8 @@ It works with the **Cursor agent** and **Claude Code** (through their hooks) and
 
 A coding agent setting this up should follow [AGENTS.md](AGENTS.md). It is the ordered procedure, with the checks that mean it is actually working.
 
+![The cockpit: a live timeline of the agent's calls, with a blocked read of .env.local and a recursive delete held for approval](docs/cockpit.png)
+
 ## What it does
 
 - **Records** every shell command, file read, file edit and MCP call the agent makes, with its result and timing, in a live timeline. Sessions are saved as JSONL and can be replayed.
