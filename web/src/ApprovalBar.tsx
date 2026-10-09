@@ -63,7 +63,7 @@ export function ApprovalBar({ pendingRow, more, busy, error, timeoutSec, onAppro
   const rule = pendingRow.request?.rule;
   const total = timeoutSec > 0 ? timeoutSec : 120;
   const left = Math.max(0, total - elapsed);
-  const turn = Math.min(1, elapsed / total) * 360;
+  const fraction = Math.min(1, elapsed / total);
 
   return (
     <section
@@ -71,7 +71,7 @@ export function ApprovalBar({ pendingRow, more, busy, error, timeoutSec, onAppro
       className="light-scope shrink-0 text-ink border-t-2 border-ink bg-yellow px-6 py-3"
     >
       <div className="mx-auto grid max-w-5xl grid-cols-[auto_minmax(0,1fr)] items-center gap-x-5 gap-y-3 lg:grid-cols-[auto_minmax(0,1fr)_auto]">
-        <StationClock turn={turn} left={left} />
+        <Countdown fraction={fraction} left={left} />
 
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
@@ -138,40 +138,16 @@ export function ApprovalBar({ pendingRow, more, busy, error, timeoutSec, onAppro
 }
 
 /**
- * A station clock whose red second hand makes one turn over the approval
- * window. The remaining time is also written out: the drawing is not the only
- * carrier of the information.
+ * The time left to decide, written out and drawn as a bar that empties. The
+ * bar is decoration: the remaining time is also in the text.
  */
-function StationClock({ turn, left }: { turn: number; left: number }) {
-  const ticks = Array.from({ length: 60 }, (_, i) => i);
+function Countdown({ fraction, left }: { fraction: number; left: number }) {
   return (
-    <div className="flex items-center gap-3">
-      <svg viewBox="0 0 64 64" className="size-16 shrink-0" role="img" aria-label={`${formatClock(left)} left to decide`}>
-        <circle cx="32" cy="32" r="30" fill="#fbfaf5" stroke="#15140f" strokeWidth="2" />
-        {ticks.map((i) => {
-          const major = i % 5 === 0;
-          return (
-            <line
-              key={i}
-              x1="32"
-              y1="5"
-              x2="32"
-              y2={major ? 12 : 8}
-              stroke="#15140f"
-              strokeWidth={major ? 2.4 : 1}
-              transform={`rotate(${i * 6} 32 32)`}
-            />
-          );
-        })}
-        <g className="clock-hand" style={{ transform: `rotate(${turn}deg)` }}>
-          <line x1="32" y1="38" x2="32" y2="10" stroke="#d5001c" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="32" cy="14" r="3.6" fill="#d5001c" />
-        </g>
-        <circle cx="32" cy="32" r="2.2" fill="#15140f" />
-      </svg>
-      <div className="leading-tight">
-        <div className="fig text-2xl font-bold text-ink">{formatClock(left)}</div>
-        <div className="text-xs text-ink">to decide</div>
+    <div className="w-24 shrink-0 leading-tight" role="timer" aria-label={`${formatClock(left)} left to decide`}>
+      <div className="fig text-3xl font-bold text-ink">{formatClock(left)}</div>
+      <div className="text-xs text-ink">to decide</div>
+      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-ink/20" aria-hidden>
+        <div className="h-full bg-ink countdown-bar" style={{ width: `${(1 - fraction) * 100}%` }} />
       </div>
     </div>
   );

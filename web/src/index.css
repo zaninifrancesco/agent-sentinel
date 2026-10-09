@@ -146,15 +146,13 @@ button:disabled {
   background: var(--color-ink-3);
 }
 
-/* The station clock's second hand: one authored motion. It steps once a
-   second like a real station clock, and holds still for reduced-motion users
-   (the remaining time is also written out as text). */
-.clock-hand {
-  transform-origin: 32px 32px;
-  transition: transform 1s linear;
+/* The countdown bar steps down once a second, and holds still for
+   reduced-motion users (the remaining time is also written out as text). */
+.countdown-bar {
+  transition: width 1s linear;
 }
 @media (prefers-reduced-motion: reduce) {
-  .clock-hand {
+  .countdown-bar {
     transition: none;
   }
 }

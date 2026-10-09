@@ -93,7 +93,7 @@ components:
 
 The cockpit is a departure board for an agent's actions. A developer glances at it on a second screen while the agent works, so the page reads like Swiss station signage: a warm paper ground, near-black ink, ruled rows, tabular times down the left edge. It lends the world its type, palette, density and one signature move; it does not copy a railway's decoration.
 
-The signature is the station clock in the approval dock. When a call is held for a human decision, its red second hand makes one full turn over the approval timeout and the remaining time is written beside it. Everything else steps back while a call waits, so the eye lands on the yellow row and the clock.
+The signature is the countdown in the approval dock. When a call is held for a human decision, the time left to decide is written large in tabular figures with a thin bar that empties over the approval timeout. Everything else steps back while a call waits, so the eye lands on the yellow row and the countdown.
 
 **Key Characteristics:**
 - Light by default with a warm dark variant; one yellow that means "this is the held or selected row".
@@ -155,7 +155,7 @@ Flat. There are no shadows. Depth is a step from paper to sheet and a 1px or 2px
 
 ## Shapes
 
-Square with a 2px corner on controls and chips. Timetable rows have no radius at all. The only circles are the journey stops and the station clock.
+Square with a 2px corner on controls and chips. Timetable rows have no radius at all. The only circles are the journey stops.
 
 ## Components
 
@@ -163,7 +163,7 @@ Square with a 2px corner on controls and chips. Timetable rows have no radius at
 Grid row with a hairline below. Selected: soft yellow. Held: full yellow, with a 2px inner ink outline when it is also selected. Refused calls strike their title through in red. Risk is written as a chip in the policy column.
 
 ### Approval dock (signature)
-Yellow band with a 2px ink top border: station clock (64px, 60 ticks, red hand with a round tip, one turn over the approval timeout), remaining time in tabular figures, tool name, risk chip, rule id, the reason, and "+N waiting". Reject is outlined, Approve is ink-filled; ⌘↵ and Esc are shown on the buttons. An optional note field opens inline.
+Yellow band with a 2px ink top border: remaining time in tabular figures with a thin bar that empties over the approval timeout, tool name, risk chip, rule id, the reason, and "+N waiting". Reject is outlined, Approve is ink-filled; ⌘↵ and Esc are shown on the buttons. An optional note field opens inline.
 
 ### Risk chip
 Critical: filled red, light text. High: red outline and text. Medium and low: ink outline in greys. Uppercase, 11px, semibold, 2px corners.
