@@ -6,6 +6,8 @@
 [![Go](https://img.shields.io/badge/Go-1.27+-00ADD8.svg?logo=go&logoColor=white)](https://go.dev)
 [![MCP](https://img.shields.io/badge/Protocol-MCP-8A2BE2.svg)](https://modelcontextprotocol.io)
 
+Site: [agent-sentinel.runs-on.dev](https://agent-sentinel.runs-on.dev/)
+
 Sentinel is a single Go binary. It sits between an AI coding agent and your machine, records what the agent does, stops what looks dangerous until you say yes, and shows it all in a local web cockpit.
 
 It works with the **Cursor agent** and **Claude Code** (through their hooks) and with **any MCP server** (as a stdio proxy). Everything runs on your machine, on `127.0.0.1`: no cloud, no account.
