@@ -10,6 +10,8 @@ Sentinel is a single Go binary. It sits between an AI coding agent and your mach
 
 It works with the **Cursor agent** (through Cursor's hooks) and with **any MCP server** (as a stdio proxy). Everything runs on your machine, on `127.0.0.1`: no cloud, no account.
 
+A coding agent setting this up should follow [AGENTS.md](AGENTS.md). It is the ordered procedure, with the checks that mean it is actually working.
+
 ## What it does
 
 - **Records** every shell command, file read, file edit and MCP call the agent makes, with its result and timing, in a live timeline. Sessions are saved as JSONL and can be replayed.
