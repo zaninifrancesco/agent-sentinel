@@ -45,10 +45,11 @@ const (
 // Handler serves POST bodies that are Cursor hook inputs.
 type Handler struct {
 	Rec       *recorder.Recorder
-	Engine    *policy.Engine // nil = policy off, only record
-	Budget    *policy.Budget // nil = no budget
-	Approvals *policy.Broker // nil = a call that needs approval is refused
-	Timeout   time.Duration  // 0 = DefaultTimeout
+	Engine    *policy.Engine                   // nil = policy off, only record
+	Budget    *policy.Budget                   // nil = no budget
+	Approvals *policy.Broker                   // nil = a call that needs approval is refused
+	Timeout   time.Duration                    // 0 = DefaultTimeout
+	Logf      func(format string, args ...any) // nil = say nothing; notes for the operator, not session events
 
 	mu   sync.Mutex
 	next uint64
@@ -454,6 +455,9 @@ func (h *Handler) stop(in input) {
 	}
 	h.mu.Unlock()
 
+	if h.Logf != nil {
+		h.Logf("Cursor sent stop (%s) for conversation %s; closed %d unfinished call(s)", in.StopStatus, in.ConversationID, len(left))
+	}
 	why := "Cursor ended the turn"
 	if in.StopStatus != "" {
 		why += " (" + in.StopStatus + ")"
@@ -510,6 +514,10 @@ func (h *Handler) afterEdit(in input) {
 			ev.Decision, ev.Rule, ev.Risk = policy.Warn.String(), res.RuleID, res.Risk
 			ev.Reason = "after the fact, the edit was already applied: " + res.Reason
 		}
+	}
+	// The diff is what the model wrote: it counts as output, like any tool call.
+	if h.Budget != nil {
+		h.Budget.AddOutput(len(ev.Payload))
 	}
 	h.Rec.Record(ev)
 }

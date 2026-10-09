@@ -220,6 +220,41 @@ func TestBudgetHoldsTheNextCall(t *testing.T) {
 	}
 }
 
+func TestFileEditsCountTowardsTheBudget(t *testing.T) {
+	b := policy.NewBroker()
+	h := newHandler(t, b, 5*time.Second)
+	h.Budget = policy.NewBudget(0.001, 0)
+
+	// The edit cannot be stopped (it already happened), but what the model wrote
+	// is spend: the next call must be held.
+	post(t, h, context.Background(), map[string]any{
+		"hook_event_name": EventAfterEdit, "file_path": "/proj/big.txt",
+		"edits": []map[string]string{{"old_string": "", "new_string": strings.Repeat("lorem ipsum\n", 400)}},
+	})
+	if cost, _ := h.Budget.Spent(); cost <= 0 {
+		t.Fatalf("an edit must be counted, spent %v", cost)
+	}
+	done := make(chan Response, 1)
+	go func() { done <- post(t, h, context.Background(), shell("ls")) }()
+	ev := waitEvent(t, h.Rec, "budget hold", awaiting)
+	if ev.Rule != "budget" {
+		t.Fatalf("rule = %q, want budget", ev.Rule)
+	}
+	b.Resolve(ev.Seq, policy.Verdict{Approved: true})
+	<-done
+}
+
+func TestStopIsLoggedForTheOperator(t *testing.T) {
+	h := newHandler(t, policy.NewBroker(), time.Second)
+	var lines []string
+	h.Logf = func(f string, a ...any) { lines = append(lines, fmt.Sprintf(f, a...)) }
+	post(t, h, context.Background(), shell("sleep 5"))
+	post(t, h, context.Background(), stopHook("c1", "aborted"))
+	if len(lines) != 1 || !strings.Contains(lines[0], "aborted") || !strings.Contains(lines[0], "1 unfinished") {
+		t.Fatalf("log = %q", lines)
+	}
+}
+
 func TestSameCommandTwiceResolvesInOrder(t *testing.T) {
 	h := newHandler(t, policy.NewBroker(), time.Second)
 	ctx := context.Background()

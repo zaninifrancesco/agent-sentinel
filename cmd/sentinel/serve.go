@@ -77,6 +77,7 @@ func runServe(args []string) int {
 	}
 	broker := policy.NewBroker()
 	hooks := cursorhooks.New(rec, engine, budget, broker, wait)
+	hooks.Logf = func(format string, args ...any) { fmt.Fprintf(os.Stderr, "sentinel: "+format+"\n", args...) }
 	cfg := serverpkg.Config{Policy: policyName, ApprovalTimeoutSec: int(wait.Seconds())}
 	url, err := startCockpit(ctx, rec, *port, *dev, broker, budget, hooks, cfg)
 	if err != nil {
