@@ -73,20 +73,23 @@ Cursor reloads `hooks.json` when it changes. If the user has Cursor open on that
 
 ## 4. Prove the path works
 
-This does not depend on Cursor having reloaded:
+This does not depend on Cursor having reloaded. Cursor reports a command twice, before it runs and after it finishes. Send both, in this order, or the row stays on "Running" forever:
 
 ```bash
 printf '%s\n' '{"hook_event_name":"beforeShellExecution","conversation_id":"setup","command":"echo sentinel-setup-ok","cwd":"<target>"}' \
   | ~/.sentinel/bin/sentinel hook
+
+printf '%s\n' '{"hook_event_name":"afterShellExecution","conversation_id":"setup","command":"echo sentinel-setup-ok","output":"sentinel-setup-ok\n","duration":1}' \
+  | ~/.sentinel/bin/sentinel hook
 ```
 
-The reply must be `{"permission":"allow"}`. Then:
+The first reply must be `{"permission":"allow"}` and the second `{}`. Then:
 
 ```bash
 curl -sf http://127.0.0.1:8848/api/events
 ```
 
-The events must include a `shell` tool call whose command is `echo sentinel-setup-ok`.
+The events must include a `shell` tool call whose command is `echo sentinel-setup-ok`, followed by its response with status `ok`. If that call has no response, you only sent the first command. Send the second.
 
 Tell the user the cockpit is at http://127.0.0.1:8848. The first real agent command in that project should appear as a new row. `cat .env` is the demonstration of a block: the policy refuses it and the agent receives the refusal. Do not run `cat .env` yourself against a real secrets file.
 
