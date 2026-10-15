@@ -1,6 +1,27 @@
 # Contratto di telemetria
 
-Stato: proposta implementativa per la nuova release. Nessuno dei nuovi campi descritti qui è da presumere già disponibile nel codice. Vedi [architettura](ARCHITECTURE.md) e [roadmap](ROADMAP.md).
+Stato: contratto di destinazione con un sottoinsieme implementato dichiarato sotto. Le sezioni successive comprendono anche lavoro ancora previsto. Vedi [stato](PROGRESS.md), [architettura](ARCHITECTURE.md) e [roadmap](ROADMAP.md).
+
+## 0. Contratto v2 attualmente implementato
+
+La nuova scrittura è un’estensione additiva dell’envelope precedente. Non introduce ancora l’envelope `data`, capability, paginazione o profili di cattura descritti più avanti.
+
+- `schemaVersion: 2`, `recordingId`, `seq`; `sessionId` mantiene il significato storico di registrazione Sentinel ed è uguale a `recordingId`.
+- `timestamp` rimane il nome serializzato dell’istante UTC di osservazione locale. `observedAt`, timestamp nativi e turni non sono ancora normalizzati.
+- `source` è `cursor-hook`, `claude-hook` o `mcp-stdio`; `sourceId` distingue l’adattatore nel collector corrente o la connessione del proxy. Non è un’identità verificata dell’installazione dell’IDE o dell’host.
+- `agentSessionId` è il valore nativo quando trasmesso. `connectionId` è disponibile per il proxy stdio; gli hook HTTP non inventano una connessione persistente. `projectRef` conserva il cwd ricevuto quando disponibile, senza leggere il progetto.
+- `callId` identifica una chiamata osservata, compresa un’osservazione parziale. `nativeCallId` è un oggetto `{ "type": "string|number|null", "value": "valore esatto" }`: anche i numeri sono memorizzati come testo per evitare arrotondamenti nel browser.
+- `correlation` espone `method`, `quality`, `requestSeq` quando la risposta è abbinata, `candidateCallIds` per le sovrapposizioni e `synthetic` per le chiusure ricostruite. Gli eventi `CaptureDiagnostic` dichiarano le ambiguità senza mutare gli eventi precedenti.
+- `timing` contiene `durationMs`, incluso zero, e `source: source-reported|proxy-monotonic`. Il vecchio campo `durationMs` resta un alias non autorevole per compatibilità. Senza `timing`, una durata legacy assente resta sconosciuta.
+- I campi esistenti `type`, `direction`, `method`, `toolName`, `rpcId`, `status` e `payload` restano leggibili. `rpcId` negli hook è un alias sintetico storico, distinto dall’ID nativo.
+
+Una richiesta con identità disponibile può iniziare con qualità `exact` e rimanere in attesa della risposta. Se compare una sovrapposizione, la diagnostica marca l’intero gruppo come ambiguo nella proiezione. `exact` indica un abbinamento univoco rispetto alle evidenze disponibili; con `method: fallback` rimane un’inferenza, non un ID nativo.
+
+Il fallback usa sessione nota, tool/server e argomenti canonici originali, prima di eventuali riduzioni nella normalizzazione. Senza sessione non viene tentato un abbinamento euristico. Il gruppo ambiguo resta tale finché tutte le risposte attese sono state osservate; non si assegna la seconda risposta rimasta a una richiesta scelta arbitrariamente. Una risposta orfana non genera una richiesta sintetica. Le chiusure per Stop/SessionEnd sono marcate come sintetiche e non forniscono una durata di esecuzione.
+
+Il lettore conserva i vecchi envelope senza migrazioni su disco, mantiene tipi di evento non interpretati con il loro payload e rifiuta major non supportate, identità miste o sequenze v2 non crescenti. Il recupero della coda incompleta è ancora previsto. Fixture eseguibile nel replay: [`../testdata/telemetry-v2.jsonl`](../testdata/telemetry-v2.jsonl).
+
+Contratti esterni consultati il 15 ottobre 2026: [Cursor hooks](https://cursor.com/docs/hooks), [Claude Code hooks](https://code.claude.com/docs/en/hooks), [JSON-RPC 2.0](https://www.jsonrpc.org/specification). L’adattatore Claude accetta il campo opzionale `duration_ms` già previsto dal codice; non presume che ogni versione o evento lo trasmetta. Non è stata eseguita una verifica live delle applicazioni esterne.
 
 ## 1. Principio
 

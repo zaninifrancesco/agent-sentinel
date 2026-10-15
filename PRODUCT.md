@@ -32,7 +32,7 @@ The Local Profiler & Flight Recorder for AI Agents. A single Go binary with an e
 
 ## Capabilities and Constraints
 
-Implemented in the first pivot phase:
+Implemented on the telemetry branch:
 
 - Timeline as the default view, with a selectable capture map grouped by tool. Map intervals use recorded request/response timestamps; source-reported duration remains a separate measure. Up to 120 recent calls are mapped, with every call still available in the list.
 - Tool profile: per-tool activity, top five completed calls by available duration and top five retained responses by JSON size. Every entry opens its captured calls.
@@ -41,21 +41,23 @@ Implemented in the first pivot phase:
 - Tool-call counts, reported errors, available duration percentiles and retained payload JSON size. No fixed-price token or dollar estimates.
 - Local JSONL recordings, replay of new and old traces, and an offline HTML report with expandable calls. Report payloads remain summarized.
 - Historical risk and policy decisions remain readable only where recorded; there are no live approval or budget controls.
+- Schema v2 recording/source/session/connection/call identity, type-preserving native IDs, explicit correlation quality and duration provenance. Concurrent indistinguishable calls stay unresolved; orphan responses remain inspectable.
+- A session/connection selector scopes the map, list, profile and metrics; reports retain the whole recording.
 - The frontend remains embedded, with local fonts and no required external assets.
 
-Planned, not implemented: reliable source/session identity and capture-quality metadata, waterfall, an analysis engine with evidence-linked findings, original payload-size measurements, recording catalog, configurable redaction/capture profiles and a JSONL export flow. See `docs/ROADMAP.md` and `docs/PROGRESS.md` for status.
+Planned, not implemented: payload completeness and capture-gap metadata, a complete waterfall, an analysis engine with evidence-linked findings, original payload-size measurements, recording catalog, configurable redaction/capture profiles and a JSONL export flow. See `docs/ROADMAP.md` and `docs/PROGRESS.md` for status.
 
 The current data does not reveal model reasoning, actual context occupancy, provider billing or a full workspace history. Some hook payloads are synthesized, reduced or omitted. Retained JSON size must never be labelled original wire traffic or model usage. Absence of a duration or an error signal does not prove zero execution time or success.
 
 ## Evidence on Hand
 
-`examples/demo-session.jsonl` is a historical enforcement trace. Synthetic hook fixtures and fake MCP servers exercise passive capture without running the commands in their payloads. `docs/profiler.png` shows the Trace Atlas timeline using a synthetic passive recording; `docs/cockpit.png` is historical.
+`examples/demo-session.jsonl` is a historical enforcement trace. `testdata/telemetry-v2.jsonl` contains a synthetic multi-session recording with ambiguous and unmatched evidence. Synthetic hook fixtures and fake MCP servers exercise passive capture without running the commands in their payloads. `docs/profiler.png` shows the Trace Atlas timeline using a synthetic passive recording; `docs/cockpit.png` is historical.
 
 No customer results, performance claims or savings measurements may be fabricated.
 
 ## Cockpit Information Hierarchy
 
-Start with the timeline and debug one captured call. Navigation is Timeline, Tool profile and Event log. The recording map, selected list row and inspector refer to the same call. A dark indigo rail separates navigation from the cool layered workspace. Recording identity, capture connection and available metric sample counts stay accessible. Tool profile exposes observed activity, not automated diagnoses. Missing measurements remain unavailable, and retained JSON is never called context usage. Historical policy data is secondary and appears only when captured.
+Start with the timeline and debug one captured call. Navigation is Timeline, Tool profile and Event log. The recording map, selected list row and inspector refer to the same call. A collapsible graphite rail separates navigation from the cool layered workspace. Recording identity, capture connection and available metric sample counts stay accessible. Tool profile exposes observed activity, not automated diagnoses. Missing measurements remain unavailable, and retained JSON is never called context usage. Historical policy data is secondary and appears only when captured.
 
 Keyboard shortcuts belong to the focused list. Search and export overlays contain keyboard focus and restore it when closed.
 

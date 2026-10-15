@@ -18,15 +18,17 @@ Available now:
 - A timeline with a selectable recording map grouped by tool. Captured request/response intervals stay distinct from reported execution durations.
 - A tool profile with per-tool activity, longest completed calls and largest retained responses, each linked to its captured evidence.
 - A call inspector with status/tool filters, full-argument search, duration/response-size sorting, payload text search, previous/next navigation, available patch diffs and a separate event log.
+- Recording-scoped call identities and separate agent sessions/connections, with a cockpit scope selector.
+- Explicit native/fallback pairing, ambiguous-call filtering and orphan responses preserved in Event log.
 - Counts of tool calls and errors, available duration percentiles and retained payload JSON size.
 - Local JSONL recordings and read-only replay, including older enforcement traces.
 - Standalone HTML session reports, without scripts or external assets.
 
-**Planned, not implemented yet:** waterfall, structured capture-quality metadata, session separation, original output-size measurements, repeated-call findings, schema diagnostics and a recording catalog. See the [implementation roadmap](docs/ROADMAP.md).
+**Planned, not implemented yet:** a full waterfall, payload/capture-gap metadata, original output-size measurements, repeated-call findings, schema diagnostics and a recording catalog. See the [implementation roadmap](docs/ROADMAP.md).
 
 ![Trace Atlas timeline showing synthetic calls](docs/profiler.png)
 
-This screenshot uses a synthetic JSONL recording. No command shown in it was executed by the fixture generator. The previous enforcement cockpit is retained in `docs/cockpit.png` as historical material.
+This screenshot uses a synthetic JSONL recording from the earlier Trace Atlas build, before the graphite sidebar and session selector. No command shown in it was executed by the fixture generator. The previous enforcement cockpit is retained in `docs/cockpit.png` as historical material.
 
 ## Build
 
@@ -97,7 +99,9 @@ Without `--ui`, it records without opening a cockpit listener. Use `--log /path/
 
 The first opens the latest recording; the second opens the selected file. Replay never executes captured commands. Historical blocks, holds and human decisions remain visible in old recordings, without approval controls.
 
-The cockpit's Export button downloads an offline HTML report with summary figures and expandable call history. It includes argument summaries, not full request/response payloads. The original JSONL is the trace for detailed local replay; a dedicated JSONL export flow is planned. `sentinel export` and `sentinel run` are not implemented.
+The cockpit's Export button always exports the whole recording, including all captured sessions and connections. It downloads an offline HTML report with summary figures and expandable call history. It includes argument summaries, not full request/response payloads. The original JSONL is the trace for detailed local replay; a dedicated JSONL export flow is planned. `sentinel export` and `sentinel run` are not implemented.
+
+A synthetic multi-session recording is included at [`testdata/telemetry-v2.jsonl`](testdata/telemetry-v2.jsonl): seven observed requests, two ambiguous responses, one orphan response and one synthetic interruption. Open it with `sentinel ui testdata/telemetry-v2.jsonl`; its command strings were never executed.
 
 ## What the numbers mean
 
@@ -105,7 +109,7 @@ Durations are those available from the adapter or proxy; they are not the model'
 
 **JSON retained** measures UTF-8 bytes of retained tool payloads reserialized for display. Some hook payloads are synthesized, omitted or truncated. This is neither original wire volume nor actual model tokens or context usage. Sentinel no longer calculates dollars from fixed token-price assumptions.
 
-Capture-quality metadata and better treatment of missing/ambiguous timing are planned in the next phase. Current logs do not reconstruct the full model conversation, task boundaries or the workspace state. Local recordings can contain commands, source text and tool output; inspect them before sharing. Configurable capture/redaction profiles are planned, not shipped in this phase.
+New JSONL events use schema v2, retaining `sessionId` as the recording identity for compatibility. Native IDs keep their type and exact value; an ambiguous response is never assigned to an arbitrary request. Missing requests are not fabricated. Duration provenance and explicit zero are preserved in `timing`; synthetic turn-end closures have no execution duration. Payload-completeness metadata and capture-gap diagnostics remain planned. Current logs do not reconstruct the full model conversation, task boundaries or the workspace state. Local recordings can contain commands, source text and tool output; inspect them before sharing. Configurable capture/redaction profiles are planned, not shipped in this phase.
 
 ## Migrating from enforcement releases
 

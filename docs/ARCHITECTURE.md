@@ -2,21 +2,18 @@
 
 Stato: specifica di destinazione, 15 ottobre 2026. Questo documento sostituisce il precedente blueprint. La distinzione tra implementato e previsto è parte del contratto.
 
-## 1. Base precedente e stato della migrazione
+## 1. Stato implementato
 
-La descrizione sotto documenta il punto di partenza precedente al pivot. La prima fase ora implementa `--mode observe` come default per `serve`, `mcp` e gli hook, senza istanziare dipendenze di enforcement. Il client hook ha un timeout di consegna finito e risponde in modo neutro anche offline. Il cockpit non contiene più controlli di approvazione/budget o stime in dollari. `internal/policy` e i percorsi interni precedenti restano temporaneamente per regressioni e compatibilità: la CLI osservativa non li attiva. Vedi [stato e verifiche](PROGRESS.md).
+`--mode observe` è il default per `serve`, `mcp` e gli hook. La CLI non costruisce dipendenze di enforcement. Il client hook risponde in modo neutro anche offline entro un limite di consegna finito. Il package di policy e i gate interni precedenti restano per le regressioni; il percorso osservativo non li usa.
 
-- `cmd/sentinel/serve.go` avvia il server locale e un recorder per gli hook; configura ancora policy, budget e broker di approvazioni.
-- `cmd/sentinel/hook.go` inoltra gli hook al server. Oggi il fallback predefinito è `ask` e il client non ha un timeout complessivo perché può attendere approvazioni.
-- `internal/cursorhooks/handler.go` e `claude.go` normalizzano gli hook in eventi simili a chiamate MCP. Alcuni payload sono sintetici, non frame MCP realmente transitati. Gli output vengono limitati a 64 KiB; alcuni contenuti letti vengono omessi o ridotti prima della registrazione.
-- `internal/proxy` inoltra frame MCP stdio, correla richieste e risposte e applica ancora il gate di policy/budget. La durata osservata attraversa il percorso proxy; non è una misura interna del server o del modello.
-- `internal/recorder` mantiene gli eventi in memoria e li scrive in JSONL. `SessionID` identifica la registrazione del processo Sentinel, non una sessione dell'agente normalizzata. Gli errori del sink non sono esposti e un subscriber lento può perdere eventi live senza una segnalazione esplicita.
-- `internal/server` espone una sola registrazione tramite `/api/session`, `/api/events`, `/api/config` e `/ws`, oltre agli endpoint di hook, budget e approvazioni. Lo stream inizia con uno snapshot.
-- `web/src/useSentinel.ts` costruisce le righe correlando soprattutto `rpcId`; `metrics.ts` calcola le metriche nel browser. Token e costi derivano dalla dimensione JSON dei payload, con euristica e prezzi fissi: non sono usage del modello.
-- Il cockpit ispeziona payload e patch presenti nei dati; non conserva snapshot completi del workspace. Il report HTML attuale è autonomo, senza script, con dettagli espandibili e senza payload completi.
-- Il replay JSONL esiste. Non esistono `sentinel run`, `sentinel export`, un catalogo multi-sessione o un motore di findings.
+- `internal/cursorhooks` normalizza gli eventi ricevuti e comunica identità di agente/sessione/call. Alcuni payload sono sintetici e gli output vengono limitati a 64 KiB; contenuti letti possono essere omessi o ridotti. La presenza di metadati di correlazione non rende questi payload frame MCP originali.
+- `internal/proxy` inoltra frame invariati. Ogni interceptor ha una propria identità di connessione e distingue il lato che ha originato una richiesta. La durata locale è un round trip del proxy, non una misura interna del server o del modello.
+- `internal/recorder` scrive un envelope v2 additivo e usa `CallTracker` per accoppiare evidenze. La registrazione Sentinel è distinta dalla sessione dell’agente. Le sovrapposizioni indistinguibili vengono segnalate con candidati espliciti e non abbinate in ordine di arrivo.
+- `internal/server` e `/ws` continuano a esporre una registrazione, tramite gli endpoint esistenti. L’API HTTP versionata e paginata resta prevista; non è stata introdotta una diversa semantica per `sessionId`.
+- `web/src/rows.ts` proietta le chiamate v2 usando `callId`, namespace e riferimento alla richiesta. La correlazione legacy è conservativa. `scopes.ts` distingue sessioni native e connessioni, con filtri coerenti su mappa, lista, profilo e metriche. Le metriche sono ancora calcolate nel browser.
+- Il replay accetta vecchi log e v2 e rifiuta versioni incompatibili. Il report HTML autonomo conserva metadati di identità e abbinamento, con argomenti sintetizzati anziché payload completi. Non vengono eseguiti comandi nel replay.
 
-Schema v2, collector con code limitate, modello multi-sessione e analisi Go restano lavoro futuro. Il JSONL, l'API e la correlazione di base non sono ancora migrati solo perché la cattura è diventata passiva.
+Restano aperti: errori del sink, code limitate, gap dello stream e recupero dei log interrotti, profili di redazione e completezza dei payload, API paginata, metriche/analisi condivise in Go, catalogo e findings. Vedi [stato e verifiche](PROGRESS.md).
 
 ## 2. Architettura di destinazione
 

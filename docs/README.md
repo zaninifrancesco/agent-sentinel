@@ -18,7 +18,7 @@ Questi documenti definiscono lo sviluppo del pivot. La prima fase di cattura pas
 - Il [README](../README.md), [PRODUCT.md](../PRODUCT.md) e il [playbook di setup](../AGENTS.md) descrivono il comportamento osservativo ora implementato e la migrazione esplicita dalle release di enforcement.
 - Le indicazioni operative e i vincoli del repository restano applicabili. Queste specifiche non autorizzano a cambiare installazioni o hook dell'utente.
 - `cockpit.png` documenta l'interfaccia precedente; `profiler.png` mostra la prima fase passiva con dati sintetici.
-- Le proposte di API e schema nei documenti seguenti sono contratti da implementare, non endpoint o campi già disponibili.
+- Schema v2 e identità/correlazione sono implementati nel sottoinsieme dichiarato in TELEMETRY_SPEC.md e PROGRESS.md; le API versionate, la qualità completa della cattura e il motore di findings restano contratti da implementare.
 - Il nome Agent Sentinel rimane quello del progetto. Non è previsto un lavoro su nome, branding o landing page in questa fase.
 
 ## Decisioni già prese
