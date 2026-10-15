@@ -94,6 +94,10 @@ func (h *Handler) serveClaude(w http.ResponseWriter, r *http.Request, in input) 
 
 func (h *Handler) claudeBefore(ctx context.Context, in input) claudeOutput {
 	tool, args, call := claudeCall(in)
+	if h.observeOnly {
+		h.observeBefore(in, tool, args, claudeKey(in))
+		return claudeOutput{}
+	}
 	return toClaude(h.gate(ctx, in, tool, args, claudeKey(in), call))
 }
 

@@ -1,12 +1,9 @@
-// Package cursorhooks lets Sentinel supervise the Cursor agent through Cursor's
-// hooks (https://cursor.com/docs/hooks).
+// Package cursorhooks records Cursor and Claude Code lifecycle hooks.
 //
 // Cursor runs a short-lived command for each agent step and reads a permission
 // decision from its stdout. `sentinel hook` forwards that JSON to a running
-// `sentinel serve`, where Handler turns it into the same events, policy
-// decisions and human approvals as an MCP tool call: a shell command is a
-// "shell" tool call, an MCP call keeps its tool name, a file edit is recorded
-// with its diff. The cockpit, the report and the budget need no special case.
+// `sentinel serve`, where the observation handler normalizes it into tool
+// events. Legacy gating remains available only to internal regression callers.
 package cursorhooks
 
 import (
@@ -51,9 +48,10 @@ type Handler struct {
 	Timeout   time.Duration                    // 0 = DefaultTimeout
 	Logf      func(format string, args ...any) // nil = say nothing; notes for the operator, not session events
 
-	mu   sync.Mutex
-	next uint64
-	open map[string][]openCall // in-flight calls awaiting their "after" hook
+	mu          sync.Mutex
+	next        uint64
+	open        map[string][]openCall // in-flight calls awaiting their "after" hook
+	observeOnly bool
 }
 
 type openCall struct {
@@ -74,7 +72,7 @@ func New(rec *recorder.Recorder, engine *policy.Engine, budget *policy.Budget, a
 // dependencies. Claude Code receives no permission override; Cursor receives
 // its normal non-blocking hook acknowledgement.
 func NewObserver(rec *recorder.Recorder) *Handler {
-	return New(rec, nil, nil, nil, 0)
+	return &Handler{Rec: rec, observeOnly: true, open: make(map[string][]openCall)}
 }
 
 // input is the union of the fields of the hooks we handle.
@@ -273,7 +271,28 @@ func resultPayload(id, text string, isError bool) json.RawMessage {
 // before is the gate: it records the call, applies the policy and the budget,
 // holds it for a human when needed, and returns Cursor's permission.
 func (h *Handler) before(ctx context.Context, in input, tool string, args map[string]any, key string) Response {
+	if h.observeOnly {
+		return h.observeBefore(in, tool, args, key)
+	}
 	return h.gate(ctx, in, tool, args, key, policy.NewCall(tool, args))
+}
+
+// observeBefore never evaluates policies, budgets or approvals. A Cursor read
+// has no after-hook, so it is recorded as an observation without a duration.
+func (h *Handler) observeBefore(in input, tool string, args map[string]any, key string) Response {
+	id := h.newID()
+	req := recorder.Event{
+		Type: recorder.EventToolCallRequest, Direction: recorder.ClientToServer,
+		Method: "tools/call", ToolName: tool, RPCID: id,
+		Payload: requestPayload(id, tool, args), Status: recorder.StatusPending,
+	}
+	if in.Event == EventBeforeRead {
+		req.Status = recorder.StatusOK
+	} else {
+		h.trackOpen(in, key, id, tool)
+	}
+	h.Rec.Record(req)
+	return allow()
 }
 
 // gate is before with the call the policy judges given by the caller, for the
