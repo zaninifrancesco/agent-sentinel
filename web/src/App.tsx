@@ -12,7 +12,7 @@ import { ExportModal } from "./ExportModal";
 import { Overview } from "./Overview";
 import { computeMetrics } from "./metrics";
 import { buildProfile, filterCalls, recordedSpan, sortCalls, type CallFilter, type CallSort } from "./profile";
-import { formatDuration, formatTime } from "./format";
+import { formatBytes, formatDuration, formatTime } from "./format";
 import type { Row } from "./types";
 import { filterScope, recordingScopes } from "./scopes";
 
@@ -123,7 +123,7 @@ export default function App() {
           {span !== undefined && <p className="mt-1">{formatDuration(span)} captured span</p>}
           {!!session?.command?.length && <p className="mt-3 break-words" title={session.command.join(" ")}>{session.command.join(" ")}</p>}
         </div>
-        <div className="rail-foot"><ConnectionBadge state={connection} replay={replay} /><div className="rail-storage mt-4 flex items-center gap-2 border-t border-[#354461] pt-4"><HardDrive aria-hidden className="size-3.5" />Stored locally</div><p className="rail-observation mt-1">Observation only</p></div>
+        <div className="rail-foot"><ConnectionBadge state={connection} replay={replay} /><div className="rail-storage mt-4 flex items-center gap-2 border-t border-[#354461] pt-4"><HardDrive aria-hidden className="size-3.5" />Stored locally</div><p className="rail-observation mt-1">Observation only{session?.capture && <span className="mt-2 block">{session.capture.profile === "full" ? "Full · no redaction" : "Standard · redacted"}<br />{formatBytes(session.capture.maxPayloadBytes)} per payload</span>}</p></div>
       </aside>
       <div className="app-workspace">
         <header className="workspace-header">

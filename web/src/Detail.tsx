@@ -7,6 +7,7 @@ import { journeyStops, statusText, type Tone } from "./journey";
 import { DiffViewer, diffFilename, extractDiff, isDiff } from "./DiffViewer";
 import { JsonView } from "./JsonView";
 import { capturedInterval } from "./trace";
+import { CaptureInfo } from "./CaptureInfo";
 import { Check, Copy, Search, Braces } from "lucide-react";
 
 type Tab = "payload" | "diff" | "raw";
@@ -25,8 +26,9 @@ export function Detail({ row }: { row: Row | null }) {
   if (row.event) blocks.push({ label: "Captured payload", event: row.event, payload: row.event.payload });
 
   let diffText: string | null = null;
+  let diffEvent: SentinelEvent | undefined;
   for (const { event } of blocks) for (const candidate of textCandidates(event.payload)) {
-    if (diffText === null && isDiff(candidate)) diffText = extractDiff(candidate);
+    if (diffText === null && isDiff(candidate)) { diffText = extractDiff(candidate); diffEvent = event; }
   }
   const tab = activeTab === "diff" && diffText === null ? "payload" : activeTab;
   const bytes = responseSize(row);
@@ -76,11 +78,12 @@ export function Detail({ row }: { row: Row | null }) {
       {!row.request && row.response && <p className="mx-4 mt-3 rounded-md border border-rule bg-paper p-3 text-xs leading-relaxed text-ink-2">Response captured without a matched request. Its start time and request → response interval are unavailable.</p>}
       {row.request && row.status === "unknown" && correlation?.quality === "unmatched" && <p className="mx-4 mt-3 rounded-md border border-rule bg-paper p-3 text-xs leading-relaxed text-ink-2">No reliable session or call identity was available. A later result cannot be paired with this request safely.</p>}
       {row.response?.correlation?.synthetic && <p className="mx-4 mt-3 rounded-md border border-rule bg-paper p-3 text-xs leading-relaxed text-ink-2">The agent ended the turn or session before a result was matched. This interruption is synthesized; no tool duration is measured.</p>}
-      {tab === "diff" && diffText ? <div className="p-4 sm:p-6"><DiffViewer text={diffText} filename={diffFilename(diffText)} /></div> : tab === "raw" ? (
+      {tab === "diff" && diffText ? <div className="p-4 sm:p-6">{diffEvent && <CaptureInfo event={diffEvent} />}<DiffViewer text={diffText} filename={diffFilename(diffText)} /></div> : tab === "raw" ? (
         <div className="p-4 sm:p-6"><p className="mb-3 text-xs text-ink-2">Captured event data, including normalized fields and any historical policy metadata.</p><pre className="json-code"><JsonView text={JSON.stringify(row, null, 2)} query={query} /></pre></div>
       ) : <>
         {blocks.map(({ label, event, payload }) => <section key={event.seq} className="payload-section" aria-label={label}>
           <div className="payload-label"><span className="font-semibold">{label}<span className="ml-2 font-normal text-ink-3">#{event.seq}</span></span><span className="text-ink-2">{event.direction === "client->server" ? "Request" : event.direction === "server->client" ? "Response" : "Observation"}</span></div>
+          <CaptureInfo event={event} />
           <pre className="json-code"><JsonView text={pretty(payload)} query={query} /></pre>
         </section>)}
         {row.kind === "tool" && !row.response && <p className="px-4 py-4 text-sm text-ink-2 sm:px-6">{row.status === "pending" ? "No response received yet. Duration and response size remain unavailable." : row.status === "unknown" ? "No result can be matched safely to this request. Inspect unassigned responses in Event log." : "No tool result was captured for this observation."}</p>}
@@ -95,6 +98,7 @@ export function Detail({ row }: { row: Row | null }) {
             <Field label="Native call ID" value={evidence?.nativeCallId === undefined ? "Not available" : `${evidence.nativeCallId.type} · ${evidence.nativeCallId.type === "string" ? JSON.stringify(evidence.nativeCallId.value) : evidence.nativeCallId.type === "null" ? "null" : evidence.nativeCallId.value}`} />
             <Field label="Pairing" value={correlation ? `${correlation.method} · ${correlation.quality}` : "Legacy / unspecified"} />
             <Field label="Request evidence" value={row.response?.correlation?.requestSeq ? `#${row.response.correlation.requestSeq}` : row.request ? `#${row.request.seq}` : "Not available"} />
+            {!!evidence?.metadataRedactedFields?.length && <Field label="Metadata redacted" value={evidence.metadataRedactedFields.join(", ")} />}
           </dl>
           <p className="mt-3 max-w-prose leading-relaxed text-ink-2">Payloads may be normalized, omitted or truncated by the adapter. Response JSON is the retained envelope size, not original tool output or model context usage. Missing timing is not a measured zero.</p>
         </details>

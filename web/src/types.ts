@@ -26,6 +26,9 @@ export type Status =
 export type Risk = "none" | "low" | "medium" | "high" | "critical";
 
 export interface SentinelEvent {
+  capture?: PayloadCapture;
+  captureSettings?: CaptureSettings;
+  metadataRedactedFields?: string[];
   schemaVersion?: number;
   recordingId?: string;
   source?: string;
@@ -54,6 +57,26 @@ export interface SentinelEvent {
   payload?: unknown;
 }
 
+export interface CaptureSettings {
+  profile: "standard" | "full";
+  maxPayloadBytes: number;
+  redaction: string;
+}
+
+export interface PayloadCapture {
+  representation: string;
+  completeness: "complete" | "partial" | "omitted" | "unknown";
+  observedBytes?: number;
+  observedUnit?: string;
+  observedField?: string;
+  sourceReportedBytes?: number;
+  sourceReportedUnit?: string;
+  normalizedBytes: number;
+  storedBytes: number;
+  profile: "standard" | "full";
+  changes?: { kind: string; stage: string; method: string; count?: number; beforeBytes?: number; afterBytes?: number }[];
+}
+
 export interface Correlation {
   method: "native" | "fallback" | "none";
   quality: "exact" | "ambiguous" | "unmatched";
@@ -63,6 +86,7 @@ export interface Correlation {
 }
 
 export interface Session {
+  capture?: CaptureSettings;
   id: string;
   command: string[] | null;
   startedAt: string;
@@ -92,6 +116,7 @@ export interface Row {
 
 /** Served at /api/config. */
 export interface SentinelConfig {
+  capture?: CaptureSettings;
   mode?: "observe" | "replay"; // absent in older recordings/servers
   maxCostUsd: number; // 0 = no budget
   maxTokens: number;

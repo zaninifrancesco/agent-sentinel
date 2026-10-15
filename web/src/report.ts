@@ -1,5 +1,6 @@
 import type { Risk, Row, Session, SentinelConfig, Status } from "./types";
-import { formatDuration, formatTime } from "./format";
+import { formatBytes, formatDuration, formatTime } from "./format";
+import { captureSummary } from "./capture";
 import { computeMetrics, PAYLOAD_NOTE } from "./metrics";
 import { journeyStops, type Stop, type Tone } from "./journey";
 
@@ -89,6 +90,7 @@ function rowHtml(row: Row, hasPolicy: boolean): string {
   const event = row.request ?? row.response ?? row.event;
   const correlation = row.correlation ?? event?.correlation;
   const context = [event?.source, event?.agentSessionId ? `agent session ${event.agentSessionId}` : event?.connectionId ? `connection ${event.connectionId}` : undefined, event?.callId, correlation ? `${correlation.method} / ${correlation.quality}` : undefined, event?.timing?.source, row.response?.timing?.source].filter(Boolean).join(" · ");
+  const coverage = [row.request, row.response, row.event].filter((e) => e?.payload !== undefined).map((e) => captureSummary(e!)).join("; ");
   const cells = `
       <span class="fig t">${esc(formatTime(row.startedAt))}</span>
       <span class="status tone-${mark.tone}"><span aria-hidden="true">${mark.glyph}</span> ${mark.word}</span>
@@ -96,6 +98,7 @@ function rowHtml(row: Row, hasPolicy: boolean): string {
         <span class="title">${esc(row.title)}</span>
         ${row.subtitle ? `<span class="sub">${esc(row.subtitle)}</span>` : ""}
         ${context ? `<span class="sub">${esc(context)}</span>` : ""}
+        ${coverage ? `<span class="sub">${esc(coverage)}</span>` : ""}
       </span>
       ${hasPolicy ? `<span class="pol">${policy}</span>` : ""}
       <span class="fig took">${row.durationMs !== undefined ? esc(formatDuration(row.durationMs)) : ""}</span>`;
@@ -280,6 +283,7 @@ export function buildReportHtml({ session, rows, config, exportedAt }: ReportInp
     fact("Started", esc(stamp(start))),
     fact("Ended", end ? `${esc(stamp(end))}${lasted ? ` (${esc(lasted)})` : ""}` : "still running when exported"),
     fact("Mode", mode),
+    fact("Capture profile", session?.capture ? `${esc(session.capture.profile)} · ${esc(session.capture.redaction)} · ${esc(formatBytes(session.capture.maxPayloadBytes))} per payload` : "not recorded"),
     fact("Tool calls", String(m.calls)),
     ...(tools.some((row) => row.correlation?.quality === "ambiguous") ? [fact("Unresolved call pairing", String(tools.filter((row) => row.correlation?.quality === "ambiguous").length))] : []),
     ...(rows.some((row) => row.response && !row.request) ? [fact("Responses without a matched request", String(rows.filter((row) => row.response && !row.request).length))] : []),

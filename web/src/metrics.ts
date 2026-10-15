@@ -1,4 +1,4 @@
-import type { Row } from "./types";
+import type { Row, SentinelEvent } from "./types";
 
 export interface Metrics {
   calls: number;
@@ -33,7 +33,7 @@ export function computeMetrics(rows: Row[]): Metrics {
     refused: tools.filter((r) => r.status === "blocked" || r.status === "rejected").length,
     errors: tools.filter((r) => r.status === "error").length,
     interrupted: tools.filter((r) => r.status === "interrupted").length,
-    payloadBytes: tools.reduce((total, row) => total + payloadSize(row.request?.payload) + payloadSize(row.response?.payload), 0),
+    payloadBytes: tools.reduce((total, row) => total + (eventPayloadSize(row.request) ?? 0) + (eventPayloadSize(row.response) ?? 0), 0),
     latencySamples: durations.length,
     p50: at(0.5),
     p95: at(0.95),
@@ -51,4 +51,10 @@ export function payloadSize(payload: unknown): number {
   return payload === undefined ? 0 : new TextEncoder().encode(JSON.stringify(payload)).length;
 }
 
-export const PAYLOAD_NOTE = "UTF-8 size of retained tool request and response JSON, serialized for display. May be truncated or synthesized by adapters; not wire volume, model tokens or context usage.";
+export function eventPayloadSize(event: SentinelEvent | undefined): number | undefined {
+  if (event?.payload === undefined) return undefined;
+  const stored = event.capture?.storedBytes;
+  return stored !== undefined && Number.isFinite(stored) && stored >= 0 ? stored : payloadSize(event.payload);
+}
+
+export const PAYLOAD_NOTE = "Stored request and matched-response JSON bytes for displayed tool calls; legacy logs use reserialized JSON. Unassigned responses are excluded. Observed source values use separate units. Not model tokens or context usage.";

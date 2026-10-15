@@ -15,6 +15,7 @@ let buildTrace;
 let capturedInterval;
 let recordingScopes;
 let filterScope;
+let captureSummary;
 
 before(async () => {
   // Use Vite's existing TypeScript loader without opening a listening socket.
@@ -26,6 +27,7 @@ before(async () => {
   ({ buildTrace, capturedInterval } = await server.ssrLoadModule("/src/trace.ts"));
   ({ buildRows } = await server.ssrLoadModule("/src/useSentinel.ts"));
   ({ recordingScopes, filterScope } = await server.ssrLoadModule("/src/scopes.ts"));
+  ({ captureSummary } = await server.ssrLoadModule("/src/capture.ts"));
 });
 after(async () => { await server?.close(); });
 
@@ -209,4 +211,30 @@ test("reports retain session identity, safe capture diagnostics and unresolved p
   assert.ok(html.includes("Pairing unresolved"));
   assert.ok(html.includes("&lt;script&gt;session&lt;/script&gt;"));
   assert.ok(!html.includes("<script>"));
+});
+
+test("retained byte metrics prefer persisted capture sizes and keep original units separate", () => {
+  const row=call(5,{request:{payload:{text:"<"},capture:{storedBytes:24,observedBytes:1000,observedUnit:"utf8-text"}},response:{payload:{text:"example"},capture:{storedBytes:64,observedBytes:9000,observedUnit:"mcp-frame"}}});
+  assert.equal(computeMetrics([row]).payloadBytes,88);
+  assert.equal(buildProfile([row]).largest[0].response.capture.storedBytes,64);
+  const other=call(5,{key:"larger",response:{payload:{text:"tiny"},capture:{storedBytes:100}}});
+  assert.equal(buildProfile([row,other]).largest[0].key,"larger");
+});
+
+test("capture summaries distinguish omitted, partial, observed zero and unrecorded provenance", () => {
+  assert.match(captureSummary({}),/quality not recorded/);
+  const c={profile:"standard",representation:"hook-normalized",completeness:"partial",observedBytes:0,observedUnit:"utf8-text",normalizedBytes:100,storedBytes:20,changes:[{kind:"redacted",stage:"recorder",method:"v1"},{kind:"truncated",stage:"recorder",method:"v1"}]};
+  assert.match(captureSummary({capture:c}),/0 B observed text UTF-8/);
+  assert.match(captureSummary({capture:c}),/redacted · truncated/);
+  assert.match(captureSummary({capture:{...c,completeness:"omitted",observedBytes:undefined}}),/Content omitted.*Observed size unknown/);
+});
+
+test("offline reports retain capture profile, observed units and transformation coverage", () => {
+  const row=call(5);
+  row.response.capture={profile:"standard",representation:"hook-normalized",completeness:"partial",observedBytes:100000,observedUnit:"utf8-text",normalizedBytes:100100,storedBytes:65536,changes:[{kind:"truncated",stage:"recorder",method:"json-prefix-v1"}]};
+  const html=buildReportHtml({session:{id:"capture",startedAt:row.startedAt,command:[],capture:{profile:"standard",maxPayloadBytes:65536,redaction:"structured-text-v1"}},rows:[row],config:{mode:"observe"},exportedAt:new Date("2026-10-15T10:01:00Z")});
+  assert.ok(html.includes("structured-text-v1"));
+  assert.ok(html.includes("Partial capture"));
+  assert.ok(html.includes("observed text UTF-8"));
+  assert.ok(html.includes("stored JSON"));
 });

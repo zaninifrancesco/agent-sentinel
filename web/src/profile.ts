@@ -1,5 +1,5 @@
 import type { Row, Session } from "./types";
-import { computeMetrics, payloadSize, toolDuration, type Metrics } from "./metrics";
+import { computeMetrics, eventPayloadSize, toolDuration, type Metrics } from "./metrics";
 
 export type CallFilter = "all" | "errors" | "open" | "interrupted" | "unresolved";
 export type CallSort = "time" | "duration" | "response";
@@ -31,7 +31,7 @@ export function buildProfile(rows: Row[]) {
 
 /** Bytes of the retained response JSON. Missing response is not zero bytes. */
 export function responseSize(row: Row): number | undefined {
-  return row.response?.payload === undefined ? undefined : payloadSize(row.response.payload);
+  return eventPayloadSize(row.response);
 }
 
 export function sortCalls(rows: Row[], sort: CallSort): Row[] {
