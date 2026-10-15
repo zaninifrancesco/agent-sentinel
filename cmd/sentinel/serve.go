@@ -24,6 +24,7 @@ func runServe(args []string) int {
 	open := fs.Bool("open", false, "open the cockpit in the browser")
 	dev := fs.Bool("dev", false, "also accept the Vite dev server (npm run dev) as WebSocket origin")
 	capture := addCaptureFlags(fs)
+	payloads := addRecorderFlags(fs)
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
 			return 0
@@ -38,6 +39,11 @@ func runServe(args []string) int {
 		fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
 		return 2
 	}
+	settings, err := payloads.settings()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
+		return 2
+	}
 
 	sink, path, err := openLog(*logPath)
 	if err != nil {
@@ -49,7 +55,11 @@ func runServe(args []string) int {
 		defer sink.Close()
 		w = sink
 	}
-	rec := recorder.New([]string{"agent hooks"}, w)
+	rec, err := recorder.NewWithCapture([]string{"agent hooks"}, w, settings)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
+		return 2
+	}
 	defer rec.Close()
 	if path != "" {
 		fmt.Fprintf(os.Stderr, "sentinel: session %s recording to %s\n", rec.Session().ID, path)

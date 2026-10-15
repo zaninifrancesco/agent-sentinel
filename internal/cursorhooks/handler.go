@@ -89,8 +89,8 @@ type input struct {
 	MCPServer      string          `json:"mcp_server_name"`
 	ResultJSON     string          `json:"result_json"`
 	FilePath       string          `json:"file_path"`
-	Content        string          `json:"content"`       // beforeReadFile: never stored
-	ContentBytes   int             `json:"content_bytes"` // set by `sentinel hook` when it shortened Content
+	Content        string          `json:"content"`       // beforeReadFile: retained only by full capture
+	ContentBytes   *int64          `json:"content_bytes"` // reported by the client when it shortened Content
 	StopStatus     string          `json:"status"`        // stop: completed | aborted | error
 	Edits          []fileEdit      `json:"edits"`
 
@@ -103,6 +103,7 @@ type input struct {
 	IsInterrupt  bool            `json:"is_interrupt"`
 	DurationMS   *float64        `json:"duration_ms"`
 	EndReason    string          `json:"reason"` // SessionEnd
+	fields       map[string]json.RawMessage
 }
 
 // fileEdit is one search/replace in a file.
@@ -129,7 +130,12 @@ func allow() Response { return Response{Permission: "allow"} }
 // The caller (the server) has already applied the loopback and CSRF defences.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var in input
-	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+	var body json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad hook input", http.StatusBadRequest)
+		return
+	}
+	if json.Unmarshal(body, &in) != nil || json.Unmarshal(body, &in.fields) != nil {
 		http.Error(w, "bad hook input", http.StatusBadRequest)
 		return
 	}
@@ -188,8 +194,8 @@ func readArgs(in input) map[string]any {
 }
 
 func readBytes(in input) int {
-	if in.ContentBytes > 0 {
-		return in.ContentBytes
+	if in.ContentBytes != nil && *in.ContentBytes >= 0 && uint64(*in.ContentBytes) <= uint64(^uint(0)>>1) {
+		return int(*in.ContentBytes)
 	}
 	return len(in.Content)
 }
@@ -285,7 +291,11 @@ func (h *Handler) observeBefore(in input, tool string, args map[string]any, key 
 	req := h.hookEnvelope(in)
 	req.Type, req.Direction = recorder.EventToolCallRequest, recorder.ClientToServer
 	req.Method, req.ToolName, req.RPCID = "tools/call", tool, id
+	if in.Event == EventBeforeRead && h.Rec.CaptureSettings().Profile == "full" && in.fields["content"] != nil {
+		args["content"] = in.Content
+	}
 	req.Payload, req.Status = requestPayload(id, tool, args), recorder.StatusPending
+	req.Capture = h.requestCapture(in)
 	identity, method := hookIdentity(in, tool)
 	if in.Event == EventBeforeRead {
 		req.Status = recorder.StatusOK
@@ -601,6 +611,7 @@ func (h *Handler) afterEdit(in input) {
 	if h.observeOnly {
 		meta := h.hookEnvelope(in)
 		ev.Source, ev.SourceID, ev.AgentSessionID, ev.ProjectRef = meta.Source, meta.SourceID, meta.AgentSessionID, meta.ProjectRef
+		ev.Capture = h.requestCapture(in)
 		h.calls.Begin(ev, "", "none")
 	} else {
 		h.Rec.Record(ev)

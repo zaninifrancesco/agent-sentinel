@@ -58,6 +58,7 @@ func printHelp() {
 	fmt.Printf("Agent Sentinel v%s\n\n", Version)
 	fmt.Println("Usage:")
 	fmt.Println("  sentinel serve [--mode observe] [--port N] [--log FILE|-] [--open]")
+	fmt.Println("    Payloads: --capture standard|full, --max-payload-bytes N. Standard redacts and retains up to 64 KiB; full keeps up to 1 MiB without redaction. Upstream omissions still apply.")
 	fmt.Println("                                Record Cursor / Claude Code hooks in the local cockpit")
 	fmt.Println("  sentinel hook install [--agent cursor|claude] [--dir PATH] [--mcp] [--user] [--dry-run]")
 	fmt.Println("                                Install passive hooks, preserving existing entries")

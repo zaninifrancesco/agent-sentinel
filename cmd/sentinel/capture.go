@@ -3,12 +3,30 @@ package main
 import (
 	"flag"
 	"fmt"
+
+	"github.com/zaninifrancesco/agent-sentinel/internal/recorder"
 )
 
 // captureFlags makes the change from enforcement to observation explicit.
 // Removed options remain parseable only to return an actionable migration error.
 type captureFlags struct {
 	mode *string
+}
+
+type recorderFlags struct {
+	profile *string
+	limit   *int
+}
+
+func addRecorderFlags(fs *flag.FlagSet) recorderFlags {
+	return recorderFlags{
+		profile: fs.String("capture", "standard", "payload profile: standard (redacted, 64 KiB) or full (unredacted, 1 MiB; upstream omissions still apply)"),
+		limit:   fs.Int("max-payload-bytes", 0, "maximum retained JSON bytes per payload (256 to 16777216; 0 uses profile default)"),
+	}
+}
+
+func (f recorderFlags) settings() (recorder.CaptureSettings, error) {
+	return recorder.CaptureOptions(*f.profile, *f.limit)
 }
 
 func addCaptureFlags(fs *flag.FlagSet) captureFlags {

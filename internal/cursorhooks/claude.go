@@ -169,7 +169,7 @@ func claudeCall(in input) (tool string, args map[string]any, call policy.Call) {
 		}
 		tool = "edit_file"
 		// "file_path" sorts before "patch", so the cockpit shows the file as the row subtitle.
-		args = map[string]any{"file_path": path, "patch": truncate(renderDiff(path, edits))}
+		args = map[string]any{"file_path": path, "patch": renderDiff(path, edits)}
 		// The policy reads the path and what is being written, never the text
 		// that is being replaced: deleting a secret is not leaking one.
 		call = policy.Call{Tool: tool, Texts: []string{path}}
@@ -214,7 +214,7 @@ func (h *Handler) claudeAfter(in input, failed bool) {
 		}
 	case tool == "read_file":
 		// The file went to the model; its content must not go to the log.
-		text = fmt.Sprintf("read %v (%d bytes returned to the model, not stored)", args["file_path"], size)
+		text = fmt.Sprintf("read %v (%d bytes of hook result JSON observed; content not stored)", args["file_path"], size)
 	case tool == "edit_file":
 		text = fmt.Sprintf("edit applied to %v", args["file_path"])
 	default:

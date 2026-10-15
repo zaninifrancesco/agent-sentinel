@@ -63,11 +63,12 @@ type Server struct {
 
 // Config is served at /api/config.
 type Config struct {
-	Mode       string  `json:"mode,omitempty"` // observe or replay; absent in older servers
-	MaxCostUSD float64 `json:"maxCostUsd"`     // 0 = no budget
-	MaxTokens  int64   `json:"maxTokens"`
-	Policy     string  `json:"policy"`    // "default", a file path or "off"
-	Approvals  bool    `json:"approvals"` // can this session approve held calls?
+	Capture    *recorder.CaptureSettings `json:"capture,omitempty"`
+	Mode       string                    `json:"mode,omitempty"` // observe or replay; absent in older servers
+	MaxCostUSD float64                   `json:"maxCostUsd"`     // 0 = no budget
+	MaxTokens  int64                     `json:"maxTokens"`
+	Policy     string                    `json:"policy"`    // "default", a file path or "off"
+	Approvals  bool                      `json:"approvals"` // can this session approve held calls?
 	// BudgetEditable is true when the limits can be changed from the cockpit.
 	BudgetEditable bool `json:"budgetEditable"`
 	// ApprovalTimeoutSec is how long a held call waits before it is refused;
@@ -123,6 +124,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, _ *http.Request) {
 // they change when a human raises them or approves going past them.
 func (s *Server) currentConfig() Config {
 	cfg := s.Config
+	cfg.Capture = s.rec.Session().Capture
 	cfg.Approvals = s.Approvals != nil
 	cfg.BudgetEditable = s.Budget != nil
 	if s.Budget != nil {

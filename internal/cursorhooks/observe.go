@@ -86,7 +86,79 @@ func (h *Handler) observeComplete(in input, tool, text string, status recorder.S
 	}
 	// rpcId is a compatibility alias for a matched internal hook request, not
 	// the agent's native identity. Orphans keep no invented request id.
-	e.Payload, _ = json.Marshal(map[string]any{"result": map[string]any{"content": []map[string]any{{"type": "text", "text": truncate(text)}}, "isError": status == recorder.StatusError}})
+	e.Payload, _ = json.Marshal(map[string]any{"result": map[string]any{"content": []map[string]any{{"type": "text", "text": text}}, "isError": status == recorder.StatusError}})
+	e.Capture = h.responseCapture(in, tool)
+	if h.Rec.CaptureSettings().Profile == "full" && isClaudeEvent(in.Event) && in.Event == EventClaudePost && in.fields["tool_response"] != nil {
+		e.Payload, _ = json.Marshal(map[string]any{"result": in.ToolResponse})
+		e.Capture.Completeness = "complete"
+	}
 	identity, method := hookIdentity(in, tool)
 	h.calls.End(e, identity, method, false, nil)
+}
+
+func observedHook(in input, field, unit string, size int) *recorder.PayloadCapture {
+	meta := recorder.ObservedPayload("hook-normalized", unit, size)
+	meta.ObservedField = field
+	if in.fields[field] == nil {
+		meta.ObservedBytes = nil
+		meta.Completeness = "unknown"
+	}
+	meta.Changes = []recorder.CaptureChange{{Kind: "normalized", Stage: "adapter", Method: "hook-normalization-v1"}}
+	return meta
+}
+
+func (h *Handler) requestCapture(in input) *recorder.PayloadCapture {
+	if in.Event == EventBeforeRead {
+		meta := observedHook(in, "content", "utf8-text", len(in.Content))
+		if in.ContentBytes != nil && *in.ContentBytes >= 0 {
+			n := *in.ContentBytes
+			meta.SourceReportedBytes = &n
+			meta.SourceReportedUnit = "utf8-text"
+			if n > int64(len(in.Content)) {
+				meta.Completeness = "partial"
+				meta.Changes = append(meta.Changes, recorder.CaptureChange{Kind: "truncated", Stage: "hook-client", Method: "read-forward-limit-v1"})
+			}
+		}
+		if h.Rec.CaptureSettings().Profile == "standard" && in.fields["content"] != nil {
+			meta.Completeness = "omitted"
+			meta.Changes = append(meta.Changes, recorder.CaptureChange{Kind: "omitted", Stage: "adapter", Method: "read-content-omitted-v1", BeforeBytes: len(in.Content)})
+		}
+		return meta
+	}
+	if in.Event == EventBeforeShell {
+		return observedHook(in, "command", "utf8-text", len(in.Command))
+	}
+	if in.Event == EventAfterEdit {
+		meta := observedHook(in, "edits", "json-value", len(in.fields["edits"]))
+		meta.Completeness = "unknown"
+		return meta
+	}
+	meta := observedHook(in, "tool_input", "json-value", len(in.ToolInput))
+	meta.Completeness = "unknown" // tool-specific normalization can omit source fields
+	return meta
+}
+
+func (h *Handler) responseCapture(in input, tool string) *recorder.PayloadCapture {
+	if in.Event == EventAfterShell {
+		return observedHook(in, "output", "utf8-text", len(in.Output))
+	}
+	if in.Event == EventAfterMCP {
+		return observedHook(in, "result_json", "utf8-text", len(in.ResultJSON))
+	}
+	if in.Event == EventClaudePostFailure {
+		return observedHook(in, "error", "utf8-text", len(in.Error))
+	}
+	meta := observedHook(in, "tool_response", "json-value", len(in.ToolResponse))
+	if h.Rec.CaptureSettings().Profile == "standard" {
+		switch tool {
+		case "read_file", "edit_file":
+			if in.fields["tool_response"] != nil {
+				meta.Completeness = "omitted"
+				meta.Changes = append(meta.Changes, recorder.CaptureChange{Kind: "omitted", Stage: "adapter", Method: "tool-result-summary-v1", BeforeBytes: len(in.ToolResponse)})
+			}
+		case "shell":
+			meta.Completeness = "unknown" // stdout/stderr text does not preserve the entire result object
+		}
+	}
+	return meta
 }

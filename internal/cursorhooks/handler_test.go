@@ -338,10 +338,13 @@ func TestFileEditIsRecordedWithItsDiffAndFlaggedAfterTheFact(t *testing.T) {
 	if ev.ToolName != "edit_file" || ev.Status != recorder.StatusOK {
 		t.Fatalf("bad edit event %+v", ev)
 	}
-	for _, want := range []string{"+++ b/proj/config.go", "@@ -1,1 +1,1 @@", `-key := \"\"`, `+key := \"AKIA`} {
+	for _, want := range []string{"+++ b/proj/config.go", "@@ -1,1 +1,1 @@", `-key := \"\"`, `+key := \"[REDACTED]`} {
 		if !strings.Contains(string(ev.Payload), want) {
 			t.Errorf("diff misses %q in %s", want, ev.Payload)
 		}
+	}
+	if strings.Contains(string(ev.Payload), "AKIAIOSFODNN7EXAMPLE") {
+		t.Fatal("default capture persisted a recognized credential")
 	}
 	// The cockpit titles a row with the first argument in key order: it must be the file, not the diff.
 	if p := string(ev.Payload); strings.Index(p, `"file_path"`) < 0 || strings.Index(p, `"file_path"`) > strings.Index(p, `"patch"`) {

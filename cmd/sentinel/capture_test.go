@@ -45,3 +45,22 @@ func TestCaptureDefaultsToObservation(t *testing.T) {
 		}
 	}
 }
+
+func TestRecorderProfileFlagsValidateBeforeStarting(t *testing.T) {
+	for _, args := range [][]string{{"--capture", "unknown"}, {"--max-payload-bytes", "1"}, {"--max-payload-bytes", "-1"}} {
+		if runServe(args) != 2 || runMCP(append(append([]string{}, args...), "--", "unused-server")) != 2 {
+			t.Fatalf("invalid capture settings accepted: %v", args)
+		}
+	}
+	for _, profile := range []string{"standard", "full"} {
+		fs := flag.NewFlagSet("test", flag.ContinueOnError)
+		flags := addRecorderFlags(fs)
+		if err := fs.Parse([]string{"--capture", profile, "--max-payload-bytes", "2048"}); err != nil {
+			t.Fatal(err)
+		}
+		settings, err := flags.settings()
+		if err != nil || settings.Profile != profile || settings.MaxPayloadBytes != 2048 {
+			t.Fatalf("bad profile config: %+v %v", settings, err)
+		}
+	}
+}

@@ -69,6 +69,7 @@ func (i *Interceptor) Observe(dir recorder.Direction, line []byte) {
 			Direction: dir,
 			Status:    recorder.StatusOK,
 			Payload:   payload,
+			Capture:   recorder.ObservedPayload("text", "utf8-text", len(frame)),
 		})
 		return
 	}
@@ -83,6 +84,7 @@ func (i *Interceptor) Observe(dir recorder.Direction, line []byte) {
 			Method:    msg.Method,
 			Status:    recorder.StatusOK,
 			Payload:   json.RawMessage(frame),
+			Capture:   recorder.ObservedPayload("mcp-frame", "mcp-frame", len(frame)),
 		})
 	case protocol.KindResponse, protocol.KindError:
 		i.onResponse(dir, msg, frame)
@@ -121,6 +123,7 @@ func (i *Interceptor) onRequest(dir recorder.Direction, msg *protocol.Message, f
 	}
 	if !i.legacy && ann == nil {
 		ev = i.envelope(ev)
+		ev.Capture = recorder.ObservedPayload("mcp-frame", "mcp-frame", len(frame))
 		ev.NativeCallID = recorder.NativeIDFromJSON(msg.IDString())
 		return i.calls.Begin(ev, msg.IDString(), "native")
 	}
@@ -204,6 +207,7 @@ func (i *Interceptor) onResponse(dir recorder.Direction, msg *protocol.Message, 
 
 func (i *Interceptor) observedResponse(dir recorder.Direction, msg *protocol.Message, frame []byte) {
 	e := i.envelope(recorder.Event{Type: recorder.EventResponse, Direction: dir, RPCID: msg.IDString(), NativeCallID: recorder.NativeIDFromJSON(msg.IDString()), Status: recorder.StatusOK, Payload: json.RawMessage(frame)})
+	e.Capture = recorder.ObservedPayload("mcp-frame", "mcp-frame", len(frame))
 	if msg.Kind() == protocol.KindError {
 		e.Status = recorder.StatusError
 	}

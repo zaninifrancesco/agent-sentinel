@@ -24,6 +24,9 @@ func TestMain(m *testing.M) {
 	case "2":
 		runEchoServer()
 		return
+	case "3":
+		runCaptureEchoServer()
+		return
 	}
 	os.Exit(m.Run())
 }
