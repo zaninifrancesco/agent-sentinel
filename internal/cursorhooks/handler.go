@@ -70,6 +70,13 @@ func New(rec *recorder.Recorder, engine *policy.Engine, budget *policy.Budget, a
 	return &Handler{Rec: rec, Engine: engine, Budget: budget, Approvals: approvals, Timeout: timeout, open: make(map[string][]openCall)}
 }
 
+// NewObserver records hooks without installing policy, budget or approval
+// dependencies. Claude Code receives no permission override; Cursor receives
+// its normal non-blocking hook acknowledgement.
+func NewObserver(rec *recorder.Recorder) *Handler {
+	return New(rec, nil, nil, nil, 0)
+}
+
 // input is the union of the fields of the hooks we handle.
 type input struct {
 	Event          string          `json:"hook_event_name"`

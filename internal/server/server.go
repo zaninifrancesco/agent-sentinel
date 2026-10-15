@@ -63,7 +63,8 @@ type Server struct {
 
 // Config is served at /api/config.
 type Config struct {
-	MaxCostUSD float64 `json:"maxCostUsd"` // 0 = no budget
+	Mode       string  `json:"mode,omitempty"` // observe or replay; absent in older servers
+	MaxCostUSD float64 `json:"maxCostUsd"`     // 0 = no budget
 	MaxTokens  int64   `json:"maxTokens"`
 	Policy     string  `json:"policy"`    // "default", a file path or "off"
 	Approvals  bool    `json:"approvals"` // can this session approve held calls?

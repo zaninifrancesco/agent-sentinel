@@ -154,3 +154,40 @@ func TestStdioProxyEndToEnd(t *testing.T) {
 		t.Errorf("error events = %d, want 2", errs)
 	}
 }
+
+func TestObserverForwardsPreviouslyBlockedTrafficVerbatim(t *testing.T) {
+	t.Setenv("SENTINEL_FAKE_SERVER", "2")
+	input := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"read_file","arguments":{"path":".env"}}}` + "\n"
+	var out bytes.Buffer
+	rec := recorder.New(nil, nil)
+	p := &StdioProxy{Command: []string{os.Args[0]}, In: strings.NewReader(input), Out: &out, Stderr: io.Discard, Rec: rec}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := p.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), `"result"`) || strings.Contains(out.String(), `"error"`) {
+		t.Fatalf("traffic was refused: %s", out.String())
+	}
+	var requests, responses int
+	for _, event := range rec.Events() {
+		if event.Decision != "" || event.Rule != "" {
+			t.Fatalf("policy was evaluated: %+v", event)
+		}
+		if event.Type == recorder.EventToolCallRequest {
+			requests++
+			if string(event.Payload)+"\n" != input {
+				t.Fatalf("request rewritten: %s", event.Payload)
+			}
+		}
+		if event.Type == recorder.EventToolCallResponse {
+			responses++
+			if string(event.Payload)+"\n" != out.String() {
+				t.Fatalf("response rewritten: %s", event.Payload)
+			}
+		}
+	}
+	if requests != 1 || responses != 1 {
+		t.Fatalf("recorded %d requests and %d responses", requests, responses)
+	}
+}

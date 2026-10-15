@@ -55,16 +55,32 @@ func (p *StdioProxy) Run(ctx context.Context) error {
 		return fmt.Errorf("starting %q: %w", p.Command[0], err)
 	}
 
-	gate := newGate(ctx, p, &syncWriter{w: serverIn}, &syncWriter{w: p.Out})
-	defer gate.Shutdown()
+	toServer, toClient := &syncWriter{w: serverIn}, &syncWriter{w: p.Out}
+	observer := NewInterceptor(p.Rec)
+	fromClient := Filter(func(line []byte) []byte {
+		observer.Observe(recorder.ClientToServer, line)
+		return line
+	})
+	fromServer := Filter(func(line []byte) []byte {
+		observer.Observe(recorder.ServerToClient, line)
+		return line
+	})
+	shutdown := func() {}
+	// Kept for legacy internal callers and regression tests. The observation
+	// CLI never constructs these dependencies and never enters the gate.
+	if p.Policy != nil || p.Budget != nil || p.Approvals != nil {
+		gate := newGate(ctx, p, toServer, toClient)
+		fromClient, fromServer, shutdown = gate.FromClient, gate.FromServer, gate.Shutdown
+	}
+	defer shutdown()
 
 	// client -> server. When the client hangs up, close the server's stdin so
 	// well-behaved servers shut down on their own. This goroutine is not
 	// awaited: it may be blocked reading the client's stdin, and it ends by
 	// itself on EOF or on the first failed write once the server is gone.
 	go func() {
-		_ = pump(gate.toServer, p.In, gate.FromClient)
-		gate.Shutdown() // the client is gone: stop waiting for approvals
+		_ = pump(toServer, p.In, fromClient)
+		shutdown()
 		_ = serverIn.Close()
 	}()
 
@@ -73,7 +89,7 @@ func (p *StdioProxy) Run(ctx context.Context) error {
 	outDone := make(chan struct{})
 	go func() {
 		defer close(outDone)
-		_ = pump(gate.toClient, serverOut, gate.FromServer)
+		_ = pump(toClient, serverOut, fromServer)
 	}()
 	<-outDone
 

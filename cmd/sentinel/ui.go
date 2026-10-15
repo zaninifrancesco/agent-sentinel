@@ -85,7 +85,7 @@ func runUI(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	url, err := startCockpit(ctx, rec, *port, *dev, nil, nil, nil, server.Config{Policy: "replay"})
+	url, err := startCockpit(ctx, rec, *port, *dev, nil, nil, nil, server.Config{Mode: "replay", Policy: "replay"})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "sentinel ui: %v\n", err)
 		return 1
