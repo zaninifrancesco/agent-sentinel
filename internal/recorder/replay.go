@@ -45,6 +45,7 @@ func Load(r io.Reader) (*Recorder, error) {
 			switch e.Type {
 			case EventSessionStarted:
 				rec.session.StartedAt = e.Timestamp
+				rec.session.Capture = e.CaptureSettings
 			case EventSessionCompleted:
 				rec.session.EndedAt = e.Timestamp
 			}

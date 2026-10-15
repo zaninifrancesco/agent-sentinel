@@ -22,6 +22,8 @@ type Recorder struct {
 	sink        *json.Encoder
 	subs        []chan Event
 	closed      bool
+	capture     CaptureSettings
+	identityKey [32]byte
 }
 
 // NewIdentity reserves a recording-scoped identity, serialized in the log so
@@ -35,15 +37,32 @@ func (r *Recorder) NewIdentity(kind string) string {
 
 // New creates a recorder for a new session. sink may be nil.
 func New(command []string, sink io.Writer) *Recorder {
-	r := &Recorder{
-		session: Session{ID: newID(), Command: command, StartedAt: time.Now().UTC()},
+	settings, _ := CaptureOptions("standard", 0)
+	return newRecorder(command, sink, settings)
+}
+
+func NewWithCapture(command []string, sink io.Writer, settings CaptureSettings) (*Recorder, error) {
+	validated, err := CaptureOptions(settings.Profile, settings.MaxPayloadBytes)
+	if err != nil {
+		return nil, err
 	}
+	return newRecorder(command, sink, validated), nil
+}
+
+func newRecorder(command []string, sink io.Writer, settings CaptureSettings) *Recorder {
+	r := &Recorder{
+		session: Session{ID: newID(), Command: captureCommand(command, settings), StartedAt: time.Now().UTC(), Capture: &settings},
+		capture: settings,
+	}
+	_, _ = rand.Read(r.identityKey[:])
 	if sink != nil {
 		r.sink = json.NewEncoder(sink)
 	}
-	r.Record(Event{Type: EventSessionStarted, Status: StatusOK})
+	r.Record(Event{Type: EventSessionStarted, Status: StatusOK, CaptureSettings: &settings})
 	return r
 }
+
+func (r *Recorder) CaptureSettings() CaptureSettings { return r.capture }
 
 func newID() string {
 	b := make([]byte, 6)
@@ -83,6 +102,7 @@ func (r *Recorder) RecordHook(e Event, hook func(Event)) Event {
 	if e.Risk == "" {
 		e.Risk = RiskNone
 	}
+	e = r.captureEvent(e)
 	if hook != nil {
 		hook(e)
 	}

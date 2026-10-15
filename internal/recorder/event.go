@@ -61,32 +61,35 @@ const (
 
 // Event is the immutable record of one thing that happened in a session.
 type Event struct {
-	SchemaVersion  int             `json:"schemaVersion,omitempty"`
-	RecordingID    string          `json:"recordingId,omitempty"`
-	Source         string          `json:"source,omitempty"`
-	SourceID       string          `json:"sourceId,omitempty"`
-	AgentSessionID string          `json:"agentSessionId,omitempty"`
-	ConnectionID   string          `json:"connectionId,omitempty"`
-	ProjectRef     string          `json:"projectRef,omitempty"`
-	CallID         string          `json:"callId,omitempty"`
-	NativeCallID   *NativeID       `json:"nativeCallId,omitempty"`
-	Correlation    *Correlation    `json:"correlation,omitempty"`
-	Timing         *Timing         `json:"timing,omitempty"`
-	Seq            uint64          `json:"seq"`
-	SessionID      string          `json:"sessionId"`
-	Timestamp      time.Time       `json:"timestamp"`
-	Type           EventType       `json:"type"`
-	Direction      Direction       `json:"direction,omitempty"`
-	Method         string          `json:"method,omitempty"`
-	ToolName       string          `json:"toolName,omitempty"`
-	RPCID          string          `json:"rpcId,omitempty"`
-	Risk           RiskLevel       `json:"risk"`
-	Decision       string          `json:"decision,omitempty"` // policy outcome: allow|warn|approve|block
-	Rule           string          `json:"rule,omitempty"`     // id of the rule that fired
-	Reason         string          `json:"reason,omitempty"`   // human-readable why
-	Status         Status          `json:"status"`
-	DurationMs     int64           `json:"durationMs,omitempty"` // set on responses
-	Payload        json.RawMessage `json:"payload,omitempty"`    // raw frame, or JSON string for RawOutput
+	SchemaVersion          int              `json:"schemaVersion,omitempty"`
+	RecordingID            string           `json:"recordingId,omitempty"`
+	Source                 string           `json:"source,omitempty"`
+	SourceID               string           `json:"sourceId,omitempty"`
+	AgentSessionID         string           `json:"agentSessionId,omitempty"`
+	ConnectionID           string           `json:"connectionId,omitempty"`
+	ProjectRef             string           `json:"projectRef,omitempty"`
+	CallID                 string           `json:"callId,omitempty"`
+	NativeCallID           *NativeID        `json:"nativeCallId,omitempty"`
+	Correlation            *Correlation     `json:"correlation,omitempty"`
+	Timing                 *Timing          `json:"timing,omitempty"`
+	Capture                *PayloadCapture  `json:"capture,omitempty"`
+	CaptureSettings        *CaptureSettings `json:"captureSettings,omitempty"`
+	MetadataRedactedFields []string         `json:"metadataRedactedFields,omitempty"`
+	Seq                    uint64           `json:"seq"`
+	SessionID              string           `json:"sessionId"`
+	Timestamp              time.Time        `json:"timestamp"`
+	Type                   EventType        `json:"type"`
+	Direction              Direction        `json:"direction,omitempty"`
+	Method                 string           `json:"method,omitempty"`
+	ToolName               string           `json:"toolName,omitempty"`
+	RPCID                  string           `json:"rpcId,omitempty"`
+	Risk                   RiskLevel        `json:"risk"`
+	Decision               string           `json:"decision,omitempty"` // policy outcome: allow|warn|approve|block
+	Rule                   string           `json:"rule,omitempty"`     // id of the rule that fired
+	Reason                 string           `json:"reason,omitempty"`   // human-readable why
+	Status                 Status           `json:"status"`
+	DurationMs             int64            `json:"durationMs,omitempty"` // set on responses
+	Payload                json.RawMessage  `json:"payload,omitempty"`    // raw frame, or JSON string for RawOutput
 }
 
 // Correlation explains a pairing without rewriting the original observations.
@@ -129,8 +132,9 @@ func NativeIDFromJSON(raw string) *NativeID {
 // Session is recording metadata (the name is retained for API compatibility).
 // One recording can contain several native agent sessions.
 type Session struct {
-	ID        string    `json:"id"`
-	Command   []string  `json:"command"`
-	StartedAt time.Time `json:"startedAt"`
-	EndedAt   time.Time `json:"endedAt,omitempty"`
+	Capture   *CaptureSettings `json:"capture,omitempty"`
+	ID        string           `json:"id"`
+	Command   []string         `json:"command"`
+	StartedAt time.Time        `json:"startedAt"`
+	EndedAt   time.Time        `json:"endedAt,omitempty"`
 }

@@ -137,6 +137,7 @@ func (t *CallTracker) End(e Event, identity, method string, measure bool, finish
 func (t *CallTracker) diagnostic(e Event, g *callGroup, reason string) {
 	e.Seq, e.CallID, e.RPCID, e.NativeCallID, e.Payload = 0, "", "", nil, nil
 	e.Type, e.Status, e.Reason = EventCaptureDiagnostic, StatusOK, reason
+	e.Capture = nil
 	e.Timing, e.DurationMs = nil, 0
 	e.Correlation = &Correlation{Method: e.Correlation.Method, Quality: "ambiguous", CandidateCallIDs: candidateIDs(g)}
 	t.rec.Record(e)
@@ -149,6 +150,7 @@ func (t *CallTracker) Interrupt(source, session, reason string) int {
 	if session == "" {
 		return 0
 	}
+	session = t.rec.captureIdentity(session)
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	n := 0
@@ -165,6 +167,7 @@ func (t *CallTracker) Interrupt(source, session, reason string) int {
 		e := req
 		e.Seq, e.Timestamp, e.Payload = 0, time.Time{}, nil
 		e.Type, e.Direction, e.Status, e.Reason = EventToolCallResponse, ServerToClient, StatusInterrupted, reason
+		e.Capture = nil
 		e.Timing, e.DurationMs = nil, 0
 		e.Correlation = &Correlation{Method: req.Correlation.Method, Quality: "exact", RequestSeq: req.Seq, Synthetic: true}
 		t.rec.Record(e)
