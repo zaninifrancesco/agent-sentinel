@@ -39,12 +39,12 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
     // Actions only show up when they match what was typed (or nothing was typed
     // yet), so searching for an event and pressing Enter never exports by accident.
     const q = query.trim().toLowerCase();
-    const exportKeywords = "export standalone audit report html download deliverable";
+    const exportKeywords = "export session report html download";
     if (!q || q.split(/\s+/).every((word) => exportKeywords.includes(word))) {
       list.push({
         id: "action-export",
-        title: "Export Standalone Audit Report",
-        subtitle: "Generate self-contained HTML deliverable",
+        title: "Export session report",
+        subtitle: "Download an offline HTML report",
         icon: <Download className="size-4 text-ok" />,
         action: () => {
           onExport();
@@ -93,8 +93,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        // Capture phase + stopPropagation: Esc closes the palette only, it must
-        // not also reach the approval dock ("Esc = block").
+        // Keep keyboard events inside the palette.
         e.preventDefault();
         e.stopPropagation();
         onClose();
@@ -108,7 +107,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
         setSelectedIndex((prev) => (prev - 1 + items.length) % Math.max(1, items.length));
       } else if (e.key === "Enter") {
         e.preventDefault();
-        e.stopPropagation(); // Cmd+Enter must not approve the pending call
+        e.stopPropagation();
         if (items[selectedIndex]) {
           items[selectedIndex].action();
         }
@@ -142,6 +141,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
             className="w-full bg-transparent font-mono text-sm text-ink placeholder:text-ink-2 focus:outline-none"
           />
           <button
+            aria-label="Close search"
             onClick={onClose}
             className="rounded p-1 text-ink-2 hover:bg-paper hover:text-ink"
           >

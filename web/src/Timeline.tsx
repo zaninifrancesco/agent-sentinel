@@ -47,15 +47,14 @@ interface Props {
   follow: boolean;
 }
 
-const COLS =
-  "grid-cols-[64px_20px_minmax(0,1fr)_56px] sm:grid-cols-[72px_20px_minmax(0,1fr)_200px_64px]";
-
 export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
 
-  // While any call waits for the human, everything else steps back.
-  const holding = rows.some((r) => r.status === "awaiting_approval");
+  const hasPolicy = rows.some((row) => row.request?.decision || row.risk !== "none");
+  const cols = hasPolicy
+    ? "grid-cols-[64px_20px_minmax(0,1fr)_56px] sm:grid-cols-[72px_20px_minmax(0,1fr)_160px_64px]"
+    : "grid-cols-[64px_20px_minmax(0,1fr)_56px] sm:grid-cols-[72px_20px_minmax(0,1fr)_64px]";
 
   // Keyboard navigation: j/k or ArrowUp/ArrowDown to navigate rows
   useEffect(() => {
@@ -103,12 +102,12 @@ export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
       className="min-h-0 flex-1 overflow-y-auto bg-sheet"
     >
       <div
-        className={`sticky top-0 z-10 grid ${COLS} items-center gap-x-3 border-b border-rule-strong bg-paper px-4 py-1.5 text-xs font-medium text-ink-2`}
+        className={`sticky top-0 z-10 grid ${cols} items-center gap-x-3 border-b border-rule-strong bg-paper px-4 py-1.5 text-xs font-medium text-ink-2`}
       >
         <span>Time</span>
         <span aria-hidden />
         <span>Event</span>
-        <span className="hidden text-right sm:block">Policy</span>
+        {hasPolicy && <span className="hidden text-right sm:block">Historical policy</span>}
         <span className="text-right">Took</span>
       </div>
 
@@ -117,7 +116,7 @@ export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
           <p className="font-semibold text-ink">No calls yet</p>
           <p className="mt-1 max-w-sm text-ink-2">
             Put an MCP server behind <code className="font-mono text-xs">sentinel mcp -- &lt;server&gt;</code>, or let
-            Cursor report here with <code className="font-mono text-xs">sentinel hook install</code>. Every call
+            your coding agent report here with <code className="font-mono text-xs">sentinel hook install</code>. Every call
             appears as a row.
           </p>
         </div>
@@ -127,7 +126,6 @@ export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
             const isSelected = selectedKey === row.key;
             const isHeld = row.status === "awaiting_approval";
             const bg = isHeld ? "light-scope bg-yellow text-ink" : isSelected ? "bg-yellow-soft" : "hover:bg-paper";
-            const recede = holding && !isHeld && !isSelected ? "row-recede" : "";
             const strong = row.kind === "tool";
             const refused = row.status === "blocked" || row.status === "rejected";
             return (
@@ -135,7 +133,7 @@ export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
                 <button
                   onClick={() => onSelect(row.key)}
                   aria-current={isSelected ? "true" : undefined}
-                  className={`grid w-full ${COLS} items-center gap-x-3 px-4 py-2 text-left ${bg} ${recede} ${
+                  className={`grid w-full ${cols} items-center gap-x-3 px-4 py-2 text-left ${bg} ${
                     isHeld && isSelected ? "outline-2 -outline-offset-2 outline-ink" : ""
                   }`}
                 >
@@ -153,12 +151,12 @@ export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
                       <span className="block truncate font-mono text-xs text-ink-2">{row.subtitle}</span>
                     )}
                   </span>
-                  <span className="hidden min-w-0 items-center justify-end gap-2 sm:flex">
+                  {hasPolicy && <span className="hidden min-w-0 items-center justify-end gap-2 sm:flex">
                     {row.request?.rule && (
                       <span className="min-w-0 truncate font-mono text-xs text-ink-2">{row.request.rule}</span>
                     )}
                     <RiskChip risk={row.risk} />
-                  </span>
+                  </span>}
                   <span className="fig text-right text-[13px] text-ink-2">
                     {row.durationMs !== undefined ? formatDuration(row.durationMs) : ""}
                   </span>

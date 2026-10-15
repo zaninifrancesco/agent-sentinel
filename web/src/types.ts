@@ -69,6 +69,7 @@ export interface Row {
 
 /** Served at /api/config. */
 export interface SentinelConfig {
+  mode?: "observe" | "replay"; // absent in older recordings/servers
   maxCostUsd: number; // 0 = no budget
   maxTokens: number;
   policy: string;

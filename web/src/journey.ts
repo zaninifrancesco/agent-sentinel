@@ -42,8 +42,8 @@ export function journeyStops(row: Row): Stop[] {
   });
 
   const decision = req.decision;
-  stops.push({
-    title: "Policy",
+  if (decision) stops.push({
+    title: "Historical policy",
     at: req.timestamp,
     text: !decision
       ? "No rule matched"

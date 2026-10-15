@@ -1,6 +1,6 @@
 import type { Risk, Row, Session, SentinelConfig, Status } from "./types";
-import { formatDuration, formatTime, formatTokens } from "./format";
-import { computeMetrics, COST_NOTE } from "./metrics";
+import { formatDuration, formatTime } from "./format";
+import { computeMetrics, PAYLOAD_NOTE } from "./metrics";
 import { journeyStops, type Stop, type Tone } from "./journey";
 
 /**
@@ -81,7 +81,7 @@ function stopHtml(s: Stop): string {
       </li>`;
 }
 
-function rowHtml(row: Row): string {
+function rowHtml(row: Row, hasPolicy: boolean): string {
   const mark = STATUS_MARK[row.status];
   const refused = row.status === "blocked" || row.status === "rejected";
   const policy = [row.request?.rule ? `<code>${esc(row.request.rule)}</code>` : "", riskChip(row.risk)].join("");
@@ -92,17 +92,17 @@ function rowHtml(row: Row): string {
         <span class="title">${esc(row.title)}</span>
         ${row.subtitle ? `<span class="sub">${esc(row.subtitle)}</span>` : ""}
       </span>
-      <span class="pol">${policy}</span>
+      ${hasPolicy ? `<span class="pol">${policy}</span>` : ""}
       <span class="fig took">${row.durationMs !== undefined ? esc(formatDuration(row.durationMs)) : ""}</span>`;
 
   // A tool call opens into its journey; plain protocol rows have nothing more to say.
   if (row.kind === "tool" && row.request) {
     return `<details class="row" id="${esc(row.key)}">
-    <summary class="grid">${cells}</summary>
+    <summary class="grid${hasPolicy ? " with-policy" : ""}">${cells}</summary>
     <ol class="journey">${journeyStops(row).map(stopHtml).join("")}</ol>
   </details>`;
   }
-  return `<div class="row"><div class="grid">${cells}</div></div>`;
+  return `<div class="row"><div class="grid${hasPolicy ? " with-policy" : ""}">${cells}</div></div>`;
 }
 
 /** The calls where policy or a human decided something: the evidence of an audit. */
@@ -200,7 +200,8 @@ ul.decisions { list-style: none; margin: 8px 0 0; padding: 0; border-top: 2px so
 .sub { color: var(--ink-2); display: block; overflow-wrap: anywhere; }
 
 .table { margin-top: 8px; background: var(--sheet); border-top: 2px solid var(--ink); }
-.head, .grid { display: grid; grid-template-columns: 72px 96px minmax(0, 1fr) 210px 64px; gap: 0 12px; align-items: center; padding: 8px 16px; }
+.head, .grid { display: grid; grid-template-columns: 72px 96px minmax(0, 1fr) 64px; gap: 0 12px; align-items: center; padding: 8px 16px; }
+.with-policy { grid-template-columns: 72px 96px minmax(0, 1fr) 210px 64px; }
 .head { background: var(--paper); border-bottom: 1px solid var(--rule-strong); font-size: 12px; font-weight: 500; color: var(--ink-2); }
 .head span:last-child, .took { text-align: right; }
 .pol { text-align: right; }
@@ -237,8 +238,8 @@ footer { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--rule-s
 footer p { margin: 0 0 4px; }
 
 @media (max-width: 720px) {
-  .head, .grid { grid-template-columns: 56px 84px minmax(0, 1fr) 56px; padding: 8px 12px; }
-  .head span:nth-child(4), .pol { display: none; }
+  .head, .grid, .with-policy { grid-template-columns: 56px 84px minmax(0, 1fr) 56px; padding: 8px 12px; }
+  .pol { display: none; }
   ol.journey { padding-left: 16px; }
 }
 @media print {
@@ -266,26 +267,21 @@ export function buildReportHtml({ session, rows, config, exportedAt }: ReportInp
   const spanMs = start && end ? new Date(end).getTime() - new Date(start).getTime() : NaN;
   const lasted = Number.isNaN(spanMs) ? undefined : formatDuration(spanMs);
 
-  // "replay" and "unknown" describe the viewer, not the recorded session.
-  const policy = config?.policy && config.policy !== "unknown" && config.policy !== "replay" ? config.policy : undefined;
-  const budget = config && config.maxCostUsd > 0 ? `$${config.maxCostUsd.toFixed(2)}` : undefined;
-  const tokenBudget = config && config.maxTokens > 0 ? formatTokens(config.maxTokens) : undefined;
+  const hasPolicy = tools.some((row) => row.request?.decision || row.risk !== "none");
+  const mode = config?.mode === "observe" ? "Observation only" : "Recorded session";
 
   const facts = [
     fact("Command", session?.command?.length ? `<span class="cmd">${esc(session.command.join(" "))}</span>` : "–"),
     fact("Started", esc(stamp(start))),
     fact("Ended", end ? `${esc(stamp(end))}${lasted ? ` (${esc(lasted)})` : ""}` : "still running when exported"),
-    fact("Policy", policy ? esc(policy) : "–"),
+    fact("Mode", mode),
     fact("Tool calls", String(m.calls)),
-    fact("Refused", `<span${m.refused > 0 ? ' class="alert"' : ""}>${m.refused}</span>`),
-    fact("Held for a human", esc(heldText)),
+    ...(m.refused > 0 ? [fact("Historical refusals", String(m.refused))] : []),
+    ...(held.length > 0 ? [fact("Historical approval holds", esc(heldText))] : []),
     fact("Tool errors", String(m.errors)),
     ...(m.interrupted > 0 ? [fact("Interrupted (no result reported)", String(m.interrupted))] : []),
-    fact("Median / p95", `${m.p50} / ${m.p95} ms`),
-    fact(
-      "Cost (estimate)",
-      `~$${m.cost.toFixed(3)}${budget ? ` of ${esc(budget)} budget` : ""} · ~${formatTokens(m.tokens)} tokens${tokenBudget ? ` of ${esc(tokenBudget)}` : ""}`,
-    ),
+    fact("Median / p95", m.latencySamples ? `${m.p50} / ${m.p95} ms (${m.latencySamples} samples)` : "not available"),
+    fact("Retained payload JSON", `${(m.payloadBytes / 1024).toFixed(1)} KiB`),
   ].join("");
 
   return `<!DOCTYPE html>
@@ -295,29 +291,29 @@ export function buildReportHtml({ session, rows, config, exportedAt }: ReportInp
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- The report is static: no script, no network, no external fonts. -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'" />
-  <title>Agent Sentinel audit - ${esc(sessionId)}</title>
+  <title>Agent Sentinel session - ${esc(sessionId)}</title>
   <style>${CSS}</style>
 </head>
 <body>
-  <div class="bar"><span>Agent Sentinel</span><span>Session audit</span></div>
+  <div class="bar"><span>Agent Sentinel</span><span>Session report</span></div>
   <main>
     <h1>${esc(sessionId)}</h1>
     <dl class="facts">${facts}</dl>
 
-    <h2>What policy and you decided</h2>
-    <p class="lede">Every call that was blocked, held for approval or flagged, with the rule that fired and why.</p>
-    ${decisionsHtml(rows)}
+    ${hasPolicy ? `<h2>Historical policy decisions</h2>
+    <p class="lede">Decisions recorded by a previous enforcement session. This report does not enforce permissions.</p>
+    ${decisionsHtml(rows)}` : ""}
 
     <h2>Timetable</h2>
     <p class="lede">Every event of the session, in order. Open a tool call to follow its journey.</p>
     <div class="table">
-      <div class="head"><span>Time</span><span>Status</span><span>Event</span><span class="pol">Policy</span><span>Took</span></div>
-      ${rows.length === 0 ? `<p class="quiet" style="padding:12px 16px">No events were recorded.</p>` : rows.map(rowHtml).join("")}
+      <div class="head${hasPolicy ? " with-policy" : ""}"><span>Time</span><span>Status</span><span>Event</span>${hasPolicy ? `<span class="pol">Historical policy</span>` : ""}<span>Took</span></div>
+      ${rows.length === 0 ? `<p class="quiet" style="padding:12px 16px">No events were recorded.</p>` : rows.map((row) => rowHtml(row, hasPolicy)).join("")}
     </div>
 
     <footer>
       <p>Exported <time datetime="${esc(exportedAt.toISOString())}">${esc(stamp(exportedAt.toISOString()))}</time> by Agent Sentinel.</p>
-      <p>Cost and tokens are estimates, not billing data. ${esc(COST_NOTE)}</p>
+      <p>${esc(PAYLOAD_NOTE)}</p>
       <p>Arguments are shown as summarised in the cockpit; full request and response payloads are not included in this file.</p>
     </footer>
   </main>

@@ -77,12 +77,15 @@ export function Detail({ row }: { row: Row | null }) {
           <Field label="Time" value={formatTime(row.startedAt)} figure />
           <Field label="Took" value={row.durationMs !== undefined ? formatDuration(row.durationMs) : "–"} figure />
           <Field label="Status" value={statusText(row.status)} />
-          <div>
-            <dt className="text-xs text-ink-2">Risk</dt>
-            <dd className="mt-0.5 flex h-5 items-center">
-              {row.risk === "none" ? <span className="text-ink-2">none</span> : <RiskChip risk={row.risk} />}
-            </dd>
-          </div>
+          {row.request?.decision || row.risk !== "none" ? (
+            <div>
+              <dt className="text-xs text-ink-2">Historical risk</dt>
+              <dd className="mt-0.5 flex h-5 items-center">
+                {row.risk === "none" ? <span className="text-ink-2">none</span> : <RiskChip risk={row.risk} />}
+              </dd>
+            </div>
+          ) : <Field label="Call ID" value={row.request?.rpcId ?? row.response?.rpcId ?? "–"} />}
+
         </dl>
 
         <div role="tablist" className="mt-5 flex gap-5">

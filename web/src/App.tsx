@@ -6,10 +6,8 @@ import { useTheme } from "./theme";
 import { Timeline } from "./Timeline";
 import { Detail } from "./Detail";
 import { CommandPalette } from "./CommandPalette";
-import { ApprovalBar } from "./ApprovalBar";
 import { MetricsBar } from "./MetricsBar";
 import { ExportModal } from "./ExportModal";
-import { BudgetModal } from "./BudgetModal";
 import { computeMetrics } from "./metrics";
 import type { Row } from "./types";
 
@@ -42,15 +40,12 @@ function matches(row: Row, f: Filter): boolean {
 
 export default function App() {
   const { session, rows, connection } = useSentinel();
-  const { config, apply: applyConfig, reload: reloadConfig } = useConfig();
+  const { config } = useConfig();
   const [theme, toggleTheme] = useTheme();
-  const [approvalBusy, setApprovalBusy] = useState(false);
-  const [approvalError, setApprovalError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [isBudgetOpen, setIsBudgetOpen] = useState(false);
 
   // Global shortcut for Cmd+K / Ctrl+K
   useEffect(() => {
@@ -67,66 +62,19 @@ export default function App() {
 
   const metrics = useMemo(() => computeMetrics(rows), [rows]);
 
-  // The limits move when a human approves a call that went over the budget
-  // (the next limit is one step higher), so read them again after any decision.
-  const decisions = useMemo(() => rows.filter((r) => r.resolution).length, [rows]);
-  useEffect(() => {
-    if (decisions > 0) reloadConfig();
-  }, [decisions, reloadConfig]);
-
   const visible = useMemo(
     () => rows.filter((r) => matches(r, filter)),
     [rows, filter]
   );
 
-  // Auto-select first item if none selected
+  // Prefer a tool call, and keep selection visible after a filter changes.
   useEffect(() => {
-    if (!selectedKey && visible.length > 0) {
-      setSelectedKey(visible[0].key);
+    if (visible.length > 0 && !visible.some((row) => row.key === selectedKey)) {
+      setSelectedKey((visible.find((row) => row.kind === "tool") ?? visible[0]).key);
     }
   }, [visible, selectedKey]);
 
-  const selected = rows.find((r) => r.key === selectedKey) ?? null;
-
-  // Human-in-the-Loop: the proxy itself holds a call and marks it
-  // "awaiting_approval"; the cockpit only has to show those, oldest first.
-  // A finished (replayed) session has nothing left to approve.
-  const awaiting = useMemo(
-    () => (connection === "live" && config.approvals ? rows.filter((r) => r.status === "awaiting_approval") : []),
-    [rows, connection, config.approvals]
-  );
-  const pendingRow = awaiting[0] ?? null;
-
-  // A call that needs a decision takes the detail pane, so what is shown
-  // beside the dock is what is being decided.
-  const pendingKey = pendingRow?.key;
-  useEffect(() => {
-    if (pendingKey) setSelectedKey(pendingKey);
-  }, [pendingKey]);
-
-  const decide = async (row: Row, approved: boolean, feedback?: string) => {
-    if (!row.request) return;
-    setApprovalBusy(true);
-    setApprovalError(null);
-    try {
-      const res = await fetch(`/api/approvals/${row.request.seq}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approved, feedback: feedback ?? "" }),
-      });
-      // 409 = already settled (timed out or cancelled by the agent): the
-      // timeline updates by itself, so there is nothing to show.
-      if (!res.ok && res.status !== 409) {
-        setApprovalError(`Sentinel refused the answer (${res.status}): ${(await res.text()).trim()}`);
-      }
-    } catch (err) {
-      setApprovalError(`Could not reach Sentinel: ${String(err)}`);
-    } finally {
-      setApprovalBusy(false);
-    }
-  };
-  const handleApprove = (row: Row, feedback?: string) => void decide(row, true, feedback);
-  const handleBlock = (row: Row, feedback?: string) => void decide(row, false, feedback);
+  const selected = visible.find((r) => r.key === selectedKey) ?? null;
 
   return (
     <div className="flex h-full flex-col bg-paper text-ink">
@@ -134,6 +82,7 @@ export default function App() {
         <span className="whitespace-nowrap text-base font-bold tracking-tight">Agent Sentinel</span>
 
         <ConnectionBadge state={connection} />
+        <span className="hidden text-xs text-rule sm:inline">{config.mode === "replay" ? "Recorded session" : "Local flight recorder"}</span>
 
         {session && (
           <div className="hidden min-w-0 truncate font-mono text-xs text-rule-strong md:block">
@@ -174,13 +123,7 @@ export default function App() {
         </div>
       </header>
 
-      <MetricsBar
-        metrics={metrics}
-        maxCostUsd={config.maxCostUsd}
-        maxTokens={config.maxTokens}
-        editable={config.budgetEditable && connection === "live"}
-        onEditBudget={() => setIsBudgetOpen(true)}
-      />
+      <MetricsBar metrics={metrics} />
 
       <main className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,2fr)_minmax(0,3fr)] lg:grid-cols-[minmax(420px,5fr)_7fr] lg:grid-rows-1">
         <div className="flex min-h-0 flex-col border-r border-rule-strong">
@@ -210,31 +153,12 @@ export default function App() {
         <Detail row={selected} />
       </main>
 
-      {/* Human-in-the-Loop approval dock (part of the layout, below the panes) */}
-      <ApprovalBar
-        pendingRow={pendingRow}
-        more={Math.max(0, awaiting.length - 1)}
-        busy={approvalBusy}
-        error={approvalError}
-        timeoutSec={config.approvalTimeoutSec}
-        onApprove={handleApprove}
-        onBlock={handleBlock}
-      />
-
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
         rows={rows}
-        onSelectRow={(key) => setSelectedKey(key)}
+        onSelectRow={(key) => { setFilter("all"); setSelectedKey(key); }}
         onExport={() => setIsExportModalOpen(true)}
-      />
-
-      <BudgetModal
-        isOpen={isBudgetOpen}
-        onClose={() => setIsBudgetOpen(false)}
-        config={config}
-        spent={{ cost: metrics.cost, tokens: metrics.tokens }}
-        onSaved={applyConfig}
       />
 
       <ExportModal

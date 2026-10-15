@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Download, Copy, Check, X, Sparkles } from "lucide-react";
+import { Download, Copy, Check, X, FileText } from "lucide-react";
 import type { Session, Row, SentinelConfig } from "./types";
 import { buildReportHtml } from "./report";
 import { computeMetrics } from "./metrics";
@@ -15,8 +15,7 @@ interface Props {
 export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
   const [copied, setCopied] = useState(false);
 
-  // Esc closes the modal. Capture phase + stopPropagation so it does not also
-  // reach the approval dock, where Esc means "block".
+  // Escape closes the export dialog without reaching the timeline.
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -41,7 +40,7 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `sentinel-audit-${session?.id || "session"}.html`;
+    a.download = `sentinel-session-${session?.id || "session"}.html`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -54,21 +53,21 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#15140f]/60 p-4">
-      <div className="w-full max-w-lg overflow-hidden rounded-sm border border-rule-strong bg-sheet">
+      <div role="dialog" aria-modal="true" aria-labelledby="export-title" className="w-full max-w-lg overflow-hidden rounded-sm border border-rule-strong bg-sheet">
         <div className="flex items-center justify-between border-b border-rule-strong bg-paper px-5 py-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-ink" />
-            <h3 className="font-semibold text-sm text-ink">Export Standalone Audit Deliverable</h3>
+            <FileText className="size-4 text-ink" />
+            <h3 id="export-title" className="font-semibold text-sm text-ink">Export session report</h3>
           </div>
-          <button onClick={onClose} className="text-ink-2 hover:text-ink">
+          <button onClick={onClose} aria-label="Close export" className="text-ink-2 hover:text-ink">
             <X className="size-4" />
           </button>
         </div>
 
         <div className="space-y-4 p-6 text-xs text-ink-2">
           <p>
-            One self-contained HTML file: what policy and you decided on each call, the full timetable with every
-            call's journey, and the session numbers. It opens offline, runs no script, and follows the reader's
+            One self-contained HTML file with the recorded calls, their outcomes and durations.
+            Historical policy decisions are included when present in the trace. It opens offline, runs no script, and follows the reader's
             light or dark theme.
           </p>
 
@@ -76,14 +75,15 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
             <Line label="Session" value={session?.id || "active"} />
             <Line label="Events" value={String(rows.length)} />
             <Line label="Tool calls" value={String(m.calls)} />
-            <Line label="Refused" value={String(m.refused)} alert={m.refused > 0} />
+            <Line label="Tool errors" value={String(m.errors)} />
+            {m.refused > 0 && <Line label="Historical refusals" value={String(m.refused)} />}
             {m.interrupted > 0 && <Line label="Interrupted" value={String(m.interrupted)} />}
-            {m.waiting > 0 && <Line label="Still waiting for a human" value={String(m.waiting)} />}
+            {m.waiting > 0 && <Line label="Historical holds" value={String(m.waiting)} />}
           </div>
 
           <p>
             Payloads are left out: the report shows each call's arguments as summarised in the cockpit, not the full
-            request and response bodies. Cost and tokens are written as estimates.
+            request and response bodies. The report does not estimate model cost or context usage.
           </p>
         </div>
 
