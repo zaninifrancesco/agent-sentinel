@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { Row, SentinelEvent } from "./types";
-import { RiskChip, StatusIcon } from "./Timeline";
-import { formatDuration, formatTime } from "./format";
+import { StatusIcon } from "./Timeline";
+import { formatBytes, formatDuration, formatTime } from "./format";
+import { responseSize } from "./profile";
 import { journeyStops, statusText, type Tone } from "./journey";
 import { DiffViewer, diffFilename, extractDiff, isDiff } from "./DiffViewer";
 import { Check, Copy } from "lucide-react";
@@ -9,140 +10,87 @@ import { Check, Copy } from "lucide-react";
 type Tab = "payload" | "diff" | "raw";
 
 export function Detail({ row }: { row: Row | null }) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const [activeTab, setActiveTab] = useState<Tab>("payload");
+  if (!row) return <section className="grid min-h-0 flex-1 place-items-center bg-paper p-8 text-sm text-ink-2">
+    <div className="max-w-xs"><h2 className="font-semibold text-ink">Inspect the evidence</h2><p className="mt-2">Select a captured call to see its arguments, result and available measurements.</p></div>
+  </section>;
 
-  if (!row) {
-    return (
-      <section className="grid place-items-center bg-paper p-8 text-sm text-ink-2">
-        <div className="max-w-xs">
-          <p className="font-semibold text-ink">Nothing selected</p>
-          <p className="mt-1">
-            Pick a row in the timetable, or move with <kbd className="font-mono text-xs">J</kbd> /{" "}
-            <kbd className="font-mono text-xs">K</kbd>. <kbd className="font-mono text-xs">⌘K</kbd> searches.
-          </p>
-        </div>
-      </section>
-    );
-  }
+  const blocks: { label: string; event: SentinelEvent; payload: unknown }[] = [];
+  if (row.request) blocks.push({ label: row.kind === "tool" ? "Arguments" : "Request", event: row.request, payload: row.kind === "tool" ? argumentsOf(row.request.payload) : row.request.payload });
+  if (row.response) blocks.push({ label: row.status === "error" ? "Error / result" : "Result", event: row.response, payload: resultOf(row.response.payload) });
+  if (row.event) blocks.push({ label: "Captured payload", event: row.event, payload: row.event.payload });
 
-  const blocks: { label: string; event: SentinelEvent }[] = [];
-  if (row.request) blocks.push({ label: "Request", event: row.request });
-  if (row.response) blocks.push({ label: "Response", event: row.response });
-  if (row.event) blocks.push({ label: "Payload", event: row.event });
-
-  // Look for a real patch in the text a tool produced or was given, not in
-  // the JSON-RPC envelope around it.
   let diffText: string | null = null;
-  for (const { event } of blocks) {
-    for (const candidate of textCandidates(event.payload)) {
-      if (diffText === null && isDiff(candidate)) diffText = extractDiff(candidate);
-    }
+  for (const { event } of blocks) for (const candidate of textCandidates(event.payload)) {
+    if (diffText === null && isDiff(candidate)) diffText = extractDiff(candidate);
   }
-  const tab: Tab = activeTab === "diff" && diffText === null ? "payload" : activeTab;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(JSON.stringify(row, null, 2));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const tab = activeTab === "diff" && diffText === null ? "payload" : activeTab;
+  const bytes = responseSize(row);
+  const historical = !!row.request?.decision || !!row.resolution || row.risk !== "none";
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "payload", label: row.kind === "tool" ? "Arguments & result" : "Payload" },
+    ...(diffText !== null ? [{ id: "diff" as Tab, label: "Patch" }] : []),
+    { id: "raw", label: "Event JSON" },
+  ];
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(JSON.stringify(row, null, 2)); setCopyState("copied"); }
+    catch { setCopyState("error"); }
   };
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "payload", label: "Payload" },
-    ...(diffText !== null ? [{ id: "diff" as Tab, label: "Diff" }] : []),
-    { id: "raw", label: "Raw JSON" },
-  ];
-
-  return (
-    <section className="flex min-h-0 flex-col overflow-hidden bg-paper">
-      <div className="border-b border-rule-strong px-6 pb-0 pt-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <h2 className="flex items-center gap-2.5 truncate text-2xl font-bold leading-tight text-ink">
-              <StatusIcon status={row.status} />
-              <span className="truncate">{row.title}</span>
-            </h2>
-            {row.subtitle && <p className="mt-1 truncate font-mono text-[13px] text-ink-2">{row.subtitle}</p>}
-          </div>
-          <button
-            onClick={handleCopy}
-            className="flex shrink-0 items-center gap-1.5 rounded-sm border border-rule-strong bg-sheet px-2.5 py-1 text-xs font-medium text-ink-2 hover:border-ink hover:text-ink"
-          >
-            {copied ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />}
-            {copied ? "Copied" : "Copy event"}
-          </button>
-        </div>
-
-        <dl className="mt-4 grid grid-cols-4 gap-6 text-sm">
-          <Field label="Time" value={formatTime(row.startedAt)} figure />
-          <Field label="Took" value={row.durationMs !== undefined ? formatDuration(row.durationMs) : "–"} figure />
-          <Field label="Status" value={statusText(row.status)} />
-          {row.request?.decision || row.risk !== "none" ? (
-            <div>
-              <dt className="text-xs text-ink-2">Historical risk</dt>
-              <dd className="mt-0.5 flex h-5 items-center">
-                {row.risk === "none" ? <span className="text-ink-2">none</span> : <RiskChip risk={row.risk} />}
-              </dd>
-            </div>
-          ) : <Field label="Call ID" value={row.request?.rpcId ?? row.response?.rpcId ?? "–"} />}
-
-        </dl>
-
-        <div role="tablist" className="mt-5 flex gap-5">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setActiveTab(t.id)}
-              className={`-mb-px border-b-2 pb-2 text-sm font-medium ${
-                tab === t.id ? "border-ink text-ink" : "border-transparent text-ink-2 hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+  return <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper" aria-label="Selected event details">
+    <div className="shrink-0 border-b border-rule-strong px-4 pt-5 sm:px-6">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0"><h2 className="flex items-center gap-2 text-xl font-bold"><StatusIcon status={row.status} /><span className="truncate">{row.title}</span></h2></div>
+        <button onClick={() => void copy()} className="action-button shrink-0">{copyState === "copied" ? <Check aria-hidden className="size-3.5" /> : <Copy aria-hidden className="size-3.5" />} {copyState === "copied" ? "Copied" : "Copy event"}</button>
       </div>
-
-      <div className="min-h-0 flex-1 select-text overflow-y-auto px-6 py-5">
-        {tab === "diff" && diffText ? (
-          <DiffViewer text={diffText} filename={diffFilename(diffText)} />
-        ) : tab === "raw" ? (
-          <pre className="overflow-x-auto rounded-sm border border-rule bg-sheet p-4 font-mono text-xs leading-relaxed text-ink">
-            {JSON.stringify(row, null, 2)}
-          </pre>
-        ) : (
-          <div className="space-y-6">
-            {row.kind === "tool" && row.request && <Journey row={row} />}
-            {blocks.map(({ label, event }) => (
-              <div key={event.seq} className="overflow-hidden rounded-sm border border-rule bg-sheet">
-                <div className="flex items-center justify-between border-b border-rule bg-paper px-4 py-1.5 text-xs text-ink-2">
-                  <span>
-                    <span className="font-semibold text-ink">{label}</span>
-                    <span className="fig ml-2">#{event.seq}</span>
-                  </span>
-                  {event.direction && <span className="font-mono">{event.direction}</span>}
-                </div>
-                <pre className="overflow-x-auto whitespace-pre-wrap p-4 font-mono text-xs leading-relaxed text-ink">
-                  {pretty(event.payload)}
-                </pre>
-              </div>
-            ))}
-          </div>
-        )}
+      {copyState === "error" && <p role="status" className="mt-2 text-xs text-warn">Could not copy this event. You can select its text in Event JSON.</p>}
+      <dl className="my-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+        <Field label="Captured at" value={formatTime(row.startedAt)} figure />
+        <Field label="Duration" value={row.durationMs === undefined ? "Not available" : formatDuration(row.durationMs)} figure />
+        <Field label="Response JSON" value={bytes === undefined ? "Not available" : formatBytes(bytes)} figure />
+        <Field label="Status" value={row.kind === "tool" && row.status === "ok" && !row.response ? "Recorded without result" : statusText(row.status)} />
+      </dl>
+      <div role="group" aria-label="Inspector view" className="flex flex-wrap gap-x-5">
+        {tabs.map((item) => <button key={item.id} aria-pressed={tab === item.id} onClick={() => setActiveTab(item.id)}
+          className={`-mb-px border-b-2 pb-2.5 pt-1 text-sm font-medium ${tab === item.id ? "border-ink text-ink" : "border-transparent text-ink-2 hover:text-ink"}`}>{item.label}</button>)}
       </div>
-    </section>
-  );
+    </div>
+    <div className="min-h-0 flex-1 select-text overflow-y-auto">
+      {tab === "diff" && diffText ? <div className="p-4 sm:p-6"><DiffViewer text={diffText} filename={diffFilename(diffText)} /></div> : tab === "raw" ? (
+        <div className="p-4 sm:p-6"><p className="mb-3 text-xs text-ink-2">Captured event data, including normalized fields and any historical policy metadata.</p><pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">{JSON.stringify(row, null, 2)}</pre></div>
+      ) : <>
+        {blocks.map(({ label, event, payload }) => <section key={event.seq} className="border-b border-rule" aria-label={label}>
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rule bg-sheet px-4 py-2.5 text-xs sm:px-6"><span className="font-semibold">{label}<span className="fig ml-2 font-normal text-ink-3">#{event.seq}</span></span><span className="text-ink-2">{event.direction}</span></div>
+          <pre className="overflow-x-auto whitespace-pre-wrap break-words px-4 py-4 font-mono text-xs leading-relaxed sm:px-6">{pretty(payload)}</pre>
+        </section>)}
+        {row.kind === "tool" && !row.response && <p className="px-4 py-4 text-sm text-ink-2 sm:px-6">{row.status === "pending" ? "No response received yet. Duration and response size remain unavailable." : "No tool result was captured for this observation."}</p>}
+        <details className="border-b border-rule px-4 py-4 text-xs sm:px-6">
+          <summary className="w-fit cursor-pointer py-1 font-medium">Capture details</summary>
+          <dl className="mt-3 grid grid-cols-2 gap-4"><Field label="Call ID" value={row.request?.rpcId ?? row.response?.rpcId ?? "Not available"} /><Field label="Recorded status" value={row.status} /></dl>
+          <p className="mt-3 max-w-prose leading-relaxed text-ink-2">Payloads may be normalized, omitted or truncated by the adapter. Response JSON is the retained envelope size, not original tool output or model context usage. Missing timing is not a measured zero.</p>
+        </details>
+        {historical && <details className="px-4 py-4 sm:px-6"><summary className="mb-3 w-fit cursor-pointer py-1 text-xs font-medium">Historical policy and call history</summary><Journey row={row} /></details>}
+      </>}
+    </div>
+  </section>;
+}
+
+function argumentsOf(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object") return payload;
+  const params = (payload as { params?: { arguments?: unknown } }).params;
+  return params?.arguments ?? payload;
+}
+
+function resultOf(payload: unknown): unknown {
+  if (!payload || typeof payload !== "object") return payload;
+  if ("result" in payload) return payload.result;
+  if ("error" in payload) return payload.error;
+  return payload;
 }
 
 function Field({ label, value, figure }: { label: string; value: string; figure?: boolean }) {
-  return (
-    <div>
-      <dt className="text-xs text-ink-2">{label}</dt>
-      <dd className={`mt-0.5 text-base font-semibold text-ink ${figure ? "fig" : ""}`}>{value}</dd>
-    </div>
-  );
+  return <div className="min-w-0"><dt className="text-xs text-ink-2">{label}</dt><dd className={`mt-1 break-words text-sm font-semibold [overflow-wrap:anywhere] ${figure ? "fig" : ""}`}>{value}</dd></div>;
 }
 
 /** The call as a journey: where it came from, what policy said, who decided, what came back. */

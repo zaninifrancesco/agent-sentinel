@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type KeyboardEvent } from "react";
 import { Ban, Check, CircleDashed, CircleSlash, Loader, OctagonPause, TriangleAlert } from "lucide-react";
 import type { Risk, Row, Status } from "./types";
-import { formatDuration, formatTime } from "./format";
+import { formatBytes, formatDuration, formatTime } from "./format";
+import { responseSize } from "./profile";
 
 /** One consistent glyph set, 16px, 2px stroke. Colour only where it means something. */
 export function StatusIcon({ status }: { status: Status }) {
@@ -12,7 +13,7 @@ export function StatusIcon({ status }: { status: Status }) {
     case "pending":
       return <Loader aria-label="running" className={`${cls} text-ink-2`} />;
     case "awaiting_approval":
-      return <OctagonPause aria-label="waiting for you" className={`${cls} text-ink`} />;
+      return <OctagonPause aria-label="historical hold" className={`${cls} text-ink`} />;
     case "blocked":
       return <Ban aria-label="blocked" className={`${cls} text-signal`} />;
     case "rejected":
@@ -45,39 +46,31 @@ interface Props {
   selectedKey: string | null;
   onSelect: (key: string) => void;
   follow: boolean;
+  showResponseSize?: boolean;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
-export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
+export function Timeline({ rows, selectedKey, onSelect, follow, showResponseSize = false, emptyTitle = "No captured events", emptyDescription = "Connect an agent or MCP server to start recording." }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
 
-  const hasPolicy = rows.some((row) => row.request?.decision || row.risk !== "none");
-  const cols = hasPolicy
-    ? "grid-cols-[64px_20px_minmax(0,1fr)_56px] sm:grid-cols-[72px_20px_minmax(0,1fr)_160px_64px]"
-    : "grid-cols-[64px_20px_minmax(0,1fr)_56px] sm:grid-cols-[72px_20px_minmax(0,1fr)_64px]";
+  const cols = showResponseSize
+    ? "grid-cols-[56px_20px_minmax(0,1fr)_56px] sm:grid-cols-[56px_20px_minmax(0,1fr)_56px_72px]"
+    : "grid-cols-[56px_20px_minmax(0,1fr)_56px]";
 
-  // Keyboard navigation: j/k or ArrowUp/ArrowDown to navigate rows
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const tag = document.activeElement?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-
-      if (e.key === "j" || e.key === "ArrowDown") {
-        e.preventDefault();
-        const currentIdx = rows.findIndex((r) => r.key === selectedKey);
-        const nextIdx = Math.min(rows.length - 1, currentIdx + 1);
-        if (rows[nextIdx]) onSelect(rows[nextIdx].key);
-      } else if (e.key === "k" || e.key === "ArrowUp") {
-        e.preventDefault();
-        const currentIdx = rows.findIndex((r) => r.key === selectedKey);
-        const prevIdx = Math.max(0, currentIdx - 1);
-        if (rows[prevIdx]) onSelect(rows[prevIdx].key);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [rows, selectedKey, onSelect]);
+  // Navigation belongs to the focused list, never to unrelated app controls.
+  const navigate = (event: KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement;
+    if (target.closest("input, textarea, select, [contenteditable=true], [role=dialog]")) return;
+    const direction = event.key === "j" || event.key === "ArrowDown" ? 1 : event.key === "k" || event.key === "ArrowUp" ? -1 : 0;
+    if (!direction || !rows.length) return;
+    event.preventDefault();
+    const current = rows.findIndex((row) => row.key === selectedKey);
+    const next = Math.max(0, Math.min(rows.length - 1, current + direction));
+    onSelect(rows[next].key);
+    scroller.current?.querySelectorAll<HTMLButtonElement>("button[data-recorded-row]")[next]?.focus();
+  };
 
   // Keep the newest event in view while following a live session.
   useEffect(() => {
@@ -95,6 +88,10 @@ export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
   return (
     <div
       ref={scroller}
+      tabIndex={0}
+      onKeyDown={navigate}
+      role="region"
+      aria-label="Captured event list"
       onScroll={(e) => {
         const el = e.currentTarget;
         stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
@@ -107,35 +104,30 @@ export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
         <span>Time</span>
         <span aria-hidden />
         <span>Event</span>
-        {hasPolicy && <span className="hidden text-right sm:block">Historical policy</span>}
-        <span className="text-right">Took</span>
+        <span className="text-right">Duration</span>
+        {showResponseSize && <span className="hidden text-right sm:block" title="Size of retained response JSON, not original output or context usage">Response</span>}
       </div>
 
       {rows.length === 0 ? (
         <div className="px-4 py-10 text-sm text-ink-2">
-          <p className="font-semibold text-ink">No calls yet</p>
-          <p className="mt-1 max-w-sm text-ink-2">
-            Put an MCP server behind <code className="font-mono text-xs">sentinel mcp -- &lt;server&gt;</code>, or let
-            your coding agent report here with <code className="font-mono text-xs">sentinel hook install</code>. Every call
-            appears as a row.
-          </p>
+          <p className="font-semibold text-ink">{emptyTitle}</p>
+          <p className="mt-1 max-w-sm text-ink-2">{emptyDescription}</p>
         </div>
       ) : (
         <ul>
           {rows.map((row) => {
             const isSelected = selectedKey === row.key;
-            const isHeld = row.status === "awaiting_approval";
-            const bg = isHeld ? "light-scope bg-yellow text-ink" : isSelected ? "bg-yellow-soft" : "hover:bg-paper";
+            const bg = isSelected ? "bg-yellow-soft" : "hover:bg-paper";
+            const bytes = responseSize(row);
             const strong = row.kind === "tool";
             const refused = row.status === "blocked" || row.status === "rejected";
             return (
               <li key={row.key} className="border-b border-rule">
                 <button
+                  data-recorded-row
                   onClick={() => onSelect(row.key)}
                   aria-current={isSelected ? "true" : undefined}
-                  className={`grid w-full ${cols} items-center gap-x-3 px-4 py-2 text-left ${bg} ${
-                    isHeld && isSelected ? "outline-2 -outline-offset-2 outline-ink" : ""
-                  }`}
+                  className={`grid w-full ${cols} items-center gap-x-3 px-4 py-2.5 text-left ${bg}`}
                 >
                   <span className="fig text-[13px] text-ink-2">{formatTime(row.startedAt)}</span>
                   <StatusIcon status={row.status} />
@@ -151,15 +143,10 @@ export function Timeline({ rows, selectedKey, onSelect, follow }: Props) {
                       <span className="block truncate font-mono text-xs text-ink-2">{row.subtitle}</span>
                     )}
                   </span>
-                  {hasPolicy && <span className="hidden min-w-0 items-center justify-end gap-2 sm:flex">
-                    {row.request?.rule && (
-                      <span className="min-w-0 truncate font-mono text-xs text-ink-2">{row.request.rule}</span>
-                    )}
-                    <RiskChip risk={row.risk} />
-                  </span>}
                   <span className="fig text-right text-[13px] text-ink-2">
-                    {row.durationMs !== undefined ? formatDuration(row.durationMs) : ""}
+                    {row.durationMs !== undefined ? formatDuration(row.durationMs) : "–"}
                   </span>
+                  {showResponseSize && <span className="fig hidden text-right text-xs text-ink-2 sm:block">{bytes === undefined ? "–" : formatBytes(bytes)}</span>}
                 </button>
               </li>
             );

@@ -14,9 +14,9 @@
     U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/* Station-timetable palette. Colour has jobs:
-   yellow = selected row / a call held for you,
-   signal red = needs the human or was refused (and nothing else),
+/* Profiler palette. Colour has jobs:
+   yellow = selected evidence / live capture,
+   signal red = historical refusals,
    green / amber-brown = outcome of a finished call. */
 @theme {
   --color-paper: #f4f2ea;
@@ -59,8 +59,7 @@
   --color-warn: #f0a040;
 }
 
-/* Surfaces that are always light-on-dark or dark-on-yellow (top bar, the held
-   row, the approval dock) take the light palette in both themes, so ink on
+/* Surfaces that are always light-on-dark or dark-on-yellow take the light palette in both themes, so ink on
    yellow stays ink. */
 .light-scope {
   color-scheme: light;
@@ -146,23 +145,14 @@ button:disabled {
   background: var(--color-ink-3);
 }
 
-/* The countdown bar steps down once a second, and holds still for
-   reduced-motion users (the remaining time is also written out as text). */
-.countdown-bar {
-  transition: width 1s linear;
-}
-@media (prefers-reduced-motion: reduce) {
-  .countdown-bar {
-    transition: none;
+@layer components {
+  .header-button {
+    @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-sm border border-ink-3 px-2.5 py-1.5 text-xs text-rule hover:border-white hover:text-white disabled:opacity-50;
   }
-}
-
-/* Rows that are not the held call step back while a call waits for you. */
-.row-recede {
-  opacity: 0.6;
-  transition: opacity 200ms cubic-bezier(0.19, 1, 0.22, 1);
-}
-.row-recede:hover,
-.row-recede:focus-visible {
-  opacity: 1;
+  .action-button {
+    @apply inline-flex min-h-9 items-center justify-center gap-2 rounded-sm border border-rule-strong bg-sheet px-3 py-2 text-xs font-medium text-ink hover:border-ink;
+  }
+  .section-heading {
+    @apply flex items-center justify-between gap-3 border-b border-rule-strong pb-3;
+  }
 }
