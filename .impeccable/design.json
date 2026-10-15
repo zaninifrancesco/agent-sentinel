@@ -1,107 +1,415 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-08T20:10:00Z",
-  "title": "Design System: Agent Sentinel Cockpit",
+  "generatedAt": "2026-10-15T17:34:50.679712+00:00",
+  "title": "Design System: Agent Sentinel — Trace Atlas",
   "extensions": {
     "colorMeta": {
-      "timetable-yellow": { "role": "primary", "displayName": "Timetable Yellow", "canonical": "#ffd92e", "tonalRamp": ["#3d3300", "#665400", "#8f7600", "#b89900", "#e0bb00", "#ffd92e", "#ffe76b", "#fff0a3"] },
-      "signal-red": { "role": "secondary", "displayName": "Signal Red", "canonical": "#d5001c", "tonalRamp": ["#3a0007", "#600010", "#86000f", "#ab0017", "#d5001c", "#ef4a5d", "#f7949f", "#fbe4e4"] },
-      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#15140f", "tonalRamp": ["#15140f", "#2a2820", "#46433a", "#6b675b", "#8d8979", "#b3ae9c", "#d9d5c7", "#f4f2ea"] },
-      "paper": { "role": "neutral", "displayName": "Paper", "canonical": "#f4f2ea", "tonalRamp": ["#15140f", "#46433a", "#6b675b", "#b3ae9c", "#d9d5c7", "#ebe8dc", "#f4f2ea", "#fbfaf5"] }
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper"
+      },
+      "sheet": {
+        "role": "neutral",
+        "displayName": "Sheet"
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule"
+      },
+      "rule-strong": {
+        "role": "neutral",
+        "displayName": "Rule Strong"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink"
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink 2"
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Ink 3"
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Accent"
+      },
+      "yellow": {
+        "role": "primary",
+        "displayName": "Selection Indigo (legacy source name)"
+      },
+      "yellow-soft": {
+        "role": "primary",
+        "displayName": "Selection Periwinkle (legacy source name)"
+      },
+      "signal": {
+        "role": "tertiary",
+        "displayName": "Signal"
+      },
+      "signal-soft": {
+        "role": "tertiary",
+        "displayName": "Signal Soft"
+      },
+      "ok": {
+        "role": "secondary",
+        "displayName": "Ok"
+      },
+      "ok-soft": {
+        "role": "secondary",
+        "displayName": "Ok Soft"
+      },
+      "warn": {
+        "role": "tertiary",
+        "displayName": "Warn"
+      },
+      "rail": {
+        "role": "neutral",
+        "displayName": "Rail"
+      },
+      "rail-muted": {
+        "role": "neutral",
+        "displayName": "Rail Muted"
+      },
+      "rail-active": {
+        "role": "neutral",
+        "displayName": "Rail Active"
+      },
+      "series-0": {
+        "role": "secondary",
+        "displayName": "Series 0"
+      },
+      "series-1": {
+        "role": "secondary",
+        "displayName": "Series 1"
+      },
+      "series-2": {
+        "role": "secondary",
+        "displayName": "Series 2"
+      },
+      "series-3": {
+        "role": "secondary",
+        "displayName": "Series 3"
+      },
+      "series-4": {
+        "role": "secondary",
+        "displayName": "Series 4"
+      },
+      "code-key": {
+        "role": "tertiary",
+        "displayName": "Code Key"
+      },
+      "code-string": {
+        "role": "tertiary",
+        "displayName": "Code String"
+      },
+      "code-number": {
+        "role": "tertiary",
+        "displayName": "Code Number"
+      },
+      "overlay": {
+        "role": "neutral",
+        "displayName": "Overlay"
+      },
+      "dark-paper": {
+        "role": "neutral",
+        "displayName": "Dark Paper"
+      },
+      "dark-sheet": {
+        "role": "neutral",
+        "displayName": "Dark Sheet"
+      },
+      "dark-rule": {
+        "role": "neutral",
+        "displayName": "Dark Rule"
+      },
+      "dark-rule-strong": {
+        "role": "neutral",
+        "displayName": "Dark Rule Strong"
+      },
+      "dark-ink": {
+        "role": "neutral",
+        "displayName": "Dark Ink"
+      },
+      "dark-ink-2": {
+        "role": "neutral",
+        "displayName": "Dark Ink 2"
+      },
+      "dark-ink-3": {
+        "role": "neutral",
+        "displayName": "Dark Ink 3"
+      },
+      "dark-accent": {
+        "role": "primary",
+        "displayName": "Dark Accent"
+      },
+      "dark-yellow": {
+        "role": "primary",
+        "displayName": "Dark Yellow"
+      },
+      "dark-yellow-soft": {
+        "role": "primary",
+        "displayName": "Dark Yellow Soft"
+      },
+      "dark-signal": {
+        "role": "tertiary",
+        "displayName": "Dark Signal"
+      },
+      "dark-signal-soft": {
+        "role": "tertiary",
+        "displayName": "Dark Signal Soft"
+      },
+      "dark-ok": {
+        "role": "secondary",
+        "displayName": "Dark Ok"
+      },
+      "dark-ok-soft": {
+        "role": "secondary",
+        "displayName": "Dark Ok Soft"
+      },
+      "dark-warn": {
+        "role": "tertiary",
+        "displayName": "Dark Warn"
+      },
+      "dark-series-0": {
+        "role": "secondary",
+        "displayName": "Dark Series 0"
+      },
+      "dark-series-1": {
+        "role": "secondary",
+        "displayName": "Dark Series 1"
+      },
+      "dark-series-2": {
+        "role": "secondary",
+        "displayName": "Dark Series 2"
+      },
+      "dark-series-3": {
+        "role": "secondary",
+        "displayName": "Dark Series 3"
+      },
+      "dark-series-4": {
+        "role": "secondary",
+        "displayName": "Dark Series 4"
+      },
+      "dark-code-key": {
+        "role": "tertiary",
+        "displayName": "Dark Code Key"
+      },
+      "dark-code-string": {
+        "role": "tertiary",
+        "displayName": "Dark Code String"
+      },
+      "dark-code-number": {
+        "role": "tertiary",
+        "displayName": "Dark Code Number"
+      }
     },
     "typographyMeta": {
-      "display": { "displayName": "Display", "purpose": "Tool name of the selected call." },
-      "title": { "displayName": "Title", "purpose": "Held call in the approval dock." },
-      "body": { "displayName": "Body", "purpose": "Rows, journey text, controls." },
-      "label": { "displayName": "Label", "purpose": "Column headers, field labels, tabs." },
-      "figure": { "displayName": "Figure", "purpose": "Times, durations, counts: tabular, condensed width." },
-      "code": { "displayName": "Code", "purpose": "Payloads, arguments, rule ids." }
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Workspace page heading."
+      },
+      "section": {
+        "displayName": "Section",
+        "purpose": "Profile introduction."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Selected tool and profile panel headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Default interface text."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Buttons, fields and tabs."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Map labels and supporting metadata."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Captured payload JSON."
+      }
     },
-    "shadows": [],
+    "shadows": [
+      {
+        "name": "map-selection-ring",
+        "value": "0 0 0 2px var(--color-sheet), 0 0 0 3px var(--color-accent)",
+        "purpose": "Registers the selected map interval."
+      },
+      {
+        "name": "selected-row-rule",
+        "value": "inset 0 -1px var(--color-rule)",
+        "purpose": "Subtle boundary on the selected list row."
+      }
+    ],
     "motion": [
-      { "name": "clock-hand", "value": "transform 1s linear", "purpose": "The red hand advances once a second; removed under prefers-reduced-motion." },
-      { "name": "recede", "value": "opacity 200ms cubic-bezier(0.19, 1, 0.22, 1)", "purpose": "Rows dim while a call awaits approval." }
+      {
+        "name": "map-cursor",
+        "value": "left 160ms cubic-bezier(.16,1,.3,1)",
+        "purpose": "Registers a new selected call across map lanes."
+      },
+      {
+        "name": "map-interval",
+        "value": "opacity 160ms ease-out, box-shadow 160ms ease-out",
+        "purpose": "Map hover and selection states."
+      },
+      {
+        "name": "row-selection",
+        "value": "background-color 160ms ease-out",
+        "purpose": "List selection state."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition: none !important; animation: none !important; scroll-behavior: auto !important",
+        "purpose": "Immediate state changes when reduced motion is requested."
+      }
     ],
     "breakpoints": [
-      { "name": "sm", "value": "640px" },
-      { "name": "lg", "value": "1024px" }
+      {
+        "name": "response-column",
+        "value": "640px"
+      },
+      {
+        "name": "top-navigation",
+        "value": "max-width: 767px"
+      },
+      {
+        "name": "split-inspector",
+        "value": "1024px"
+      },
+      {
+        "name": "short-desktop",
+        "value": "(min-width: 1024px) and (max-height: 850px)"
+      },
+      {
+        "name": "profile-columns",
+        "value": "1280px"
+      },
+      {
+        "name": "wide-desktop",
+        "value": "1536px"
+      }
     ]
   },
   "components": [
     {
-      "name": "Approve Button",
+      "name": "Export action",
       "kind": "button",
-      "refersTo": "button-approve",
-      "description": "Primary action in the approval dock.",
-      "html": "<button class=\"ds-approve\">Approve <kbd>⌘↵</kbd></button>",
-      "css": ".ds-approve{background:#15140f;color:#fff;border:2px solid #15140f;border-radius:2px;padding:8px 14px;font:600 14px 'Archivo Variable',system-ui,sans-serif;display:inline-flex;gap:6px;align-items:center;cursor:pointer}.ds-approve kbd{font:500 11px ui-monospace,monospace;color:#ffd92e}.ds-approve:hover{background:#46433a}.ds-approve:focus-visible{outline:2px solid #15140f;outline-offset:2px}"
+      "refersTo": "button-export",
+      "description": "Filled action used for the report download.",
+      "html": "<button class=\"ds-export\">Download HTML report</button>",
+      "css": ".ds-export{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:inline-flex;align-items:center;gap:6px;border:0;border-radius:6px;background:var(--color-accent,#4f5fc7);color:var(--color-sheet,#fff);padding:8px 16px;font-size:12px;line-height:16px;font-weight:600;cursor:pointer}.ds-export:hover{opacity:.9}.ds-export:focus-visible{outline:2px solid var(--color-accent,#4f5fc7);outline-offset:3px}"
     },
     {
-      "name": "Reject Button",
+      "name": "Outlined action",
       "kind": "button",
-      "refersTo": "button-reject",
-      "description": "Secondary action in the approval dock, outlined.",
-      "html": "<button class=\"ds-reject\">Reject <kbd>Esc</kbd></button>",
-      "css": ".ds-reject{background:#fbfaf5;color:#15140f;border:2px solid #15140f;border-radius:2px;padding:8px 14px;font:600 14px 'Archivo Variable',system-ui,sans-serif;display:inline-flex;gap:6px;align-items:center;cursor:pointer}.ds-reject kbd{font:500 11px ui-monospace,monospace;color:#46433a}.ds-reject:hover{background:#fff}.ds-reject:focus-visible{outline:2px solid #15140f;outline-offset:2px}"
+      "refersTo": "button-action",
+      "description": "Standard header and profile action.",
+      "html": "<button class=\"ds-action\">Inspect calls</button>",
+      "css": ".ds-action{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;border:1px solid var(--color-rule-strong,#cbd4e3);border-radius:6px;background:var(--color-sheet,#fff);color:var(--color-ink,#202d45);padding:8px 12px;font-size:12px;line-height:16px;font-weight:500;cursor:pointer}.ds-action:hover{background:var(--color-paper,#f3f6fb)}.ds-action:focus-visible{outline:2px solid var(--color-accent,#4f5fc7);outline-offset:3px}"
     },
     {
-      "name": "Risk Chip (critical)",
-      "kind": "chip",
-      "refersTo": "chip-critical",
-      "description": "Critical risk, filled red.",
-      "html": "<span class=\"ds-chip-critical\">critical</span>",
-      "css": ".ds-chip-critical{background:#d5001c;color:#fff;border-radius:2px;padding:0 6px;font:600 11px/16px 'Archivo Variable',system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em}"
+      "name": "Icon action",
+      "kind": "button",
+      "refersTo": "button-icon",
+      "description": "Quiet 32px action used beside labels and payloads.",
+      "html": "<button class=\"ds-icon\" aria-label=\"Search events\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M21 21l-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/></svg></button>",
+      "css": ".ds-icon{display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center;border:0;border-radius:6px;background:transparent;color:var(--color-ink-2,#58677f);cursor:pointer}.ds-icon:hover{background:var(--color-paper,#f3f6fb);color:var(--color-ink,#202d45)}.ds-icon:focus-visible{outline:2px solid var(--color-accent,#4f5fc7);outline-offset:3px}"
     },
     {
-      "name": "Risk Chip (high)",
-      "kind": "chip",
-      "refersTo": "chip-high",
-      "description": "High risk, red outline.",
-      "html": "<span class=\"ds-chip-high\">high</span>",
-      "css": ".ds-chip-high{border:1px solid #d5001c;color:#d5001c;border-radius:2px;padding:0 6px;font:600 11px/16px 'Archivo Variable',system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em}"
+      "name": "Search field",
+      "kind": "input",
+      "refersTo": "field-input",
+      "description": "Call search uses the standard field and a leading SVG.",
+      "html": "<label class=\"ds-search\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M21 21l-4.34-4.34\"/><circle cx=\"11\" cy=\"11\" r=\"8\"/></svg><input aria-label=\"Filter calls by tool or arguments\" placeholder=\"Search calls or arguments…\" /></label>",
+      "css": ".ds-search{position:relative;display:inline-flex;color:var(--color-ink-3,#65758d)}.ds-search>svg{position:absolute;left:10px;top:10px;pointer-events:none}.ds-search input{font-family:var(--font-sans, 'Archivo Variable', sans-serif);min-height:36px;border:1px solid var(--color-rule-strong,#cbd4e3);border-radius:6px;background:var(--color-sheet,#fff);color:var(--color-ink,#202d45);padding:8px 12px 8px 32px;font-size:12px;line-height:16px;caret-color:var(--color-accent,#4f5fc7)}.ds-search input::placeholder{color:var(--color-ink-3,#65758d);opacity:1}.ds-search input:focus-visible{outline:2px solid var(--color-accent,#4f5fc7);outline-offset:3px}"
     },
     {
-      "name": "Held Timetable Row",
-      "kind": "custom",
-      "refersTo": "row-held",
-      "description": "A call waiting for the human: full yellow, rule id and risk on the right.",
-      "html": "<div class=\"ds-row\"><span class=\"ds-time\">22:02:55</span><span class=\"ds-event\"><b>run_shell</b><code>rm -rf ./dist</code></span><span class=\"ds-rule\">rm-recursive</span></div>",
-      "css": ".ds-row{display:grid;grid-template-columns:72px 1fr auto;gap:12px;align-items:center;background:#ffd92e;color:#15140f;padding:8px 16px;border-bottom:1px solid #d9d5c7;font:14px 'Archivo Variable',system-ui,sans-serif}.ds-time{font-variant-numeric:tabular-nums;font-stretch:78%;font-size:13px;color:#46433a}.ds-event b{display:block;font-weight:600}.ds-event code{font:12px ui-monospace,monospace;color:#46433a}.ds-rule{font:12px ui-monospace,monospace}"
-    },
-    {
-      "name": "Underline Tabs",
+      "name": "Rail navigation",
       "kind": "nav",
-      "refersTo": "tabs",
-      "description": "Filter and detail tabs: ink underline on the active one.",
-      "html": "<div class=\"ds-tabs\"><button class=\"on\">All</button><button>Tool calls</button><button>Problems</button></div>",
-      "css": ".ds-tabs{display:flex;gap:20px;border-bottom:1px solid #b3ae9c;font:500 14px 'Archivo Variable',system-ui,sans-serif}.ds-tabs button{background:none;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;padding:8px 0;color:#46433a;cursor:pointer}.ds-tabs button:hover{color:#15140f}.ds-tabs .on{border-bottom-color:#15140f;color:#15140f}.ds-tabs button:focus-visible{outline:2px solid #15140f;outline-offset:2px}"
+      "refersTo": "navigation-active",
+      "description": "Persistent navigation with a selected page and call count.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Recording views\"><button aria-current=\"page\">Timeline <span>17</span></button><button>Tool profile</button><button>Event log</button></nav>",
+      "css": ".ds-nav{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:flex;flex-direction:column;gap:5px;width:162px;background:var(--rail,#17233d);padding:14px}.ds-nav button{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:flex;align-items:center;gap:10px;min-height:40px;padding:9px 11px;border:0;border-radius:7px;background:transparent;color:#b8c6e0;font-size:13px;line-height:19.5px;text-align:left;cursor:pointer}.ds-nav button:hover{background:#233352;color:#fff}.ds-nav button[aria-current]{background:var(--rail-active,#2c3d61);color:#fff}.ds-nav span{margin-left:auto;border-radius:4px;padding:0 5px;background:#405078;color:#dde6ff;font-size:11px}.ds-nav button:focus-visible{outline:2px solid var(--color-accent,#4f5fc7);outline-offset:3px}"
+    },
+    {
+      "name": "Status filters",
+      "kind": "chip",
+      "refersTo": "filter-selected",
+      "description": "Compact filters register active state in periwinkle.",
+      "html": "<div class=\"ds-filters\" role=\"group\" aria-label=\"Call status filters\"><button aria-pressed=\"true\">All calls</button><button aria-pressed=\"false\">Errors <span>2</span></button><button aria-pressed=\"false\">Open</button></div>",
+      "css": ".ds-filters{display:flex;gap:4px}.ds-filters button{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--color-ink-2,#58677f);font-size:11px;line-height:16.5px;cursor:pointer}.ds-filters button:hover{background:var(--color-paper,#f3f6fb)}.ds-filters button[aria-pressed=true]{background:var(--color-yellow-soft,#edf0ff);color:var(--color-accent,#4f5fc7);border-color:var(--color-rule,#e3e8f1);font-weight:600}.ds-filters span{color:var(--color-warn,#996019)}.ds-filters button:focus-visible{outline:2px solid var(--color-accent,#4f5fc7);outline-offset:3px}"
+    },
+    {
+      "name": "Profile panel",
+      "kind": "card",
+      "refersTo": "profile-panel",
+      "description": "Bordered tool-activity container with categorical share bars.",
+      "html": "<section class=\"ds-panel\"><h2>Tool activity</h2><div class=\"ds-tool\"><strong>shell</strong><span>7 calls</span></div><div class=\"ds-track\"><span></span></div><p>Bars show each tool’s share of recorded calls.</p></section>",
+      "css": ".ds-panel{font-family:var(--font-sans, 'Archivo Variable', sans-serif);width:300px;padding:18px;border:1px solid var(--color-rule,#e3e8f1);border-radius:12px;background:var(--color-sheet,#fff);color:var(--color-ink,#202d45)}.ds-panel h2{margin:0 0 12px;padding-bottom:12px;border-bottom:1px solid var(--color-rule,#e3e8f1);font-size:16px;line-height:24px;font-weight:600}.ds-tool{display:flex;justify-content:space-between;gap:12px;font-size:14px;line-height:20px}.ds-tool span{color:var(--color-ink-2,#58677f);font-variant-numeric:tabular-nums}.ds-track{height:5px;margin-top:8px;border-radius:3px;background:var(--color-paper,#f3f6fb);overflow:hidden}.ds-track span{display:block;height:100%;width:41%;border-radius:inherit;background:var(--series-1,#258c83)}.ds-panel p{margin:12px 0 0;color:var(--color-ink-2,#58677f);font-size:12px;line-height:19.5px}"
+    },
+    {
+      "name": "Registered map intervals",
+      "kind": "custom",
+      "refersTo": "map-interval",
+      "description": "Tool intervals, an amber error, a selected ring and an open marker.",
+      "html": "<div class=\"ds-map\"><span>shell <small>3</small></span><div class=\"ds-lane\"><i></i><button class=\"ds-interval ds-selected\" aria-label=\"shell: captured interval 1.7 seconds, tool error\" aria-pressed=\"true\"></button><button class=\"ds-interval ds-success\" aria-label=\"shell: captured interval 9.4 seconds\"></button><button class=\"ds-interval ds-open\" aria-label=\"shell: no valid captured response time\"></button></div></div>",
+      "css": ".ds-map{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:grid;grid-template-columns:76px minmax(0,1fr);gap:12px;width:340px;padding:12px;background:var(--color-sheet,#fff);color:var(--color-ink,#202d45);font-size:11px;line-height:22px}.ds-map small{float:right;color:var(--color-ink-3,#65758d)}.ds-lane{position:relative;height:22px;overflow:hidden;background:linear-gradient(90deg,transparent 49.6%,var(--color-rule,#e3e8f1) 50%,transparent 50.4%)}.ds-lane i{position:absolute;left:10%;top:0;bottom:0;width:1px;background:var(--color-accent,#4f5fc7);opacity:.5}.ds-interval{position:absolute;top:5px;min-width:7px;height:12px;padding:0;border:0;border-radius:3px;opacity:.75;cursor:pointer;transition:opacity 160ms ease-out,box-shadow 160ms ease-out}.ds-interval:hover{opacity:1}.ds-selected{left:10%;width:10%;top:4px;height:14px;background:var(--color-warn,#996019);opacity:1;box-shadow:0 0 0 2px var(--color-sheet,#fff),0 0 0 3px var(--color-accent,#4f5fc7)}.ds-success{left:35%;width:48%;background:var(--series-1,#258c83)}.ds-open{left:94%;width:7px;border:1px dashed var(--color-ink-2,#58677f);border-radius:50%;background:var(--color-sheet,#fff)}.ds-interval:focus-visible{outline:2px solid var(--color-accent,#4f5fc7);outline-offset:3px}@media(prefers-reduced-motion:reduce){.ds-interval{transition:none}}"
+    },
+    {
+      "name": "Captured payload",
+      "kind": "custom",
+      "refersTo": "payload-section",
+      "description": "Cool label strip, framed code and safe syntax colours.",
+      "html": "<section class=\"ds-payload\"><div class=\"ds-payload-label\"><strong>Arguments <span>#8</span></strong><span>Request</span></div><pre>{\n  <span class=\"ds-key\">\"command\":</span> <span class=\"ds-string\">\"go test ./internal/server\"</span>\n}</pre></section>",
+      "css": ".ds-payload{font-family:var(--font-sans, 'Archivo Variable', sans-serif);width:340px;border:1px solid var(--color-rule,#e3e8f1);border-radius:8px;overflow:hidden;background:var(--color-sheet,#fff);color:var(--color-ink,#202d45)}.ds-payload-label{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--color-paper,#f3f6fb);border-bottom:1px solid var(--color-rule,#e3e8f1);font-size:11px;line-height:16.5px}.ds-payload-label strong{font-weight:600}.ds-payload-label span{font-weight:400;color:var(--color-ink-2,#58677f)}.ds-payload-label strong span{margin-left:8px;color:var(--color-ink-3,#65758d)}.ds-payload pre{margin:0;padding:12px 14px;font:11px/1.9 var(--font-mono,ui-monospace,monospace);tab-size:2;overflow-wrap:anywhere;white-space:pre-wrap}.ds-key{color:var(--code-key,#4f5fc7)}.ds-string{color:var(--code-string,#19776b)}"
     }
   ],
   "narrative": {
-    "northStar": "The Station Timetable",
-    "overview": "The cockpit is a departure board for an agent's actions. A developer glances at it on a second screen while the agent works, so the page reads like Swiss station signage: a warm paper ground, near-black ink, ruled rows, tabular times down the left edge. It lends the world its type, palette, density and one signature move; it does not copy a railway's decoration.\n\nThe signature is the station clock in the approval dock. When a call is held for a human decision, its red second hand makes one full turn over the approval timeout and the remaining time is written beside it. Everything else steps back while a call waits, so the eye lands on the yellow row and the clock.",
+    "northStar": "Trace Atlas",
+    "overview": "Trace Atlas treats a recording as navigable evidence. A navy navigation rail anchors a cool, layered workspace; compact measurements and aligned rows make dense captured data readable. Archivo carries the interface, with monospace reserved chiefly for captured arguments, identifiers and JSON.\n\nAnalytical cartography supplies the signature: the same selected call is registered in the recording map, call list and inspector. Tool series remain consistent across these regions. Borders and tonal changes give each region a clear job while the inspector preserves room for the evidence.",
     "keyCharacteristics": [
-      "Light, warm-white ground with ink-black type; one yellow that means \"this is the held or selected row\".",
-      "Red is reserved for what needs the human or was refused.",
-      "Square corners, hairline rules, no shadows; hierarchy by weight and position.",
-      "Dense but ruled: rows are tables, not cards."
+      "Cool paper, white panels and a stable navy navigation rail.",
+      "Periwinkle selection shared across map intervals, rows and filters.",
+      "Tool series identify categories; amber and explicit status marks identify reported errors.",
+      "Compact tabular measurements, readable captured payloads and restrained rounded geometry."
     ],
     "rules": [
-      { "name": "The One Reserved Colour Rule", "body": "Red appears only where the human must look or something was refused. If red is on screen, something needs attention.", "section": "colors" },
-      { "name": "The Dim-the-Rest Rule", "body": "While any call awaits approval, every other row recedes to 60% opacity; hover and focus restore it.", "section": "colors" },
-      { "name": "The Weight-Not-Icon Rule", "body": "Tool calls are semibold, session and raw rows are regular and grey. Rows do not carry per-kind icons.", "section": "typography" }
+      {
+        "name": "The Registered Selection Rule",
+        "body": "A selected call uses the same identity in the map, list and inspector; periwinkle communicates selection rather than tool category.",
+        "section": "colors"
+      },
+      {
+        "name": "The Separate Measures Rule",
+        "body": "Captured request-to-response intervals and source-reported tool duration are distinct measurements. Keep their labels and visual positions distinct; unavailable values remain unavailable.",
+        "section": "typography"
+      },
+      {
+        "name": "The Bordered Surface Rule",
+        "body": "Use cool tonal steps and hairline borders for panel hierarchy. Reserve rings for selection and focus, rather than adding floating panel shadows.",
+        "section": "elevation"
+      }
     ],
     "dos": [
-      "Do keep times and durations in tabular figures.",
-      "Do write remaining time as text next to the clock hand.",
-      "Do let the held row, and only it, carry full yellow.",
-      "Do keep focus visible with the 2px ink outline."
+      "Do keep each tool’s series colour consistent across the map, list and profile.",
+      "Do pair status colour with a readable label or SVG status icon.",
+      "Do align times, counts and sizes with tabular figures.",
+      "Do keep the selected call and its captured payload readable at laptop and mobile sizes.",
+      "Do retain visible focus and remove transitions under reduced motion.",
+      "Do label retained JSON size and reported duration precisely."
     ],
     "donts": [
-      "Don't use red for decoration, hover or branding.",
-      "Don't add shadows, blur or rounded cards.",
-      "Don't colour a status by hue alone; every status also has a glyph or a word.",
-      "Don't put a sparkline or a hero metric on the status strip."
+      "Don't use tool-series colour as the only indication of an error or selection.",
+      "Don't describe captured intervals as model thinking time, or retained JSON as original output or context usage.",
+      "Don't replace unavailable measurements with a measured zero.",
+      "Don't add decorative metric tiles, imagery or panel shadows to this evidence-led cockpit.",
+      "Don't turn historical policy metadata into live approval controls."
     ]
   }
 }
