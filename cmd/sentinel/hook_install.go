@@ -11,16 +11,14 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/zaninifrancesco/agent-sentinel/internal/cursorhooks"
-	"github.com/zaninifrancesco/agent-sentinel/internal/proxy"
 )
 
 // Cursor hook events Sentinel listens to. Shell, file reads, file edits and the
 // end of a turn (it closes the calls Cursor never reported back on) are
 // always installed; the MCP pair is opt-in because an MCP server that already
-// goes through `sentinel mcp` would be judged twice.
+// goes through `sentinel mcp` would be recorded twice.
 var (
 	coreEvents = []string{cursorhooks.EventBeforeShell, cursorhooks.EventAfterShell, cursorhooks.EventBeforeRead, cursorhooks.EventAfterEdit, cursorhooks.EventStop}
 	mcpEvents  = []string{cursorhooks.EventBeforeMCP, cursorhooks.EventAfterMCP}
@@ -115,14 +113,11 @@ func (f *hooksFile) removeOurs() int {
 
 // installOurs replaces Sentinel's entries with fresh ones for events, leaving
 // every other hook as it was.
-func (f *hooksFile) installOurs(binary string, events []string, timeoutSec int, offline string) {
+func (f *hooksFile) installOurs(binary string, events []string) {
 	f.removeOurs()
-	command := shellQuote(binary) + " hook"
-	if offline != "ask" {
-		command += " --offline " + offline
-	}
+	command := shellQuote(binary) + " hook --mode observe"
 	for _, ev := range events {
-		entry := map[string]any{"command": command, "timeout": timeoutSec}
+		entry := map[string]any{"command": command, "timeout": hookProcessTimeoutSec}
 		b, _ := json.Marshal(entry)
 		f.Hooks[ev] = append(f.Hooks[ev], b)
 	}
@@ -143,12 +138,12 @@ func runHookInstall(args []string, install bool) int {
 	}
 	fs := flag.NewFlagSet("hook "+name, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	agent := fs.String("agent", "cursor", "which agent to supervise: cursor (.cursor/hooks.json) or claude (.claude/settings.local.json)")
+	agent := fs.String("agent", "cursor", "which agent to record: cursor (.cursor/hooks.json) or claude (.claude/settings.local.json)")
 	user := fs.Bool("user", false, "use the agent's user-level file (~/.cursor/hooks.json, ~/.claude/settings.json: every project) instead of this project's")
 	dir := fs.String("dir", ".", "project directory (ignored with --user)")
-	mcp := fs.Bool("mcp", false, "also gate MCP tool calls made through the agent (skip it for servers already behind `sentinel mcp`)")
-	offline := fs.String("offline", "ask", "what the hook answers when Sentinel is not running: ask, deny or allow")
-	approvalTimeout := fs.Duration("approval-timeout", proxy.DefaultApprovalTimeout, "the --approval-timeout you run `sentinel serve` with")
+	mcp := fs.Bool("mcp", false, "also record MCP tool calls made through the agent (skip it for servers already behind `sentinel mcp`)")
+	fs.String("offline", "", "removed: observation hooks always acknowledge neutrally")
+	capture := addCaptureFlags(fs)
 	dry := fs.Bool("dry-run", false, "print the resulting file and write nothing")
 	if err := fs.Parse(args); err != nil {
 		if err == flag.ErrHelp {
@@ -156,15 +151,25 @@ func runHookInstall(args []string, install bool) int {
 		}
 		return 2
 	}
-	if *offline != "ask" && *offline != "deny" && *offline != "allow" {
-		fmt.Fprintf(os.Stderr, "sentinel hook %s: --offline must be ask, deny or allow\n", name)
+	if err := capture.validate(fs); err != nil {
+		fmt.Fprintf(os.Stderr, "sentinel hook %s: %v\n", name, err)
+		return 2
+	}
+	removedOffline := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "offline" {
+			removedOffline = true
+		}
+	})
+	if removedOffline || fs.NArg() != 0 {
+		fmt.Fprintln(os.Stderr, "sentinel hook: remove --offline and positional arguments; the observation release never asks or denies")
 		return 2
 	}
 
 	switch *agent {
 	case "cursor":
 	case "claude":
-		return runClaudeHookInstall(install, *user, *dir, *offline, *approvalTimeout, *mcp, *dry)
+		return runClaudeHookInstall(install, *user, *dir, *mcp, *dry)
 	default:
 		fmt.Fprintf(os.Stderr, "sentinel hook %s: --agent must be cursor or claude, not %q\n", name, *agent)
 		return 2
@@ -200,9 +205,7 @@ func runHookInstall(args []string, install bool) int {
 		if *mcp {
 			events = append(append([]string{}, coreEvents...), mcpEvents...)
 		}
-		// Cursor kills a hook after its timeout, so it must outlast the wait for a human.
-		timeout := int((*approvalTimeout + 15*time.Second).Seconds())
-		f.installOurs(bin, events, timeout, *offline)
+		f.installOurs(bin, events)
 	} else if f.removeOurs() == 0 {
 		fmt.Fprintf(os.Stderr, "sentinel: no Sentinel hooks in %s\n", path)
 		return 0
@@ -223,7 +226,7 @@ func runHookInstall(args []string, install bool) int {
 	}
 	if install {
 		fmt.Fprintf(os.Stderr, "sentinel: hooks written to %s (other hooks left as they were).\n", path)
-		fmt.Fprintf(os.Stderr, "Start the cockpit with `sentinel serve`; Cursor reloads hooks.json on save.\n")
+		fmt.Fprintf(os.Stderr, "Observation hooks do not block commands, even offline. Start `sentinel serve` to record; Cursor reloads hooks.json on save.\n")
 	} else {
 		fmt.Fprintf(os.Stderr, "sentinel: Sentinel hooks removed from %s.\n", path)
 	}

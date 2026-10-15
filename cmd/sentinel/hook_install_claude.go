@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/zaninifrancesco/agent-sentinel/internal/cursorhooks"
 )
@@ -198,30 +197,26 @@ func removeClaudeOurs(hooks map[string][]json.RawMessage) int {
 
 // installClaudeOurs replaces Sentinel's handlers with fresh ones.
 //
-// The call that waits for a human gets the approval wait plus a margin (Claude
-// Code cancels a hook at its timeout, and a cancelled PreToolUse lets the call
-// through to Claude's own prompt). The others never wait for anyone.
-func installClaudeOurs(hooks map[string][]json.RawMessage, binary string, approvalTimeout time.Duration, offline string, mcp bool) {
+// Observation hooks only deliver telemetry. The process limit allows a small
+// margin beyond the maximum HTTP delivery deadline, never a human decision.
+func installClaudeOurs(hooks map[string][]json.RawMessage, binary string, mcp bool) {
 	removeClaudeOurs(hooks)
-	command := shellQuote(binary) + " hook"
-	if offline != "ask" {
-		command += " --offline " + offline
-	}
+	command := shellQuote(binary) + " hook --mode observe"
 	add := func(event, matcher string, timeoutSec int) {
 		g, _ := json.Marshal(claudeGroup{Matcher: matcher, Hooks: []claudeHandler{{Type: "command", Command: command, Timeout: timeoutSec}}})
 		hooks[event] = append(hooks[event], g)
 	}
 	tools := cursorhooks.ClaudeToolMatcher(mcp)
-	add(cursorhooks.EventClaudePre, tools, int((approvalTimeout + 15*time.Second).Seconds()))
-	add(cursorhooks.EventClaudePost, tools, 30)
-	add(cursorhooks.EventClaudePostFailure, tools, 30)
-	add(cursorhooks.EventClaudeStop, "", 30)
-	add(cursorhooks.EventClaudeSessionEnd, "", 10)
+	add(cursorhooks.EventClaudePre, tools, hookProcessTimeoutSec)
+	add(cursorhooks.EventClaudePost, tools, hookProcessTimeoutSec)
+	add(cursorhooks.EventClaudePostFailure, tools, hookProcessTimeoutSec)
+	add(cursorhooks.EventClaudeStop, "", hookProcessTimeoutSec)
+	add(cursorhooks.EventClaudeSessionEnd, "", hookProcessTimeoutSec)
 }
 
 // runClaudeHookInstall implements `sentinel hook install --agent claude` and
 // the matching uninstall.
-func runClaudeHookInstall(install, user bool, dir, offline string, approvalTimeout time.Duration, mcp, dry bool) int {
+func runClaudeHookInstall(install, user bool, dir string, mcp, dry bool) int {
 	path, err := claudeSettingsPath(user, dir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
@@ -253,7 +248,7 @@ func runClaudeHookInstall(install, user bool, dir, offline string, approvalTimeo
 			fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
 			return 1
 		}
-		installClaudeOurs(hooks, bin, approvalTimeout, offline, mcp)
+		installClaudeOurs(hooks, bin, mcp)
 	} else if removeClaudeOurs(hooks) == 0 {
 		fmt.Fprintf(os.Stderr, "sentinel: no Sentinel hooks in %s\n", path)
 		return 0
@@ -275,7 +270,7 @@ func runClaudeHookInstall(install, user bool, dir, offline string, approvalTimeo
 	}
 	if install {
 		fmt.Fprintf(os.Stderr, "sentinel: Claude Code hooks written to %s (everything else in the file left as it was).\n", path)
-		fmt.Fprintf(os.Stderr, "Start the cockpit with `sentinel serve`, then start `claude` in this project (it reads hooks when a session starts).\n")
+		fmt.Fprintf(os.Stderr, "Observation hooks preserve Claude permissions, even offline. Start `sentinel serve`, then restart `claude` in this project to load the hooks.\n")
 	} else {
 		fmt.Fprintf(os.Stderr, "sentinel: Sentinel hooks removed from %s.\n", path)
 	}

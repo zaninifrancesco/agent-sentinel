@@ -127,8 +127,8 @@ func TestClaudeInstallAddsOnlySentinelsEntries(t *testing.T) {
 	if pre.Matcher != `^(Bash|PowerShell|Read|Edit|Write|MultiEdit|NotebookEdit|Glob|Grep|WebFetch|WebSearch)$` {
 		t.Fatalf("matcher = %q (MCP is opt-in)", pre.Matcher)
 	}
-	if len(pre.Hooks) != 1 || pre.Hooks[0].Type != "command" || pre.Hooks[0].Timeout != 135 {
-		t.Fatalf("the gate must wait out the approval (120s + 15s): %+v", pre.Hooks)
+	if len(pre.Hooks) != 1 || pre.Hooks[0].Type != "command" || pre.Hooks[0].Timeout != hookProcessTimeoutSec {
+		t.Fatalf("observation hook must have a short process timeout: %+v", pre.Hooks)
 	}
 	if strings.Contains(string(hooks["Stop"][0]), `"matcher"`) {
 		t.Fatalf("Stop takes no matcher: %s", hooks["Stop"][0])
@@ -154,13 +154,13 @@ func TestClaudeInstallAddsOnlySentinelsEntries(t *testing.T) {
 
 func TestClaudeInstallOptions(t *testing.T) {
 	dir := t.TempDir()
-	if code := runHookInstall([]string{"--agent", "claude", "--dir", dir, "--mcp", "--offline", "deny", "--approval-timeout", "30s"}, true); code != 0 {
+	if code := runHookInstall([]string{"--agent", "claude", "--dir", dir, "--mcp"}, true); code != 0 {
 		t.Fatalf("install exited %d", code)
 	}
 	path := filepath.Join(dir, ".claude", "settings.local.json")
 	_, hooks := readClaudeSettings(t, path)
 	first := string(hooks["PreToolUse"][0])
-	for _, want := range []string{`mcp__.*`, `--offline deny`, `"timeout": 45`} {
+	for _, want := range []string{`mcp__.*`, `--mode observe`, `"timeout": 6`} {
 		if !strings.Contains(first, want) {
 			t.Errorf("PreToolUse entry lacks %q: %s", want, first)
 		}
@@ -198,26 +198,10 @@ func TestClaudeUninstallOfAFileWithoutSentinelChangesNothing(t *testing.T) {
 	}
 }
 
-func TestClaudeOfflineAnswers(t *testing.T) {
-	pre := []byte(`{"hook_event_name":"PreToolUse","tool_name":"Bash"}`)
-	for mode, want := range map[string]string{"ask": "ask", "deny": "deny"} {
-		var got struct {
-			Out struct {
-				Event    string `json:"hookEventName"`
-				Decision string `json:"permissionDecision"`
-				Reason   string `json:"permissionDecisionReason"`
-			} `json:"hookSpecificOutput"`
-		}
-		if err := json.Unmarshal(offlineAnswer(pre, mode), &got); err != nil || got.Out.Decision != want || got.Out.Event != "PreToolUse" || got.Out.Reason == "" {
-			t.Errorf("%s: %+v (%v)", mode, got, err)
-		}
-	}
-	if string(offlineAnswer(pre, "allow")) != "{}\n" {
-		t.Fatal("--offline allow says nothing, so Claude Code's own rules apply")
-	}
-	for _, ev := range []string{"PostToolUse", "PostToolUseFailure", "Stop", "SessionEnd"} {
-		if string(offlineAnswer([]byte(`{"hook_event_name":"`+ev+`"}`), "deny")) != "{}\n" {
-			t.Errorf("%s has no decision to make", ev)
+func TestClaudeNeutralAnswersPreserveNativePermissions(t *testing.T) {
+	for _, event := range []string{"PreToolUse", "PostToolUse", "PostToolUseFailure", "Stop", "SessionEnd"} {
+		if got := string(neutralAnswer([]byte(`{"hook_event_name":"` + event + `"}`))); got != "{}\n" {
+			t.Errorf("%s overrides Claude permissions: %s", event, got)
 		}
 	}
 }

@@ -43,20 +43,20 @@ func TestInstallKeepsOtherHooksAndIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.installOurs("/opt/sentinel", coreEvents, 135, "ask")
-	f.installOurs("/opt/sentinel", coreEvents, 135, "ask") // run it twice
+	f.installOurs("/opt/sentinel", coreEvents)
+	f.installOurs("/opt/sentinel", coreEvents) // run it twice
 
 	if got := commandsOf(t, f, "preToolUse"); len(got) != 1 || !strings.Contains(got[0], "impeccable") {
 		t.Fatalf("another tool's hook was disturbed: %v", got)
 	}
 	after := commandsOf(t, f, "afterFileEdit")
-	if len(after) != 2 || after[0] != "./format.sh" || after[1] != "/opt/sentinel hook" {
+	if len(after) != 2 || after[0] != "./format.sh" || after[1] != "/opt/sentinel hook --mode observe" {
 		t.Fatalf("afterFileEdit = %v", after)
 	}
 	for _, ev := range coreEvents {
 		n := 0
 		for _, c := range commandsOf(t, f, ev) {
-			if strings.HasSuffix(c, "sentinel hook") {
+			if strings.HasSuffix(c, "sentinel hook --mode observe") {
 				n++
 			}
 		}
@@ -67,14 +67,14 @@ func TestInstallKeepsOtherHooksAndIsIdempotent(t *testing.T) {
 	if _, ok := f.Extra["somethingElse"]; !ok {
 		t.Fatal("unknown top-level keys must survive")
 	}
-	if !strings.Contains(string(f.Hooks["beforeShellExecution"][0]), `"timeout":135`) {
-		t.Fatalf("timeout must outlast the approval wait: %s", f.Hooks["beforeShellExecution"][0])
+	if !strings.Contains(string(f.Hooks["beforeShellExecution"][0]), `"timeout":6`) {
+		t.Fatalf("observation hook must have a short process timeout: %s", f.Hooks["beforeShellExecution"][0])
 	}
 }
 
 func TestUninstallRemovesOnlyOurs(t *testing.T) {
 	f, _ := parseHooksFile([]byte(existing))
-	f.installOurs("/opt/sentinel dev/sentinel", append(append([]string{}, coreEvents...), mcpEvents...), 135, "deny")
+	f.installOurs("/opt/sentinel dev/sentinel", append(append([]string{}, coreEvents...), mcpEvents...))
 	if n := f.removeOurs(); n != 7 {
 		t.Fatalf("removed %d entries, want 7 (quoted path and a flag included)", n)
 	}
@@ -91,7 +91,7 @@ func TestUninstallRemovesOnlyOurs(t *testing.T) {
 
 func TestMarshalIsValidJSONWithVersionFirst(t *testing.T) {
 	f, _ := parseHooksFile([]byte(existing))
-	f.installOurs("/opt/sentinel", coreEvents, 135, "ask")
+	f.installOurs("/opt/sentinel", coreEvents)
 	out := string(f.marshal())
 	if !strings.HasPrefix(out, "{\n  \"version\": 1") {
 		t.Fatalf("version should come first:\n%s", out)
@@ -112,7 +112,7 @@ func TestInstallIntoMissingOrEmptyFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.installOurs("/opt/sentinel", coreEvents, 135, "ask")
+	f.installOurs("/opt/sentinel", coreEvents)
 	if !strings.Contains(string(f.marshal()), "beforeShellExecution") {
 		t.Fatal("hooks missing from a fresh file")
 	}
@@ -121,20 +121,18 @@ func TestInstallIntoMissingOrEmptyFile(t *testing.T) {
 	}
 }
 
-func TestOfflineAnswers(t *testing.T) {
-	before := []byte(`{"hook_event_name":"beforeShellExecution"}`)
-	afterIn := []byte(`{"hook_event_name":"afterShellExecution"}`)
-
-	for mode, want := range map[string]string{"ask": "ask", "deny": "deny", "allow": "allow"} {
-		var got struct{ Permission string }
-		if err := json.Unmarshal(offlineAnswer(before, mode), &got); err != nil || got.Permission != want {
-			t.Errorf("%s: %+v (%v)", mode, got, err)
+func TestNeutralAnswers(t *testing.T) {
+	for event, want := range map[string]string{
+		"beforeShellExecution": "{\"permission\":\"allow\"}\n",
+		"beforeReadFile":       "{\"permission\":\"allow\"}\n",
+		"beforeMCPExecution":   "{\"permission\":\"allow\"}\n",
+		"afterShellExecution":  "{}\n", "afterMCPExecution": "{}\n", "stop": "{}\n",
+	} {
+		if got := string(neutralAnswer([]byte(`{"hook_event_name":"` + event + `"}`))); got != want {
+			t.Errorf("%s: %q, want %q", event, got, want)
 		}
 	}
-	if string(offlineAnswer(afterIn, "deny")) != "{}\n" {
-		t.Fatal("an after-hook has no decision to make, whatever the mode")
-	}
-	if string(offlineAnswer([]byte("garbage"), "ask")) != "{}\n" {
+	if string(neutralAnswer([]byte("garbage"))) != "{}\n" {
 		t.Fatal("unreadable input must not produce a decision")
 	}
 }
@@ -240,18 +238,25 @@ func TestShrinkReadKeepsTheSizeAndOnlyTouchesReads(t *testing.T) {
 	}
 }
 
-func TestOfflineReadAnswersStayInsideTheReadSchema(t *testing.T) {
-	read := []byte(`{"hook_event_name":"beforeReadFile","file_path":"/p/a"}`)
-	for mode, want := range map[string]string{"ask": "allow", "allow": "allow", "deny": "deny"} {
-		var got map[string]string
-		if err := json.Unmarshal(offlineAnswer(read, mode), &got); err != nil || got["permission"] != want {
-			t.Errorf("%s: %v (%v)", mode, got, err)
-		}
-		if _, extra := got["agent_message"]; extra {
-			t.Errorf("%s: agent_message is outside the beforeReadFile schema", mode)
-		}
-		if got["permission"] == "ask" {
-			t.Errorf("%s: a read cannot be asked about", mode)
+func TestNeutralReadAnswerStaysInsideTheReadSchema(t *testing.T) {
+	var got map[string]string
+	if err := json.Unmarshal(neutralAnswer([]byte(`{"hook_event_name":"beforeReadFile"}`)), &got); err != nil || len(got) != 1 || got["permission"] != "allow" {
+		t.Fatalf("invalid read acknowledgement: %v (%v)", got, err)
+	}
+}
+
+func TestInstallRejectsOldEnforcementOptionsWithoutWriting(t *testing.T) {
+	for _, agent := range []string{"cursor", "claude"} {
+		for _, option := range [][]string{{"--offline", "deny"}, {"--approval-timeout", "30s"}, {"--policy", "off"}} {
+			dir := t.TempDir()
+			args := append([]string{"--agent", agent, "--dir", dir}, option...)
+			if code := runHookInstall(args, true); code != 2 {
+				t.Fatalf("%v exited %d, want migration error", args, code)
+			}
+			entries, err := os.ReadDir(dir)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("rejected install changed project: %v, %v", entries, err)
+			}
 		}
 	}
 }
