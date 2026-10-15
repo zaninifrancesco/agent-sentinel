@@ -51,23 +51,22 @@ export function Detail({ row }: { row: Row | null }) {
   };
 
   return <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-sheet" aria-label="Selected event details">
-    <div className="shrink-0 border-b border-rule px-4 pt-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0"><h2 className="flex items-center gap-2 text-base font-semibold"><StatusIcon status={row.status} /><span className="truncate">{row.title}</span></h2></div>
+    <div className="shrink-0 border-b border-rule px-4 pt-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 items-baseline gap-2"><h2 className="flex min-w-0 items-center gap-2 text-sm font-semibold"><span className="shrink-0"><StatusIcon status={row.status} /></span><span className="truncate">{row.title}</span></h2><span className="min-w-0 flex-1 truncate font-mono text-[10px] text-ink-2" title={row.subtitle}>{row.subtitle ?? "Captured event"}</span></div>
         <button onClick={() => void copy()} className="icon-button shrink-0" aria-label={copyState === "copied" ? "Event copied" : "Copy event"}>{copyState === "copied" ? <Check aria-hidden className="size-3.5" /> : <Copy aria-hidden className="size-3.5" />}</button>
       </div>
-      {copyState === "error" && <p role="status" className="mt-2 text-xs text-warn">Could not copy this event. You can select its text in Event JSON.</p>}
-      <p className="mt-1 truncate font-mono text-[11px] text-ink-2" title={row.subtitle}>{row.subtitle ?? "Captured event"}</p>
-      <dl className="my-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
+      {copyState === "error" && <p role="status" className="mt-1 text-xs text-warn">Could not copy this event. You can select its text in Event JSON.</p>}
+      <dl className="my-2 grid grid-cols-2 gap-x-3 gap-y-1 sm:grid-cols-4">
         <Field label="Captured at" value={formatTime(row.startedAt)} figure />
         <Field label={timingSource === "proxy-monotonic" ? "Proxy round trip" : timingSource === "source-reported" ? "Reported duration" : "Recorded duration"} value={row.durationMs === undefined ? "Not available" : formatDuration(row.durationMs)} figure />
         <Field label="Response JSON" value={bytes === undefined ? "Not available" : formatBytes(bytes)} figure />
         <Field label="Status" value={row.kind === "tool" && row.status === "ok" && !row.response ? "Recorded without result" : statusText(row.status)} />
       </dl>
-      <div className="mb-2 flex items-center justify-between gap-3 rounded-md bg-paper px-3 py-1.5 text-[10px] text-ink-2"><span>Captured request → response</span><span className="font-medium text-ink">{capturedMs === undefined ? "Not available" : formatDuration(capturedMs)}</span></div>
+      <p className="mb-1 flex items-center justify-between gap-3 text-[10px] text-ink-2"><span>Observed interval</span><span className="font-medium text-ink">{capturedMs === undefined ? "Not available" : formatDuration(capturedMs)}</span></p>
       <div role="group" aria-label="Inspector view" className="flex flex-wrap gap-x-4">
         {tabs.map((item) => <button key={item.id} aria-pressed={tab === item.id} onClick={() => setActiveTab(item.id)}
-          className={`-mb-px border-b-2 pb-2.5 pt-1 text-xs font-medium ${tab === item.id ? "border-accent text-accent" : "border-transparent text-ink-2 hover:text-ink"}`}>{item.label}</button>)}
+          className={`-mb-px border-b-2 pb-2 pt-0.5 text-xs font-medium ${tab === item.id ? "border-accent text-accent" : "border-transparent text-ink-2 hover:text-ink"}`}>{item.label}</button>)}
       </div>
     </div>
     {tab !== "diff" && <label className="relative mx-4 my-2 flex shrink-0 items-center gap-2 rounded-md border border-rule px-2.5 py-2">
