@@ -3,6 +3,7 @@ import { Download, Copy, Check, X, FileText } from "lucide-react";
 import type { Session, Row, SentinelConfig } from "./types";
 import { buildReportHtml } from "./report";
 import { computeMetrics } from "./metrics";
+import { useDialogFocus } from "./useDialogFocus";
 
 interface Props {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
+  const dialog = useDialogFocus(isOpen);
   const [copied, setCopied] = useState(false);
 
   // Escape closes the export dialog without reaching the timeline.
@@ -53,7 +55,7 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#15140f]/60 p-4">
-      <div role="dialog" aria-modal="true" aria-labelledby="export-title" className="w-full max-w-lg overflow-hidden rounded-sm border border-rule-strong bg-sheet">
+      <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="export-title" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-sm border border-rule-strong bg-sheet">
         <div className="flex items-center justify-between border-b border-rule-strong bg-paper px-5 py-4">
           <div className="flex items-center gap-2">
             <FileText className="size-4 text-ink" />

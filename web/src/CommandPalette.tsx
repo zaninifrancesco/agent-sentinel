@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { Search, Wrench, AlertTriangle, Download, X, Terminal, Radio } from "lucide-react";
 import type { Row } from "./types";
+import { useDialogFocus } from "./useDialogFocus";
 
 interface Props {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }: Props) {
+  const dialog = useDialogFocus(isOpen);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -123,6 +125,10 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#15140f]/60 pt-24">
       <div
+        ref={dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search captured events"
         className="w-full max-w-xl overflow-hidden rounded-sm border border-rule-strong bg-sheet"
         onClick={(e) => e.stopPropagation()}
       >
