@@ -1,6 +1,7 @@
 import { ArrowUpRight, ArrowRight } from "lucide-react";
 import type { Row } from "./types";
 import type { buildProfile } from "./profile";
+import { toolColor } from "./trace";
 import { responseSize } from "./profile";
 import { formatBytes, formatDuration } from "./format";
 import { PAYLOAD_NOTE, toolDuration } from "./metrics";
@@ -16,12 +17,13 @@ interface Props {
 }
 
 export function Overview({ profile, onInspect, onTool, onCalls, connecting, replay }: Props) {
+  const total = profile.calls.length;
   return (
     <main className="min-h-0 flex-1 overflow-y-auto" aria-label="Recording overview">
-      <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1600px] px-4 py-5 sm:px-5">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Recording overview</h1>
+            <h2 className="text-lg font-semibold tracking-tight">Where the work happens</h2>
             <p className="mt-1 text-sm text-ink-2">Inspect tool time, captured responses and reported errors.</p>
           </div>
           {profile.calls.length > 0 && <button onClick={onCalls} className="action-button">
@@ -41,8 +43,8 @@ export function Overview({ profile, onInspect, onTool, onCalls, connecting, repl
             </div>}
           </section>
         ) : (
-          <div className="grid items-start gap-x-8 gap-y-8 xl:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]">
-            <section className="min-w-0" aria-labelledby="tool-activity-title">
+          <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,3fr)_minmax(300px,2fr)]">
+            <section className="profile-panel min-w-0" aria-labelledby="tool-activity-title">
               <div className="section-heading">
                 <h2 id="tool-activity-title" className="text-base font-semibold">Tool activity</h2>
                 <span className="text-xs text-ink-2">{profile.tools.length} {profile.tools.length === 1 ? "tool" : "tools"}</span>
@@ -62,8 +64,9 @@ export function Overview({ profile, onInspect, onTool, onCalls, connecting, repl
                   {profile.tools.map(({ name, metrics }) => <tr key={name} className="border-b border-rule hover:bg-sheet">
                     <th scope="row" className="py-3 pr-3 font-semibold">
                       <button onClick={() => onTool(name)} className="group flex max-w-full items-center gap-2 py-1 text-left hover:underline" title={`Inspect ${name} calls`}>
-                        <span className="truncate">{name}</span><ArrowUpRight aria-hidden className="size-3.5 shrink-0 text-ink-3 group-hover:text-ink" />
+                        <i aria-hidden className="series-dot" style={{ background: toolColor(name) }} /><span className="truncate">{name}</span><ArrowUpRight aria-hidden className="size-3.5 shrink-0 text-ink-3 group-hover:text-ink" />
                       </button>
+                      <div className="share-track" aria-hidden><span style={{ width: `${metrics.calls / Math.max(1, total) * 100}%`, background: toolColor(name) }} /></div>
                     </th>
                     <td className="fig py-3 text-right">{metrics.calls}</td>
                     <td className={`fig py-3 text-right ${metrics.errors ? "font-semibold text-warn" : "text-ink-2"}`}>{metrics.errors}</td>
@@ -75,11 +78,11 @@ export function Overview({ profile, onInspect, onTool, onCalls, connecting, repl
                 </tbody>
               </table>
               <p className="mt-3 max-w-prose text-xs leading-relaxed text-ink-2">
-                Durations use completed calls with an available measurement. Interrupted calls and historical approval holds are excluded. Select a tool to inspect its evidence.
+                Bars show each tool’s share of recorded calls. Durations use completed calls with an available measurement. Interrupted calls and historical approval holds are excluded. Select a tool to inspect its evidence.
               </p>
             </section>
 
-            <div className="min-w-0 space-y-8">
+            <div className="min-w-0 space-y-5">
               <Ranking title="Longest completed calls" rows={profile.longest} measure="duration" onInspect={onInspect}
                 empty="No completed tool calls with an available duration." />
               <Ranking title="Largest captured responses" rows={profile.largest} measure="response" onInspect={onInspect}
@@ -104,7 +107,7 @@ export function Overview({ profile, onInspect, onTool, onCalls, connecting, repl
 function Ranking({ title, rows, measure, onInspect, empty }: {
   title: string; rows: Row[]; measure: "duration" | "response"; onInspect: (row: Row) => void; empty: string;
 }) {
-  return <section aria-label={title}>
+  return <section className="profile-panel" aria-label={title}>
     <div className="section-heading"><h2 className="text-base font-semibold">{title}</h2><span className="text-xs text-ink-2">Top {rows.length || 5}</span></div>
     {rows.length === 0 ? <p className="py-5 text-sm text-ink-2">{empty}</p> : <ol>
       {rows.map((row) => <li key={row.key} className="border-b border-rule">

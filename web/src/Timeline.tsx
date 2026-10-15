@@ -2,6 +2,7 @@ import { useEffect, useRef, type KeyboardEvent } from "react";
 import { Ban, Check, CircleDashed, CircleSlash, Loader, OctagonPause, TriangleAlert } from "lucide-react";
 import type { Risk, Row, Status } from "./types";
 import { formatBytes, formatDuration, formatTime } from "./format";
+import { toolColor } from "./trace";
 import { responseSize } from "./profile";
 
 /** One consistent glyph set, 16px, 2px stroke. Colour only where it means something. */
@@ -99,11 +100,11 @@ export function Timeline({ rows, selectedKey, onSelect, follow, showResponseSize
       className="min-h-0 flex-1 overflow-y-auto bg-sheet"
     >
       <div
-        className={`sticky top-0 z-10 grid ${cols} items-center gap-x-3 border-b border-rule-strong bg-paper px-4 py-1.5 text-xs font-medium text-ink-2`}
+        className={`sticky top-0 z-10 grid ${cols} items-center gap-x-3 border-b border-rule-strong bg-paper px-4 py-2.5 text-[10px] font-medium text-ink-2`}
       >
         <span>Time</span>
         <span aria-hidden />
-        <span>Event</span>
+        <span>{showResponseSize ? "Tool / arguments" : "Event"}</span>
         <span className="text-right">Duration</span>
         {showResponseSize && <span className="hidden text-right sm:block" title="Size of retained response JSON, not original output or context usage">Response</span>}
       </div>
@@ -127,26 +128,26 @@ export function Timeline({ rows, selectedKey, onSelect, follow, showResponseSize
                   data-recorded-row
                   onClick={() => onSelect(row.key)}
                   aria-current={isSelected ? "true" : undefined}
-                  className={`grid w-full ${cols} items-center gap-x-3 px-4 py-2.5 text-left ${bg}`}
+                  className={`timeline-row grid w-full ${cols} items-center gap-x-3 px-4 py-2.5 text-left ${bg}`}
                 >
-                  <span className="fig text-[13px] text-ink-2">{formatTime(row.startedAt)}</span>
+                  <span className="fig text-[11px] text-ink-2">{formatTime(row.startedAt)}</span>
                   <StatusIcon status={row.status} />
                   <span className="min-w-0">
                     <span
-                      className={`block truncate text-sm ${
+                      className={`flex items-center gap-2 truncate text-xs ${
                         strong ? "font-semibold text-ink" : row.kind === "session" ? "text-ink-3" : "text-ink-2"
                       } ${refused ? "line-through decoration-signal decoration-2" : ""}`}
                     >
-                      {row.title}
+                      {strong && <i aria-hidden className="series-dot" style={{ background: toolColor(row.request?.toolName ?? row.title) }} />}{row.title}
                     </span>
                     {row.subtitle && (
-                      <span className="block truncate font-mono text-xs text-ink-2">{row.subtitle}</span>
+                      <span className="mt-1 block truncate font-mono text-[10px] text-ink-2">{row.subtitle}</span>
                     )}
                   </span>
-                  <span className="fig text-right text-[13px] text-ink-2">
+                  <span className="fig text-right text-[11px] text-ink-2">
                     {row.durationMs !== undefined ? formatDuration(row.durationMs) : "–"}
                   </span>
-                  {showResponseSize && <span className="fig hidden text-right text-xs text-ink-2 sm:block">{bytes === undefined ? "–" : formatBytes(bytes)}</span>}
+                  {showResponseSize && <span className="fig hidden text-right text-[10px] text-ink-2 sm:block">{bytes === undefined ? "–" : formatBytes(bytes)}</span>}
                 </button>
               </li>
             );

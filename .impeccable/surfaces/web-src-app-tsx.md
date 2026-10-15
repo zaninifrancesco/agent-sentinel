@@ -2,25 +2,25 @@
 version: 1
 slug: "web-src-app-tsx"
 primary_target: "web/src/App.tsx"
-related_targets: []
+related_targets: ["web/src/TraceMap.tsx","web/src/Timeline.tsx","web/src/Detail.tsx","web/src/index.css"]
 ---
 
-# Surface brief: Agent Sentinel cockpit (web/src)
+# Surface brief: Agent Sentinel cockpit
 
 ## Scope and mode
-Operate. One surface: the live cockpit (timeline, detail, approval dock, command palette). Replaces the existing dark "SaaS dashboard + blue accent" look; function, data and keyboard shortcuts are unchanged.
+Operate. Replace the cockpit's visual world; keep passive capture, replay, export and historical trace inspection. Landing page is out of scope.
 
-## Audience, task, constraints
-A developer with an AI coding agent running, cockpit on a second screen. Jobs: see what the agent is doing, and decide fast on a held call. Must work offline (self-hosted fonts, no CDN), keep statuses pending / awaiting / ok / error / blocked / rejected readable, label cost as estimate.
+## Audience and task
+Developers debugging individual agent tool calls. Timeline and call evidence lead; aggregate performance is secondary. Offline assets, keyboard access, truthful unknowns and mobile list/detail navigation are required.
 
 ## Direction contract
-THESIS: The session is a timetable and the held call is a train held at the platform. Everything reads in columns (time, tool, rule, duration) and one clock tells how long the human has left. It refuses the dark-dashboard-with-neon-accent default.
-OWN-WORLD: Swiss station timetable. Warm white paper ground, near-black ink, timetable yellow for the selected or held row, signal red reserved for what needs the human or was refused. Archivo (variable, narrow numerals for the time column), tabular figures everywhere, hairline rules, square corners, no shadows except one soft one under overlays. Light theme.
-STORY: Glance: nothing is red, the agent is running. A call stops: the row turns yellow, every other row steps back, a station clock starts its red second hand over the approval window. The developer reads the rule and the quoted trigger, approves or rejects, the table resumes.
-FIRST VIEWPORT: Header 44px (wordmark, session, connection, budget as a plain line with a thin rule gauge). Left 5/12: timetable with sticky column header and rows. Right 7/12: selected call as a journey (Request, Policy, Human, Response as stops on a vertical line) above tabbed payload. Bottom dock (only when held): yellow bar with the station clock left, tool + rule + trigger centre, Reject and Approve right.
-SIGNATURE: the station clock in the dock. The red hand sweeps one revolution over the approval timeout (from /api/config) and the remaining time is also written as text; at zero the call is refused by the server.
-FORM: Fahrplan, assigned index 4 of my list, challenger-donated raises: DIM-THE-REST (streaming wall) and ONE RESERVED COLOUR (orienteering). Seed key f5401336.
+THESIS: A recording is navigable evidence, with time and selected call registered across the screen. Refuse the undifferentiated event table and decorative metric tiles.
+OWN-WORLD: Trace Atlas, analytical cartography. Indigo navigation rail, cool white layered workspaces, periwinkle selection, teal tool series and amber errors. Archivo UI type, mono only for captured data; precise rounded controls and restrained borders.
+STORY: Locate a call in the recording map, inspect the sequence, then read its arguments and result. Filters expose errors and missing results without inventing diagnoses.
+FIRST VIEWPORT: Desktop rail at left; recording header and compact measurement strip above a tool-lane capture map. Below: filtered call list left, generous inspector right. At desktop heights up to 850px, the map sits above the list and the inspector spans the full workspace height. Mobile map and list lead, detail replaces them with a back action. Profile and Event log stay in standard navigation.
+SIGNATURE: Selecting a map interval registers that same call in the list and inspector. Intervals use captured request/response timestamps; reported tool duration is a separate value. Selection transitions over 160ms; reduced motion is immediate.
+FORM: User selected the assigned fifth grounded direction, Trace Atlas, seed 94272183, code-led. Donor disciplines: dense but readable data; fixed detail positions; evident selection; meaningful inspector space; one job per region; aligned durations.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 
-## Unresolved
-Dark variant (not built). Export modal restyled only, feature on hold.
+## Constraints and unresolved decisions
+No native model context or billing data. A recording may contain several conversations. Map shows at most the latest 120 calls and five named tool lanes plus Other; list retains every call. No generated decision comp exists for this code-led choice.
