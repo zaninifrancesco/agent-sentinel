@@ -8,48 +8,52 @@ web
 
 ## Users
 
-Primary: a developer running an AI coding agent (Claude Code, Cursor, etc.) who keeps the Sentinel cockpit open on a second screen or window while the agent works. They glance at it to see what the agent is doing, and are pulled in when the agent is paused on a risky tool call and needs a fast, well-informed yes or no. Confirmed by the user.
+Primary: a developer inspecting a local Cursor or Claude Code session to understand tool calls, errors, large outputs and repeated attempts. They use Sentinel live while the agent works and afterwards when debugging.
 
-Secondary (not the focus of design decisions): the same developer replaying a recorded session afterwards (`sentinel ui`).
+Secondary: an MCP server developer inspecting stdio requests, responses and protocol errors. Colleagues can read an exported offline report.
 
 ## Product Purpose
 
-Agent Sentinel is a single Go binary that sits between an AI coding agent and its MCP servers. It records every JSON-RPC frame (flight recorder), enforces a policy before a tool call is forwarded (block, ask a human, warn, budget breaker), and serves a local cockpit where the human watches the session live and approves or rejects held calls with an optional steering note for the agent.
+Agent Sentinel is a local profiler and flight recorder for AI agents. It records observable actions, helps a developer inspect their evidence and preserves sessions for offline debugging. It does not block commands, hold calls for approval or enforce spending limits. The coding agent's own permissions remain responsible for execution decisions.
 
-Success: the developer trusts the agent with more autonomy because anything dangerous stops and asks them, and they can see at a glance what happened and why.
+Success: the developer can identify a concrete problem in a session, inspect the calls behind it and choose an informed change for the next attempt.
 
 ## Positioning
 
-It is on the wire, not beside it: because it proxies the protocol it can stop a call before it executes, not just log it afterwards. It is local-first (loopback only, no cloud, no account) and ships as one binary with the UI embedded.
+The Local Profiler & Flight Recorder for AI Agents. A single Go binary with an embedded cockpit, loopback-only by default, without cloud accounts or external databases. Offline describes Sentinel's recording and analysis; agents and MCP servers may make their own network requests.
 
 ## Operating Context
 
-- Runs on the developer's machine next to the agent; the cockpit is served on `127.0.0.1` and opened in a browser tab or window.
-- Live sessions stream over a WebSocket; a held call blocks the agent until answered or until a timeout (default 2 minutes) rejects it.
-- Approving is keyboard-driven today: ⌘/Ctrl+Enter approves, Esc rejects, J/K or arrows move through the timeline, ⌘K opens a command palette.
-- Sessions are also stored as JSONL and replayed read-only.
+- The hook collector normally listens on `127.0.0.1:8848`; sessions stream to the cockpit over WebSocket and are stored in local JSONL files.
+- Cursor and Claude Code hooks acknowledge neutrally, including when the collector is unavailable. Delivery has a one-second default HTTP timeout, configurable up to five seconds.
+- MCP stdio traffic is forwarded unchanged in the observation path. A transport-process crash can still interrupt the connection.
+- J/K and arrow keys navigate calls; Cmd/Ctrl+K searches. Export downloads a self-contained HTML report.
+- Existing hook installations and installed executables require an explicit migration; normal development must not modify them silently.
 
 ## Capabilities and Constraints
 
-- Timeline of events (tool calls merged with their responses, notifications, raw output), a detail panel with payload, raw JSON and a visual diff when a patch is present, a metrics bar, a command palette, an approval dock.
-- Policy verdicts shown per call: rule id, reason, risk level (none to critical), decision (allow, warn, approve, block) and the human verdict.
-- The Cursor agent is supervised through Cursor's hooks: `sentinel serve` runs the cockpit and `sentinel hook` (installed with `sentinel hook install`) reports each shell command, MCP call and file edit to it. A shell or MCP call is judged by the same policy and budget as an MCP proxy call and can be held for approval; a file edit is recorded with its diff and can only be flagged, because it has already happened. If Sentinel is not running the hook answers "ask", so Cursor asks the user instead of silently allowing.
-- Claude Code is supervised the same way (`sentinel hook install --agent claude`, settings in `.claude/settings.local.json`) and reaches the same policy, budget, approvals and cockpit. Differences the user can feel: a file write is judged before it happens and can be blocked or held, not only flagged; Sentinel says nothing about a call it has no objection to, so Claude Code's own permission prompts still apply, and it says "allow" only for a call the user approved in the cockpit; a call interrupted with Esc is closed as "interrupted" at the end of the turn. Verified and confirmed on live Claude Code sessions.
-- The session budget (cost and token limits) can be set, raised or removed from the cockpit's status strip while a session is live. Every change is written to the session log as a "Budget changed" row, so the audit shows who moved the ceiling and from what.
-- Cost and tokens are estimates from tool traffic size only (the proxy cannot see the LLM API); the UI must label them as estimates.
-- The UI is a React + Vite + Tailwind SPA built into `internal/ui/dist` and embedded in the Go binary with `go:embed`. It must work offline, with no CDN assets or external fonts.
-- Statuses the UI must express: pending, awaiting approval, ok, error, blocked (by policy), rejected (by a human or timeout), interrupted (the call never reported a result: skipped, declined, cancelled or cut short). Interrupted is not an error of the tool, so it has its own glyph (a dashed circle), its own count, and its duration stays out of the latency figures.
-- The standalone HTML report (Export button) is built in the browser from the timeline rows: summary facts, every policy and human decision with its rule and reason, and the timetable with each call's journey. It is one offline file with no script, follows the reader's light or dark theme, and leaves payloads out. It is a secondary surface; do not design the cockpit around it. A `sentinel export` command does not exist yet.
-- Undecided: light theme, multi-session views, mobile layout.
+Implemented in the first pivot phase:
+
+- Live timeline, payload inspector, patch viewer where patch data exists, event search and dark/light themes.
+- Tool-call counts, reported errors, available duration percentiles and retained payload JSON size. No fixed-price token or dollar estimates.
+- Local JSONL recordings, replay of new and old traces, and an offline HTML report with expandable calls. Report payloads remain summarized.
+- Historical risk and policy decisions remain readable only where recorded; there are no live approval or budget controls.
+- The frontend remains embedded, with local fonts and no required external assets.
+
+Planned, not implemented: reliable source/session identity and capture-quality metadata, waterfall, an analysis engine with evidence-linked findings, original payload-size measurements, recording catalog, configurable redaction/capture profiles and a JSONL export flow. See `docs/ROADMAP.md` and `docs/PROGRESS.md` for status.
+
+The current data does not reveal model reasoning, actual context occupancy, provider billing or a full workspace history. Some hook payloads are synthesized, reduced or omitted. Retained JSON size must never be labelled original wire traffic or model usage. Absence of a duration or an error signal does not prove zero execution time or success.
 
 ## Evidence on Hand
 
-Real data only: `examples/demo-session.jsonl` and live sessions produced with `examples/fake_mcp_server.py`. No customers, testimonials, benchmarks or brand assets exist; none may be fabricated.
+`examples/demo-session.jsonl` is a historical enforcement trace. Synthetic hook fixtures and fake MCP servers exercise passive capture without running the commands in their payloads. `docs/profiler.png` shows a synthetic passive session; `docs/cockpit.png` is historical.
+
+No customer results, performance claims or savings measurements may be fabricated.
 
 ## Product Principles
 
-1. The decision moment comes first: when a call is waiting for a human, nothing else on screen should compete with it.
-2. Show the evidence, not a verdict alone: every block or hold names the rule and quotes what triggered it.
-3. Honest numbers: estimates are labelled as estimates.
-4. Calm when nothing needs you, loud only when something does.
-5. Keyboard first for the repeated actions, mouse always possible.
+1. Inspect the evidence: every future diagnostic must link to the events supporting it.
+2. Observe without changing execution permissions or adding confirmation prompts.
+3. Honest measures: distinguish observed values, source-reported values, estimates and unknowns.
+4. Make useful details easy to reach, with quiet summaries and progressive disclosure.
+5. Keep recordings local and make capture limits visible; offline does not mean safe to share without inspection.

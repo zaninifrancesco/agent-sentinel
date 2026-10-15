@@ -1,6 +1,6 @@
 # Roadmap del pivot
 
-Stato iniziale: documentazione nuova, implementazione ancora orientata a policy e approvazioni. Nessuna fase sotto è da considerare già completata. Vedi [direzione](PRODUCT_DIRECTION.md), [architettura](ARCHITECTURE.md), [telemetria](TELEMETRY_SPEC.md) e [analisi](ANALYSIS_SPEC.md).
+Stato: la fase 1 è implementata sul branch `telemetry-profiler`; fasi 2–5 ancora da implementare. Evidenze e limiti in [PROGRESS.md](PROGRESS.md). Vedi [direzione](PRODUCT_DIRECTION.md), [architettura](ARCHITECTURE.md), [telemetria](TELEMETRY_SPEC.md) e [analisi](ANALYSIS_SPEC.md).
 
 Non vengono assegnate date arbitrarie. Ogni fase ha una condizione di uscita verificabile e prepara quella successiva.
 
@@ -124,4 +124,4 @@ Usare fixture JSONL e payload hook sanitizzati; testare il comportamento osserva
 
 Per modifiche Go eseguire i check pertinenti del repository (`make test` include vet e race test); per il frontend aggiungere typecheck e build. Usare test mirati durante il lavoro e i check completi prima di chiudere una fase. I test di installazione operano in directory temporanee, senza toccare gli hook del progetto dell'utente.
 
-Questa revisione della documentazione non richiede esecuzione dell'agente, installazione del binario, avvio del server o test applicativi: richiede coerenza delle specifiche, link locali validi e diff limitato a `docs/`.
+Le modifiche documentali richiedono verifica dei link e coerenza con il codice. Le modifiche applicative richiedono anche i check sopra e una prova del percorso completo con dati sintetici, senza modificare l'installazione dell'utente.

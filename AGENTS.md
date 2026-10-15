@@ -1,57 +1,66 @@
-# Setup playbook
+# Setup playbook — observation release
 
-Follow this when a user asks you to install Agent Sentinel, set it up, or "make it work". Do the steps in order. After each step, the check must pass before you continue. If a check fails, stop and report the command and its output. Do not invent a different install path.
+Follow this when asked to install or set up Agent Sentinel. Do the steps in order; a failed check stops setup. Report the failed command and output instead of inventing another installation path.
 
-"Working" means all of these:
+Sentinel records actions. It does not block commands, ask for approval or enforce budgets. The coding agent's own permissions still apply. The implementation roadmap is in `docs/ROADMAP.md`; planned analysis features must not be advertised as already shipped.
 
-1. `~/.sentinel/bin/sentinel version` prints a version.
-2. `sentinel serve` is running, and `http://127.0.0.1:8848/api/config` returns JSON with `"approvals": true`.
-3. The target project's hook file lists Sentinel, and every hook that was already there is unchanged. For Cursor that is `.cursor/hooks.json` with `beforeShellExecution`, `afterShellExecution`, `beforeReadFile`, `afterFileEdit` and `stop`. For Claude Code it is `.claude/settings.local.json` with `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Stop` and `SessionEnd`.
-4. A synthetic hook call is allowed and shows up in the cockpit.
+## Working means
 
-Which agent? If the user did not say, ask: Cursor or Claude Code. Do both only when asked. Steps 3 to 5 below say what differs.
+1. `~/.sentinel/bin/sentinel version` prints a version and `sentinel help` describes observation mode.
+2. A background `sentinel serve` answers at `http://127.0.0.1:8848/api/config` with `"mode":"observe"`, `"approvals":false`, `"budgetEditable":false` and `"policy":"off"`.
+3. The target project's hook file has one Sentinel entry for each required event, with `hook --mode observe`; every pre-existing non-Sentinel hook and setting is unchanged.
+4. A synthetic request and response are recorded as a completed call, without a policy decision.
+
+If the user has not chosen an agent, ask Cursor or Claude Code. Configure both only when asked.
 
 ## Do not
 
-- Do not run `sentinel run`. It is not implemented.
-- Do not run `sentinel export`. The report is the Export button in the cockpit.
-- Do not pass `--mcp` to `hook install` unless the user asked to gate MCP tools. A server already started with `sentinel mcp` would be judged twice.
-- Do not pass `--user` unless the user asked for every project. The default is one project.
-- Do not edit `hooks.json` or `.claude/settings.local.json` by hand. `sentinel hook install` adds Sentinel and leaves everything else alone.
-- Do not move or rebuild over the binary after installing hooks. The hook file stores its absolute path.
+- Do not run `sentinel run` or `sentinel export`; they are not implemented. HTML export is the cockpit's Export button.
+- Do not pass `--policy`, `--max-cost`, `--approval-timeout` or `--offline`; these enforcement options are rejected by the observation release.
+- Do not pass `--mcp` unless the user asked to record agent MCP hooks. Use one source for the same MCP traffic: hooks or the stdio proxy.
+- Do not pass `--user` unless the user asked for every project.
+- Do not edit agent hook files by hand; use `sentinel hook install` and `uninstall`.
+- Do not move or rebuild over an executable referenced by existing hooks during routine development. Replacing it changes all integrations using that path.
 - Do not commit `.cursor/`, `.claude/`, `.codex/` or `.impeccable/questions/`. They are local.
 - Do not start `sentinel serve` in the foreground. It runs until stopped.
+- Do not execute a dangerous command or read a real secrets file to test capture. Synthetic payloads do not need to run their command.
 
-## 0. Choose the target project
+## 0. Choose the target and handle migration
 
-The target is the project whose Cursor or Claude Code agent should be supervised. If the user said "this repo" or "here", that is the workspace root. Say which directory you chose.
+The target is the project whose agent should be recorded. If the user said "here" or "this repo", use the workspace root. State the chosen directory. Hooks inside Sentinel's source tree do not record agents working on other projects.
 
-Installing hooks inside the Agent Sentinel source tree only supervises an agent working in that tree. It does not turn Sentinel on for other projects.
+If the target uses an enforcement release, explain that the new version removes Sentinel blocking and prompts. A general development request does not authorize replacing the installed executable or migrating every project that references it. An explicit observation-upgrade request authorizes that migration; preserve all unrelated hooks.
 
-## 1. Get the binary
+## 1. Get the observation binary
 
-If `~/.sentinel/bin/sentinel version` already prints a version, keep that binary and go to step 2. Rebuild only when the user asked to build this checkout.
+Check the existing installation:
 
-From this repository you need Go 1.27+ and Node.js 20.19+ or 22.12+. Check both, then:
+```bash
+~/.sentinel/bin/sentinel version
+~/.sentinel/bin/sentinel help
+```
+
+Reuse it if it describes observation mode, unless the user asked to build this checkout. If it is an older enforcement binary, stop and report that an explicit upgrade is needed; do not silently replace it.
+
+For a missing binary or an explicitly requested source build, check Go 1.27+ and Node.js 20.19+ or 22.12+, then:
 
 ```bash
 make install
 ~/.sentinel/bin/sentinel version
+~/.sentinel/bin/sentinel help
 ```
 
-`make install` builds the cockpit with npm, embeds it, and copies the binary to `~/.sentinel/bin/sentinel`. That path is where it must stay.
+`make install` embeds the cockpit and copies the executable to `~/.sentinel/bin/sentinel`. If Go or Node is missing, stop and report which prerequisite is missing. Do not choose another installation path or download a release archive unless building from source is impossible.
 
-If Go or Node is missing, stop and say which one. Do not download a release archive unless building from source is impossible.
+## 2. Start and check the collector
 
-## 2. Start the cockpit before installing hooks
+If port 8848 is occupied, curl its config before starting anything. Reuse an observation collector. If the config is from an older enforcement release, stop and report the required explicit migration; if it is not Sentinel JSON, report that the port is occupied. Do not choose another port for installed hooks.
 
-Hooks installed while nothing is listening make the agent ask the user to confirm every later command, including yours. Start Sentinel first.
+Start in the background and keep the printed session ID and JSONL path:
 
 ```bash
-~/.sentinel/bin/sentinel serve
+~/.sentinel/bin/sentinel serve --mode observe
 ```
-
-Run it in the background. It listens on `127.0.0.1:8848` and prints the session id and the JSONL log path; keep both.
 
 Check:
 
@@ -59,11 +68,11 @@ Check:
 curl -sf http://127.0.0.1:8848/api/config
 ```
 
-The JSON must contain `"approvals": true` and `"budgetEditable": true`.
+Require `mode=observe`, `policy=off`, `approvals=false`, `budgetEditable=false` and `approvalTimeoutSec=0`. Starting first makes the setup evidence available; offline hooks no longer ask or deny.
 
-If the port is taken, curl it. A JSON config means Sentinel is already running: reuse it and do not start a second one. Anything else, stop and say the port is occupied. Do not switch ports. The installed hook calls `http://127.0.0.1:8848` and has no port flag.
+## 3. Install the chosen agent's hooks
 
-## 3. Install the hooks
+Read and preserve the target hook/settings file before installation so the check can compare non-Sentinel entries.
 
 Cursor:
 
@@ -71,67 +80,67 @@ Cursor:
 ~/.sentinel/bin/sentinel hook install --dir "<target>"
 ```
 
+Require exactly one Sentinel command under each of `beforeShellExecution`, `afterShellExecution`, `beforeReadFile`, `afterFileEdit` and `stop` in `<target>/.cursor/hooks.json`.
+
 Claude Code:
 
 ```bash
 ~/.sentinel/bin/sentinel hook install --agent claude --dir "<target>"
 ```
 
-Check that `<target>/.cursor/hooks.json` contains exactly one `"sentinel hook"` command for each of `beforeShellExecution`, `afterShellExecution`, `beforeReadFile`, `afterFileEdit` and `stop`, and that every pre-existing hook is still there. Run it again if you need to; a second install replaces Sentinel's own entries instead of duplicating them.
+Require exactly one Sentinel handler under each of `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Stop` and `SessionEnd` in `<target>/.claude/settings.local.json`.
 
-For Claude Code, check that `<target>/.claude/settings.local.json` has exactly one `"sentinel hook"` command under each of `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Stop` and `SessionEnd`, and that its other keys and hooks are still there. Claude Code reads hooks when a session starts: a `claude` already running in that project must be restarted, or use `/hooks` to see what it loaded.
+Each generated command includes `hook --mode observe` and the executable's absolute path. Process timeouts are six seconds, independent of tool execution time. A second install must replace Sentinel's own entries instead of duplicating them. Verify every other hook, matcher and setting is unchanged.
 
-Cursor reloads `hooks.json` when it changes. If the user has Cursor open on that project, tell them to look at Cursor Settings, Hooks tab. An empty list means Cursor has not loaded the file yet: reopen the project.
+Cursor reloads hooks on file changes. Tell the user to inspect Cursor Settings, Hooks; if empty, reopen the project. Claude Code must be restarted after installation to load the hooks.
 
-## 4. Prove the path works
+## 4. Prove request and response recording
 
-This does not depend on Cursor or Claude Code having reloaded. Cursor reports a command twice, before it runs and after it finishes. Send both, in this order, or the row stays on "Running" forever:
+Send only the pair for the chosen agent. These are synthetic hook messages; they do not execute the command.
+
+Cursor:
 
 ```bash
 printf '%s\n' '{"hook_event_name":"beforeShellExecution","conversation_id":"setup","command":"echo sentinel-setup-ok","cwd":"<target>"}' \
-  | ~/.sentinel/bin/sentinel hook
+  | ~/.sentinel/bin/sentinel hook --mode observe
 
 printf '%s\n' '{"hook_event_name":"afterShellExecution","conversation_id":"setup","command":"echo sentinel-setup-ok","output":"sentinel-setup-ok\n","duration":1}' \
-  | ~/.sentinel/bin/sentinel hook
+  | ~/.sentinel/bin/sentinel hook --mode observe
 ```
 
-The first reply must be `{"permission":"allow"}` and the second `{}`. Then:
+The replies must be `{"permission":"allow"}` and `{}`.
+
+Claude Code:
+
+```bash
+printf '%s\n' '{"hook_event_name":"PreToolUse","session_id":"setup","cwd":"<target>","tool_name":"Bash","tool_input":{"command":"echo sentinel-setup-ok"},"tool_use_id":"setup-1"}' \
+  | ~/.sentinel/bin/sentinel hook --mode observe
+
+printf '%s\n' '{"hook_event_name":"PostToolUse","session_id":"setup","tool_name":"Bash","tool_input":{"command":"echo sentinel-setup-ok"},"tool_response":{"stdout":"sentinel-setup-ok","stderr":"","interrupted":false},"tool_use_id":"setup-1","duration_ms":1}' \
+  | ~/.sentinel/bin/sentinel hook --mode observe
+```
+
+Both replies must be `{}`. An explicit Claude `allow` would override native permissions and is not the observation contract.
+
+Check:
 
 ```bash
 curl -sf http://127.0.0.1:8848/api/events
 ```
 
-Claude Code reports a tool call twice as well (`PreToolUse`, then `PostToolUse`), so send both:
+Require a `shell` request for `echo sentinel-setup-ok` and its matching response with status `ok`, without `decision` or `rule`. A request alone is not completed setup: send the response before reporting success.
 
-```bash
-printf '%s\n' '{"hook_event_name":"PreToolUse","session_id":"setup","cwd":"<target>","tool_name":"Bash","tool_input":{"command":"echo sentinel-setup-ok"},"tool_use_id":"setup-1"}' \
-  | ~/.sentinel/bin/sentinel hook
+## 5. Report and stop
 
-printf '%s\n' '{"hook_event_name":"PostToolUse","session_id":"setup","tool_name":"Bash","tool_input":{"command":"echo sentinel-setup-ok"},"tool_response":{"stdout":"sentinel-setup-ok","stderr":"","interrupted":false},"tool_use_id":"setup-1","duration_ms":1}' \
-  | ~/.sentinel/bin/sentinel hook
-```
+Report binary path and version; cockpit URL; session ID and JSONL path; hook file path; and successful synthetic capture. Explain that the background collector keeps recording until stopped. If it stops, new hooks acknowledge neutrally after a bounded delivery attempt: telemetry is unavailable, but Sentinel does not add confirmations. Native agent permissions still apply.
 
-Both replies must be `{}`: for Claude Code, Sentinel says nothing about a call it has no objection to, and Claude's own permission rules still apply.
-
-Either way, the events must include a `shell` tool call whose command is `echo sentinel-setup-ok`, followed by its response with status `ok`. If that call has no response, you only sent the first command. Send the second.
-
-Tell the user the cockpit is at http://127.0.0.1:8848. For Claude Code, `claude` must be started after the hooks were installed. The first real agent command in that project should appear as a new row. `cat .env` is the demonstration of a block: the policy refuses it and the agent receives the refusal. Do not run `cat .env` yourself against a real secrets file.
-
-## 5. Report back
-
-Tell the user, and stop:
-
-- the binary path and the version
-- the cockpit URL and the JSONL log path `sentinel serve` printed
-- the hook file path (`hooks.json` or `.claude/settings.local.json`)
-- that the synthetic call was allowed and recorded
-- that `sentinel serve` keeps running in the background, and that quitting it makes the agent ask for confirmation on every command until it is started again
+For Claude Code, remind the user to start a new session. The first real agent action should appear as a new row. Do not describe `.env` access as a Sentinel block demonstration; the observation release has no command policy.
 
 ## Undo
 
 ```bash
-~/.sentinel/bin/sentinel hook uninstall --dir "<target>"                 # Cursor
-~/.sentinel/bin/sentinel hook uninstall --agent claude --dir "<target>"  # Claude Code
+~/.sentinel/bin/sentinel hook uninstall --dir "<target>"
+~/.sentinel/bin/sentinel hook uninstall --agent claude --dir "<target>"
 ```
 
-Then stop the `sentinel serve` process. Uninstall removes only Sentinel's entries.
+Run the command for the chosen agent, then stop the collector. Uninstall removes only Sentinel entries and leaves other settings intact.

@@ -2,7 +2,7 @@
 
 Decisione di prodotto del 15 ottobre 2026: **Agent Sentinel diventa un profiler locale e un flight recorder per coding agent e tool MCP.** Il valore principale è capire cosa è successo, dove è stato speso tempo e quali sequenze meritano attenzione.
 
-Questi documenti sono la specifica per il prossimo sviluppo. **Non attestano che il pivot sia già implementato.** Questa revisione cambia solo `docs/`; codice, configurazioni installate e landing page restano invariati.
+Questi documenti definiscono lo sviluppo del pivot. La prima fase di cattura passiva è implementata sul branch `telemetry-profiler`; il resto rimane una specifica di destinazione. Lo stato verificato è in [PROGRESS.md](PROGRESS.md). Configurazioni installate e landing page restano invariati.
 
 ## Percorso di lettura
 
@@ -15,9 +15,9 @@ Questi documenti sono la specifica per il prossimo sviluppo. **Non attestano che
 ## Autorità e stato dei documenti
 
 - Queste specifiche definiscono il **comportamento futuro desiderato**. Il vecchio blueprint in `ARCHITECTURE.md` è stato sostituito: conteneva anche ipotesi e comandi mai implementati.
-- Il [README attuale](../README.md), [PRODUCT.md](../PRODUCT.md) e il [playbook di setup](../AGENTS.md) descrivono ancora il prodotto orientato a policy e approvazioni. Non vanno letti come la nuova direzione. Il playbook resta valido per installare la versione corrente, fino alla migrazione del codice.
+- Il [README](../README.md), [PRODUCT.md](../PRODUCT.md) e il [playbook di setup](../AGENTS.md) descrivono il comportamento osservativo ora implementato e la migrazione esplicita dalle release di enforcement.
 - Le indicazioni operative e i vincoli del repository restano applicabili. Queste specifiche non autorizzano a cambiare installazioni o hook dell'utente.
-- `cockpit.png` documenta l'interfaccia precedente; non è il riferimento per il nuovo profiler.
+- `cockpit.png` documenta l'interfaccia precedente; `profiler.png` mostra la prima fase passiva con dati sintetici.
 - Le proposte di API e schema nei documenti seguenti sono contratti da implementare, non endpoint o campi già disponibili.
 - Il nome Agent Sentinel rimane quello del progetto. Non è previsto un lavoro su nome, branding o landing page in questa fase.
 

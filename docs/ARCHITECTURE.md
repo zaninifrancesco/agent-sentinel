@@ -2,7 +2,9 @@
 
 Stato: specifica di destinazione, 15 ottobre 2026. Questo documento sostituisce il precedente blueprint. La distinzione tra implementato e previsto è parte del contratto.
 
-## 1. Base attuale verificata nel repository
+## 1. Base precedente e stato della migrazione
+
+La descrizione sotto documenta il punto di partenza precedente al pivot. La prima fase ora implementa `--mode observe` come default per `serve`, `mcp` e gli hook, senza istanziare dipendenze di enforcement. Il client hook ha un timeout di consegna finito e risponde in modo neutro anche offline. Il cockpit non contiene più controlli di approvazione/budget o stime in dollari. `internal/policy` e i percorsi interni precedenti restano temporaneamente per regressioni e compatibilità: la CLI osservativa non li attiva. Vedi [stato e verifiche](PROGRESS.md).
 
 - `cmd/sentinel/serve.go` avvia il server locale e un recorder per gli hook; configura ancora policy, budget e broker di approvazioni.
 - `cmd/sentinel/hook.go` inoltra gli hook al server. Oggi il fallback predefinito è `ask` e il client non ha un timeout complessivo perché può attendere approvazioni.
@@ -14,7 +16,7 @@ Stato: specifica di destinazione, 15 ottobre 2026. Questo documento sostituisce 
 - Il cockpit ispeziona payload e patch presenti nei dati; non conserva snapshot completi del workspace. Il report HTML attuale è autonomo, senza script, con dettagli espandibili e senza payload completi.
 - Il replay JSONL esiste. Non esistono `sentinel run`, `sentinel export`, un catalogo multi-sessione o un motore di findings.
 
-Questi elementi sono il punto di partenza, non il risultato del pivot.
+Schema v2, collector con code limitate, modello multi-sessione e analisi Go restano lavoro futuro. Il JSONL, l'API e la correlazione di base non sono ancora migrati solo perché la cattura è diventata passiva.
 
 ## 2. Architettura di destinazione
 
