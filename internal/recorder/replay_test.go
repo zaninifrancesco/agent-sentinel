@@ -3,9 +3,42 @@ package recorder
 import (
 	"bytes"
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 )
+
+func TestSyntheticMultiSessionFixtureReplays(t *testing.T) {
+	f, err := os.Open("../../testdata/telemetry-v2.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+	rec, err := Load(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requests, ambiguous, orphans, synthetic := 0, 0, 0, 0
+	for _, e := range rec.Events() {
+		if e.Type == EventToolCallRequest {
+			requests++
+		}
+		if e.Type == EventToolCallResponse {
+			switch e.Correlation.Quality {
+			case "ambiguous":
+				ambiguous++
+			case "unmatched":
+				orphans++
+			}
+			if e.Correlation.Synthetic {
+				synthetic++
+			}
+		}
+	}
+	if len(rec.Events()) != 18 || requests != 7 || ambiguous != 2 || orphans != 1 || synthetic != 1 {
+		t.Fatalf("fixture evidence changed: events=%d requests=%d ambiguous=%d orphans=%d synthetic=%d", len(rec.Events()), requests, ambiguous, orphans, synthetic)
+	}
+}
 
 func TestV2EnvelopeRoundTripAndExplicitZero(t *testing.T) {
 	var log bytes.Buffer
