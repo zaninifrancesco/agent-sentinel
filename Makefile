@@ -43,6 +43,7 @@ test:
 	go vet ./...
 	go test -race ./...
 	cd web && npm run typecheck
+	cd web && npm test
 
 # Vite dev server with hot reload; proxies /api and /ws to a running
 # `sentinel mcp --ui --dev`, `sentinel serve --dev` or `sentinel ui --dev` on :8848.

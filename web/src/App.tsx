@@ -99,6 +99,7 @@ export default function App() {
         <div className="ml-auto flex items-center gap-3">
           <button
             onClick={() => setIsCommandPaletteOpen(true)}
+            aria-label="Search events"
             className="flex items-center gap-2 rounded-sm border border-ink-3 px-3 py-1.5 text-xs text-rule hover:border-white hover:text-white"
           >
             <Search className="size-3.5" />
@@ -115,6 +116,7 @@ export default function App() {
           </button>
           <button
             onClick={() => setIsExportModalOpen(true)}
+            aria-label="Export session report"
             className="flex items-center gap-1.5 rounded-sm border border-ink-3 px-3 py-1.5 text-xs text-rule hover:border-white hover:text-white"
           >
             <Download className="size-3.5" />

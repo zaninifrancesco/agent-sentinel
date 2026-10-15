@@ -12,7 +12,7 @@ export interface Metrics {
   /** UTF-8 size of the retained, reserialized tool payload JSON. */
   payloadBytes: number;
   latencySamples: number;
-  /** Median and 95th percentile of real tool latency, in ms. */
+  /** Median and p95 of available completed tool durations, in ms. */
   p50: number;
   p95: number;
 }
@@ -29,11 +29,11 @@ export function computeMetrics(rows: Row[]): Metrics {
 
   return {
     calls: tools.length,
-    waiting: rows.filter((r) => r.status === "awaiting_approval").length,
-    running: rows.filter((r) => r.status === "pending").length,
-    refused: rows.filter((r) => r.status === "blocked" || r.status === "rejected").length,
-    errors: rows.filter((r) => r.status === "error").length,
-    interrupted: rows.filter((r) => r.status === "interrupted").length,
+    waiting: tools.filter((r) => r.status === "awaiting_approval").length,
+    running: tools.filter((r) => r.status === "pending").length,
+    refused: tools.filter((r) => r.status === "blocked" || r.status === "rejected").length,
+    errors: tools.filter((r) => r.status === "error").length,
+    interrupted: tools.filter((r) => r.status === "interrupted").length,
     payloadBytes: tools.reduce((total, row) => total + payloadSize(row.request?.payload) + payloadSize(row.response?.payload), 0),
     latencySamples: durations.length,
     p50: at(0.5),
