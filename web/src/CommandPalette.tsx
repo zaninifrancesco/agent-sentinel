@@ -123,13 +123,13 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#15140f]/60 pt-24">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[var(--overlay)] pt-24">
       <div
         ref={dialog}
         role="dialog"
         aria-modal="true"
         aria-label="Search captured events"
-        className="w-full max-w-xl overflow-hidden rounded-sm border border-rule-strong bg-sheet"
+        className="w-full max-w-xl max-h-[85dvh] overflow-y-auto rounded-xl border border-rule-strong bg-sheet"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Input */}
@@ -144,7 +144,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
               setSelectedIndex(0);
             }}
             placeholder="Search events, e.g. read_file"
-            className="w-full bg-transparent font-mono text-sm text-ink placeholder:text-ink-2 focus:outline-none"
+            className="w-full bg-transparent font-mono text-sm text-ink placeholder:text-ink-2"
           />
           <button
             aria-label="Close search"
@@ -170,7 +170,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`flex w-full items-center gap-3 rounded-sm px-3 py-2 text-left ${
                       idx === selectedIndex
-                        ? "light-scope bg-yellow text-ink"
+                        ? "bg-yellow-soft text-accent"
                         : "text-ink-2 hover:bg-paper"
                     }`}
                   >

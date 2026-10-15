@@ -54,8 +54,8 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#15140f]/60 p-4">
-      <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="export-title" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-sm border border-rule-strong bg-sheet">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4">
+      <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby="export-title" className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-xl border border-rule-strong bg-sheet">
         <div className="flex items-center justify-between border-b border-rule-strong bg-paper px-5 py-4">
           <div className="flex items-center gap-2">
             <FileText className="size-4 text-ink" />
@@ -92,7 +92,7 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
         <div className="flex items-center justify-end gap-3 border-t border-rule bg-paper px-6 py-3.5">
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1.5 rounded-sm border border-rule-strong bg-paper px-3 py-1.5 text-xs text-ink hover:border-ink"
+            className="flex items-center gap-1.5 rounded-md border border-rule-strong bg-sheet px-3 py-2 text-xs text-ink hover:border-ink"
           >
             {copied ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />}
             <span>{copied ? "Copied" : "Copy HTML"}</span>
@@ -100,7 +100,7 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
 
           <button
             onClick={handleDownload}
-            className="flex items-center gap-1.5 rounded-sm border-2 border-ink bg-ink px-4 py-1.5 text-xs font-semibold text-sheet hover:bg-ink-2"
+            className="flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-xs font-semibold text-sheet hover:opacity-90"
           >
             <Download className="size-3.5" />
             <span>Download .html</span>

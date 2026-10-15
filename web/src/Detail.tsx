@@ -5,15 +5,18 @@ import { formatBytes, formatDuration, formatTime } from "./format";
 import { responseSize } from "./profile";
 import { journeyStops, statusText, type Tone } from "./journey";
 import { DiffViewer, diffFilename, extractDiff, isDiff } from "./DiffViewer";
-import { Check, Copy } from "lucide-react";
+import { JsonView } from "./JsonView";
+import { capturedInterval } from "./trace";
+import { Check, Copy, Search, Braces } from "lucide-react";
 
 type Tab = "payload" | "diff" | "raw";
 
 export function Detail({ row }: { row: Row | null }) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const [activeTab, setActiveTab] = useState<Tab>("payload");
-  if (!row) return <section className="grid min-h-0 flex-1 place-items-center bg-paper p-8 text-sm text-ink-2">
-    <div className="max-w-xs"><h2 className="font-semibold text-ink">Inspect the evidence</h2><p className="mt-2">Select a captured call to see its arguments, result and available measurements.</p></div>
+  const [query, setQuery] = useState("");
+  if (!row) return <section className="grid min-h-0 flex-1 place-items-center bg-sheet p-8 text-sm text-ink-2">
+    <div className="max-w-xs"><Braces aria-hidden className="mb-4 size-6 text-accent" /><h2 className="font-semibold text-ink">Inspect the evidence</h2><p className="mt-2">Select a captured call to see its arguments, result and available measurements.</p></div>
   </section>;
 
   const blocks: { label: string; event: SentinelEvent; payload: unknown }[] = [];
@@ -27,42 +30,51 @@ export function Detail({ row }: { row: Row | null }) {
   }
   const tab = activeTab === "diff" && diffText === null ? "payload" : activeTab;
   const bytes = responseSize(row);
+  const interval = capturedInterval(row);
+  const capturedMs = interval?.end === undefined ? undefined : interval.end - interval.start;
   const historical = !!row.request?.decision || !!row.resolution || row.risk !== "none";
   const tabs: { id: Tab; label: string }[] = [
     { id: "payload", label: row.kind === "tool" ? "Arguments & result" : "Payload" },
     ...(diffText !== null ? [{ id: "diff" as Tab, label: "Patch" }] : []),
     { id: "raw", label: "Event JSON" },
   ];
+  const searchable = tab === "raw" ? JSON.stringify(row, null, 2) : blocks.map(({ payload }) => pretty(payload)).join("\n");
+  const matches = query.trim() ? searchable.toLocaleLowerCase().split(query.toLocaleLowerCase()).length - 1 : undefined;
   const copy = async () => {
     try { await navigator.clipboard.writeText(JSON.stringify(row, null, 2)); setCopyState("copied"); }
     catch { setCopyState("error"); }
   };
 
-  return <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-paper" aria-label="Selected event details">
-    <div className="shrink-0 border-b border-rule-strong px-4 pt-5 sm:px-6">
+  return <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-sheet" aria-label="Selected event details">
+    <div className="shrink-0 border-b border-rule px-4 pt-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0"><h2 className="flex items-center gap-2 text-xl font-bold"><StatusIcon status={row.status} /><span className="truncate">{row.title}</span></h2></div>
-        <button onClick={() => void copy()} className="action-button shrink-0">{copyState === "copied" ? <Check aria-hidden className="size-3.5" /> : <Copy aria-hidden className="size-3.5" />} {copyState === "copied" ? "Copied" : "Copy event"}</button>
+        <div className="min-w-0"><h2 className="flex items-center gap-2 text-base font-semibold"><StatusIcon status={row.status} /><span className="truncate">{row.title}</span></h2></div>
+        <button onClick={() => void copy()} className="icon-button shrink-0" aria-label={copyState === "copied" ? "Event copied" : "Copy event"}>{copyState === "copied" ? <Check aria-hidden className="size-3.5" /> : <Copy aria-hidden className="size-3.5" />}</button>
       </div>
       {copyState === "error" && <p role="status" className="mt-2 text-xs text-warn">Could not copy this event. You can select its text in Event JSON.</p>}
-      <dl className="my-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+      <p className="mt-1 truncate font-mono text-[11px] text-ink-2" title={row.subtitle}>{row.subtitle ?? "Captured event"}</p>
+      <dl className="my-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
         <Field label="Captured at" value={formatTime(row.startedAt)} figure />
-        <Field label="Duration" value={row.durationMs === undefined ? "Not available" : formatDuration(row.durationMs)} figure />
+        <Field label="Reported duration" value={row.durationMs === undefined ? "Not available" : formatDuration(row.durationMs)} figure />
         <Field label="Response JSON" value={bytes === undefined ? "Not available" : formatBytes(bytes)} figure />
         <Field label="Status" value={row.kind === "tool" && row.status === "ok" && !row.response ? "Recorded without result" : statusText(row.status)} />
       </dl>
-      <div role="group" aria-label="Inspector view" className="flex flex-wrap gap-x-5">
+      <div className="mb-2 flex items-center justify-between gap-3 rounded-md bg-paper px-3 py-1.5 text-[10px] text-ink-2"><span>Captured request → response</span><span className="font-medium text-ink">{capturedMs === undefined ? "Not available" : formatDuration(capturedMs)}</span></div>
+      <div role="group" aria-label="Inspector view" className="flex flex-wrap gap-x-4">
         {tabs.map((item) => <button key={item.id} aria-pressed={tab === item.id} onClick={() => setActiveTab(item.id)}
-          className={`-mb-px border-b-2 pb-2.5 pt-1 text-sm font-medium ${tab === item.id ? "border-ink text-ink" : "border-transparent text-ink-2 hover:text-ink"}`}>{item.label}</button>)}
+          className={`-mb-px border-b-2 pb-2.5 pt-1 text-xs font-medium ${tab === item.id ? "border-accent text-accent" : "border-transparent text-ink-2 hover:text-ink"}`}>{item.label}</button>)}
       </div>
     </div>
+    {tab !== "diff" && <label className="relative mx-4 my-2 flex shrink-0 items-center gap-2 rounded-md border border-rule px-2.5 py-2">
+      <Search aria-hidden className="size-3.5 text-ink-3" /><input aria-label="Find in captured payload" placeholder="Find in payload…" value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-xs" /><span aria-live="polite" className="shrink-0 text-[10px] text-ink-2">{matches === undefined ? "" : matches === 0 ? "No matches" : `${matches} found`}</span>
+    </label>}
     <div className="min-h-0 flex-1 select-text overflow-y-auto">
       {tab === "diff" && diffText ? <div className="p-4 sm:p-6"><DiffViewer text={diffText} filename={diffFilename(diffText)} /></div> : tab === "raw" ? (
-        <div className="p-4 sm:p-6"><p className="mb-3 text-xs text-ink-2">Captured event data, including normalized fields and any historical policy metadata.</p><pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-xs leading-relaxed">{JSON.stringify(row, null, 2)}</pre></div>
+        <div className="p-4 sm:p-6"><p className="mb-3 text-xs text-ink-2">Captured event data, including normalized fields and any historical policy metadata.</p><pre className="json-code"><JsonView text={JSON.stringify(row, null, 2)} query={query} /></pre></div>
       ) : <>
-        {blocks.map(({ label, event, payload }) => <section key={event.seq} className="border-b border-rule" aria-label={label}>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-rule bg-sheet px-4 py-2.5 text-xs sm:px-6"><span className="font-semibold">{label}<span className="fig ml-2 font-normal text-ink-3">#{event.seq}</span></span><span className="text-ink-2">{event.direction}</span></div>
-          <pre className="overflow-x-auto whitespace-pre-wrap break-words px-4 py-4 font-mono text-xs leading-relaxed sm:px-6">{pretty(payload)}</pre>
+        {blocks.map(({ label, event, payload }) => <section key={event.seq} className="payload-section" aria-label={label}>
+          <div className="payload-label"><span className="font-semibold">{label}<span className="ml-2 font-normal text-ink-3">#{event.seq}</span></span><span className="text-ink-2">{event.direction === "client->server" ? "Request" : event.direction === "server->client" ? "Response" : "Observation"}</span></div>
+          <pre className="json-code"><JsonView text={pretty(payload)} query={query} /></pre>
         </section>)}
         {row.kind === "tool" && !row.response && <p className="px-4 py-4 text-sm text-ink-2 sm:px-6">{row.status === "pending" ? "No response received yet. Duration and response size remain unavailable." : "No tool result was captured for this observation."}</p>}
         <details className="border-b border-rule px-4 py-4 text-xs sm:px-6">
@@ -90,7 +102,7 @@ function resultOf(payload: unknown): unknown {
 }
 
 function Field({ label, value, figure }: { label: string; value: string; figure?: boolean }) {
-  return <div className="min-w-0"><dt className="text-xs text-ink-2">{label}</dt><dd className={`mt-1 break-words text-sm font-semibold [overflow-wrap:anywhere] ${figure ? "fig" : ""}`}>{value}</dd></div>;
+  return <div className="min-w-0"><dt className="text-[10px] text-ink-2">{label}</dt><dd className={`mt-1 break-words text-xs font-medium [overflow-wrap:anywhere] ${figure ? "fig" : ""}`}>{value}</dd></div>;
 }
 
 /** The call as a journey: where it came from, what policy said, who decided, what came back. */
