@@ -1,198 +1,108 @@
-# Agent Sentinel: Architectural Blueprint & Product Specification
+# Architettura — profiler locale e flight recorder
 
-> **The Local-First Flight Recorder, Execution Boundary & Cockpit for AI Coding Agents**
+Stato: specifica di destinazione, 15 ottobre 2026. Questo documento sostituisce il precedente blueprint. La distinzione tra implementato e previsto è parte del contratto.
 
-> **Stato del documento.** Questa è la specifica di visione scritta all'inizio del progetto; descrive anche cose che oggi non esistono. Per ciò che funziona davvero, vedi il [README](../README.md) e [PRODUCT.md](../PRODUCT.md). Differenze principali:
-> - **Storage:** gli eventi stanno in memoria e sono scritti in un file JSONL per sessione (`~/.sentinel/sessions/`), non in SQLite.
-> - **Streaming:** solo WebSocket; non c'è SSE.
-> - **PTY:** non è più il piano. Cursor e Claude Code si supervisionano con i loro hook, gli altri strumenti via proxy MCP.
-> - **`sentinel run` e `sentinel export`** non sono implementati (il report si esporta dal bottone nel cockpit).
-> - **Diagrammi Mermaid nel report, metriche di "file modificati" e "pensieri dell'agente"**: non presenti.
+## 1. Base attuale verificata nel repository
 
----
+- `cmd/sentinel/serve.go` avvia il server locale e un recorder per gli hook; configura ancora policy, budget e broker di approvazioni.
+- `cmd/sentinel/hook.go` inoltra gli hook al server. Oggi il fallback predefinito è `ask` e il client non ha un timeout complessivo perché può attendere approvazioni.
+- `internal/cursorhooks/handler.go` e `claude.go` normalizzano gli hook in eventi simili a chiamate MCP. Alcuni payload sono sintetici, non frame MCP realmente transitati. Gli output vengono limitati a 64 KiB; alcuni contenuti letti vengono omessi o ridotti prima della registrazione.
+- `internal/proxy` inoltra frame MCP stdio, correla richieste e risposte e applica ancora il gate di policy/budget. La durata osservata attraversa il percorso proxy; non è una misura interna del server o del modello.
+- `internal/recorder` mantiene gli eventi in memoria e li scrive in JSONL. `SessionID` identifica la registrazione del processo Sentinel, non una sessione dell'agente normalizzata. Gli errori del sink non sono esposti e un subscriber lento può perdere eventi live senza una segnalazione esplicita.
+- `internal/server` espone una sola registrazione tramite `/api/session`, `/api/events`, `/api/config` e `/ws`, oltre agli endpoint di hook, budget e approvazioni. Lo stream inizia con uno snapshot.
+- `web/src/useSentinel.ts` costruisce le righe correlando soprattutto `rpcId`; `metrics.ts` calcola le metriche nel browser. Token e costi derivano dalla dimensione JSON dei payload, con euristica e prezzi fissi: non sono usage del modello.
+- Il cockpit ispeziona payload e patch presenti nei dati; non conserva snapshot completi del workspace. Il report HTML attuale è autonomo, senza script, con dettagli espandibili e senza payload completi.
+- Il replay JSONL esiste. Non esistono `sentinel run`, `sentinel export`, un catalogo multi-sessione o un motore di findings.
 
-## 1. Executive Summary & Product Vision
+Questi elementi sono il punto di partenza, non il risultato del pivot.
 
-### 1.1 Il Problema nel Mercato (The Black Box Dilemma)
-Oggi gli sviluppatori affidano sempre più compiti critici ad agenti autonomi da terminale (Claude Code, Aider, Codex CLI, agenti custom via MCP). Tuttavia, l'esperienza utente e l'affidabilità soffrono di tre problemi strutturali:
-
-1. **Scatola Nera (Zero Visibilità):** Gli agenti agiscono all'interno del terminale producendo log caotici e stream testuali infiniti. È difficile comprendere la gerarchia di pensiero, la sequenza delle chiamate ai tool e la cronologia degli eventi.
-2. **Rischio di Esecuzione & Costi Incontrollati:** Un loop infinito o un'istruzione mal interpretata può cancellare file sensibili, leakare secret (`.env`, token AWS) o consumare decine di dollari in token prima che lo sviluppatore riesca a premere `Ctrl+C`.
-3. **Deliverable Dispersi:** Gli output intermedi (diagrammi di architettura Mermaid, benchmark di performance, report di analisi, diff di codice) restano sepolti nei buffer del terminale invece di diventare deliverable chiari, auditabili e condivisibili con il team.
-
-### 1.2 La Soluzione: Agent Sentinel
-**Agent Sentinel** è un binario ultra-leggero e distribuibile con zero dipendenze esterne che fa da **supervisore trasparente, proxy di protocollo e flight recorder** per qualsiasi agente AI.
-
-* **Nessun lock-in:** Non richiede di riscrivere o modificare l'agente.
-* **Local-First & Zero Config:** Funziona localmente sulla macchina dello sviluppatore senza richiedere server cloud terzi.
-* **Human-in-the-Loop Nativo:** Consente all'uomo di intervenire visivamente quando l'agente sta per compiere un'azione rischiosa.
-
----
-
-## 2. Target Personas & Use Cases
-
-### Persona A: Il Solo Developer (Productivity & Peace of Mind)
-* **Contesto:** Usa Claude Code o Aider quotidianamente per refactor e nuove feature.
-* **Dolore:** Non si fida a lasciare l'agente lavorare da solo in background; ha paura che tocchi file fuori scopo o che sfori i budget API.
-* **Valore di Sentinel:** Lancia l'agente con Sentinel in background. Ha una dashboard web su `localhost` che traccia i costi in tempo reale, mostra le modifiche con un diff visuale pulito e chiede approvazione con un click solo se l'agente prova a eseguire comandi pericolosi.
-
-### Persona B: L'Engineering Lead / Reviewer (Audit & Collaboration)
-* **Contesto:** Il team usa agenti AI per risolvere issue e aprire Pull Request.
-* **Dolore:** I colleghi aprono PR generate da agenti senza spiegare il "perché" di certe scelte architetturali o quali tool/benchmark sono stati eseguiti.
-* **Valore di Sentinel:** A fine sessione, Sentinel genera un file `audit-report.html` autonomo e graficamente impeccabile. Viene allegato alla PR come prova del ragionamento dell'agente, dei test eseguiti e del consumo di risorse.
-
-### Persona C: Il SecOps / Security Conscious Engineer (Execution Boundary)
-* **Contesto:** Lavora in aziende con policy stringenti su credenziali e codice proprietario.
-* **Dolore:** Gli agenti LLM non devono mai accedere a cartelle esterne alla repository (`~/.ssh`, `~/.aws`), né leggere file contenenti secret.
-* **Valore di Sentinel:** Sentinel agisce da **Boundary di Sicurezza**: blocca a monte le chiamate a tool o file vietati tramite policy preconfigurate.
-
----
-
-## 3. Architettura di Sistema ad Alto Livello
+## 2. Architettura di destinazione
 
 ```mermaid
-flowchart TD
-    subgraph AgentLayer["1. Agent Runtime Layer"]
-        Agent["AI Coding Agent\n(Claude Code / Aider / Cursor / CLI custom)"]
-    end
-
-    subgraph SentinelCore["2. Sentinel Core Engine (Go)"]
-        direction TB
-        Proxy["MCP Proxy & Agent Hooks\n(Cursor, Claude Code)"]
-        PolicyEngine["Policy & Boundary Engine\n(Cost Limits, Secret Leak, Dangerous Commands)"]
-        Recorder["Flight Recorder & State Store\n(In-memory + JSONL session log)"]
-        WSServer["WebSocket Streaming Server"]
-        
-        Proxy --> PolicyEngine
-        PolicyEngine --> Recorder
-        Recorder --> WSServer
-    end
-
-    subgraph Downstream["3. Execution & Upstream"]
-        LocalFS["Local Workspace / Git Worktrees"]
-        UpstreamMCP["Upstream MCP Servers / agent tools"]
-        LLMProviders["LLM Providers (Anthropic, OpenAI, etc.)"]
-        
-        PolicyEngine -->|If Approved| UpstreamMCP
-        PolicyEngine -->|If Approved| LocalFS
-        Agent -.->|API Calls| LLMProviders
-    end
-
-    subgraph CockpitLayer["4. Sentinel Cockpit (Embedded Web UI)"]
-        WebUI["Local Dashboard (React + Tailwind)\nhttp://localhost:8848"]
-        TimelineView["Event Timeline & Agent Thoughts"]
-        DiffView["Visual Git Diff & File Changes"]
-        ApprovalModal["Human-in-the-Loop Approval Modal"]
-        ExportEngine["Standalone HTML Artifact Generator"]
-        
-        WSServer <==>|Bi-directional WS| WebUI
-        WebUI --> TimelineView
-        WebUI --> DiffView
-        WebUI --> ApprovalModal
-        WebUI --> ExportEngine
-    end
+flowchart LR
+    Agent["Coding agent"] --> Hooks["Hook adapter"]
+    Client["MCP client"] <--> Proxy["Proxy stdio trasparente"]
+    Proxy <--> MCP["Server MCP"]
+    Hooks --> Capture["Normalizzazione e qualità della cattura"]
+    Proxy --> Capture
+    Capture --> Store["Recorder locale JSONL"]
+    Store --> Analysis["Analisi deterministica"]
+    Store --> API["API e stream locali"]
+    Analysis --> API
+    API --> UI["Profiler incorporato"]
+    UI --> Export["Report e traccia offline"]
 ```
 
----
+Il percorso di esecuzione passa attraverso il proxy quando necessario al trasporto, ma non attraverso policy, findings o UI. Un'anomalia diagnostica non modifica la richiesta, la risposta o i permessi dell'agente.
 
-## 4. Specifiche Tecniche dei Componenti Core
+La prima versione continua a usare Go, JSONL e frontend incorporato. Nessun SQLite, servizio collector separato o database esterno è un prerequisito. Un indice ricostruibile dai file è sufficiente per selezionare le sessioni; la paginazione deve evitare il caricamento di tutta la storia nel browser.
 
-### 4.1 Interception Engine (MCP Proxy & Agent Hooks)
-Il core engine supporta due modalità di intercettazione non invasiva:
-1. **MCP Proxy Mode:** Si registra come server/middleware MCP. Quando l'agente esegue chiamate a tool (es. `execute_command`, `write_file`, `search_files`), la richiesta passa attraverso Sentinel via JSON-RPC 2.0.
-2. **Agent Hooks Mode (Cursor, Claude Code):** l'agente stesso comunica a Sentinel ogni passo, tramite i suoi hook, e legge la decisione di Sentinel prima di eseguirlo. `sentinel hook` è il comando che l'agente lancia a ogni passo: inoltra il JSON a `sentinel serve` e restituisce la risposta nello schema dell'agente. Ogni agente ha il suo adattatore (`internal/cursorhooks`), che traduce gli eventi in chiamate `tools/call` e li passa allo stesso motore di policy, approvazioni e budget del proxy MCP.
+Il collector locale mantiene come indirizzo predefinito `http://127.0.0.1:8848`. Il pivot non richiede di cambiare porta o introdurre un servizio remoto.
 
-   | | Cursor | Claude Code |
-   | :--- | :--- | :--- |
-   | Dove si installano | `.cursor/hooks.json` | `.claude/settings.local.json` (o `~/.claude/settings.json`) |
-   | Prima del passo | `beforeShellExecution`, `beforeReadFile`, `beforeMCPExecution` | `PreToolUse` (ogni tool, anche le modifiche ai file) |
-   | Dopo il passo | `afterShellExecution`, `afterFileEdit`, `afterMCPExecution` | `PostToolUse`, `PostToolUseFailure` |
-   | Fine turno | `stop` | `Stop`, `SessionEnd` |
-   | Modifica di un file | solo registrata dopo il fatto | giudicata e bloccabile prima |
-   | Chiamata senza obiezioni | `permission: allow` | nessuna risposta, così valgono le regole di Claude Code (un `allow` esplicito salterebbe la sua richiesta di conferma) |
-   | Sentinel non raggiungibile | `ask` | `ask` |
+## 3. Separazione delle responsabilità
 
-   Le chiamate che l'agente non chiude (comando saltato, rifiutato dall'utente nella conferma dell'agente o interrotto) restano "Running" finché non arriva `stop`/`Stop`/`SessionEnd`, che le chiude con lo stato `interrupted`. Questo stato non è un errore dello strumento: il cockpit lo mostra con un'icona propria, la barra delle metriche e il report lo contano a parte, e la sua durata non entra nelle latenze (mediana e p95). Un comando interrotto che l'agente stesso riporta come finito (Cursor manda l'evento "dopo" comunque) resta `ok`, perché Sentinel non ha modo di saperlo; Claude Code invece segnala `interrupted` nella risposta dello strumento e Sentinel lo registra.
+### Adattatori di cattura
 
-Una modalità **PTY** (Sentinel lancia l'agente in uno pseudoterminale) era prevista in origine e non è più il piano: dal testo di un terminale non si ricavano in modo affidabile i singoli comandi, mentre gli hook li consegnano già strutturati. `sentinel run claude` sarà un avvio di Claude Code con gli hook di Sentinel attivi solo per quella sessione (`claude --settings`), non un PTY.
+Gli adattatori conoscono i payload dell'agente o del trasporto e dichiarano le proprie capability. Estraggono identità native, timestamp, argomenti, risultati e limiti noti. Non decidono se un comportamento è sbagliato.
 
-### 4.2 Policy & Guardrail Engine (Security Boundary)
-Il motore di regole valuta ogni azione prima che venga inoltrata al sistema:
-* **Livelli di Enforcing:**
-  - `ALLOW`: Azione innocua (es. lettura file sorgente non sensibile). Inoltrata istantaneamente.
-  - `WARN`: Azione potenzialmente impattante. Registrata nel log con flag di attenzione.
-  - `REQUIRE_APPROVAL`: Azione a rischio (es. cancellazione file, script bash non convenzionali, comandi git distruttivi). Il proxy sospende la risposta dell'agente finché l'utente non clicca "Approva" nella UI.
-  - `BLOCK`: Azione vietata categoricamente (es. accesso a chiavi SSH o `.env.production`). Chiamata respinta con messaggio di errore artificiale inoltrato all'agente.
-* **Token & Budget Circuit Breaker:**
-  - Stima dei token I/O e calcolo dinamico del costo stimato in USD per sessione.
-  - Trigger automatico di pausa se il budget configurato (es. $2.50) viene superato.
+Un payload normalizzato da hook va etichettato come tale. La vista «raw MCP» è disponibile solo se un frame MCP è stato effettivamente acquisito. Conservare l'input originale dell'hook segue le stesse regole di redazione e conservazione degli altri payload.
 
-### 4.3 Flight Recorder & Schema degli Eventi
-Gli eventi registrati da Sentinel seguono uno schema canonico immutabile:
+L'installazione resta responsabilità della CLI: merge idempotente dei soli hook Sentinel, conservazione degli altri hook e rimozione selettiva. Nessuna modifica automatica delle integrazioni durante la lettura di una traccia.
 
-```json
-{
-  "session_id": "sess_01j7x9k2...",
-  "timestamp": "2026-10-08T19:00:00Z",
-  "sequence": 42,
-  "type": "TOOL_CALL",
-  "source": "claude-code",
-  "payload": {
-    "tool_name": "bash",
-    "parameters": {
-      "command": "git checkout -b refactor/auth"
-    },
-    "risk_level": "LOW",
-    "status": "APPROVED",
-    "duration_ms": 128
-  }
-}
-```
+### Recorder e store
 
-### 4.4 The Cockpit (Local-First Web UI)
-* **Single Binary Embedded:** Il frontend compilato (React + Tailwind) è impacchettato nel binario Go tramite `go:embed`. L'utente non deve configurare Node.js o porte speciali.
-* **Real-time Live Stream:** Connessione WebSocket bidirezionale:
-  - Invio continuo di eventi, log e variazioni dei file.
-  - Invio di risposte di approvazione dall'interfaccia verso il motore Go.
-* **Visual Diff Viewer:** Integrazione di un visualizzatore di diff (side-by-side e unified) con sintassi evidenziata per ispezionare le modifiche ai file prima dell'applicazione.
+Il recorder assegna sequenze e identità, conserva i metadati di cattura e rende visibili errori di persistenza, perdita di eventi e limiti di memoria. Il formato e la compatibilità sono definiti nel [contratto di telemetria](TELEMETRY_SPEC.md).
 
-### 4.5 Standalone Report Generator (Deliverable Hub)
-A fine sessione, dal bottone Export del cockpit (il comando `sentinel export` non esiste ancora), il motore genera un singolo file HTML autonomo:
-- Zero dipendenze esterne (CSS e JS inline).
-- Diagrammi Mermaid renderizzati.
-- Timeline interattiva espandibile.
-- Metriche aggregate: tempo totale, token stimati, comandi eseguiti, file modificati.
+La raccolta usa code limitate. Un sink lento non può trattenere indefinitamente una chiamata dell'agente. Quando la capacità è esaurita, il prodotto degrada la cattura e segnala l'intervallo perso; non dichiara una traccia completa. Il flush alla chiusura ha un limite finito.
 
----
+Un browser lento non rallenta il recorder. La UI recupera i gap dallo store quando possibile. «Non visto nello stream» e «non persistito» sono condizioni distinte.
 
-## 5. Modalità d'Uso & CLI UX
+### Motore di analisi
 
-```bash
-# 1. Supervisionare Cursor o Claude Code tramite i loro hook
-sentinel serve --open
-sentinel hook install                  # Cursor: .cursor/hooks.json
-sentinel hook install --agent claude   # Claude Code: .claude/settings.local.json
+Proposta: package Go `internal/analysis`, indipendente da HTTP, UI e policy. Riceve eventi normalizzati ordinati, capability e versione delle regole; produce metriche e findings con riferimenti agli eventi.
 
-# (non ancora implementato) avviare Claude Code con gli hook attivi solo per quella sessione
-# sentinel run claude
+L'analisi è derivata, ricalcolabile e separata dalle evidenze originali. Lo stesso input, con gli stessi parametri e la stessa versione, produce lo stesso risultato in live, replay ed export. Nessun servizio LLM nella prima release.
 
-# 2. Avviare solo come proxy MCP per client come Cursor o Claude Desktop
-sentinel mcp --port 8848
+### API locale e profiler
 
-# 3. Aprire il cockpit web su una sessione passata
-sentinel ui --session sess_01j7x9k2
+L'API serve sessioni, chiamate, metriche, findings e dettagli dei payload. L'interfaccia applica filtri e presenta risultati; non mantiene una seconda implementazione degli algoritmi di analisi.
 
-# 4. Esportare il report standalone: bottone Export nel cockpit
-# (non ancora implementato) sentinel export --format html -o ./audit-report.html
-```
+La UI presenta waterfall, graduatorie dei payload, errori e findings, con accesso al dettaglio e copertura dei dati. Approvazioni e budget non occupano il percorso principale. Un vecchio log conserva una lettura storica dei verdict.
 
----
+Le difese già presenti per host, origin e contenuti non fidati restano pertinenti: il cockpit contiene codice e output locali. Eliminare il gate dei comandi non significa esporre i dati a siti estranei.
 
-## 6. Perché questo progetto è un differenziatore per il CV
+## 4. Comportamento passivo e guasti
 
-| Aspetto Tradizionale dei Progetti Junior | Approccio di Agent Sentinel (Hiring-Ready) |
-| :--- | :--- |
-| Semplice wrapper di API OpenAI con prompt | Architettura di sistema complessa: proxying di rete, protocolli standard (MCP / JSON-RPC). |
-| Codice monolitico in Python senza tipizzazione | Architettura modulare in **Go** con concorrenza reale (goroutines, canali, mutex). |
-| Richiede setup complesso (Docker Compose, npm, python env) | **Zero-config single binary** con frontend incorporato via `go:embed`. |
-| Solo un'interfaccia chat standard | Developer Tooling reale con diff viewer, timeline e circuit breakers di sicurezza. |
+- Hook online: risposta neutra secondo il contratto dell'agente. Per Claude Code non introdurre `allow` che salti la sua conferma nativa. Verificare i contratti con fixture prima di cambiare le risposte.
+- Hook offline, recorder indisponibile o timeout: nessuna conferma aggiuntiva introdotta da Sentinel; restituzione neutra entro un limite finito e diagnostica su stderr, senza sporcare stdout.
+- Proxy: inoltro di byte e risposte senza riscritture da parte dell'analisi. Gli errori di cattura possono degradare la registrazione mentre il trasporto continua, quando tecnicamente possibile.
+- Un crash del proxy o del server MCP può interrompere il collegamento: non promettere continuità se il processo che gestisce stdio termina. Distinguere questi guasti dalle decisioni di policy, che il nuovo percorso non prende.
+- Schema non valido: registrare una diagnosi; non correggere, respingere o simulare la risposta del tool.
+- Payload oltre il limite: inoltro intatto nel proxy; solo la copia registrata può essere ridotta con metadati espliciti. L'adattatore non può conservare ciò che la sorgente non invia.
+- Chiusura senza risposta: chiamata incompleta; usare `interrupted` solo con evidenza di interruzione, altrimenti `unknown`. Non inventare successo, timeout o durata di esecuzione.
+
+I timeout della raccolta non sono timeout del tool. Le code e i limiti scelti devono essere misurati nel lavoro di implementazione, non presentati come benchmark già ottenuti.
+
+## 5. Sessioni e concorrenza
+
+Una registrazione può ricevere più conversazioni. Separare `recordingId`, `agentSessionId`, `turnId` quando disponibile, `connectionId` e `callId`. Una risposta non si correla per solo nome del comando o `rpcId` globale.
+
+I confini del processo collector non diventano automaticamente confini del task. Il `stop` di un agente non conclude altre conversazioni. Alla ripartenza, ID riutilizzati da una sorgente devono essere isolati da una nuova identità di connessione/istanza.
+
+Il proxy standalone e il collector degli hook possono produrre registrazioni separate nella prima release. Non è necessario farli confluire in un unico daemon o sulla stessa porta. Il replay deve poter aprire entrambe; la correlazione automatica tra le due fonti è rimandata e non deve duplicare chiamate nelle metriche.
+
+Configurare una sola fonte primaria per lo stesso traffico MCP: proxy oppure hook MCP. Se entrambe sono presenti, presentarle separatamente e non sommarle in un totale unico senza una deduplicazione dimostrabile.
+
+## 6. Compatibilità e migrazione
+
+Il lettore riconosce i JSONL senza versione come formato precedente e li adatta senza riscriverli. I campi non recuperabili restano sconosciuti. Gli eventi di approvazione e budget sono conservati per spiegare la storia di quella registrazione.
+
+L'API di destinazione aggiunge una versione e capability; il contratto HTTP dettagliato va fissato nella fase del modello dati. Gli endpoint esistenti non diventano multi-sessione solo cambiandone il contenuto in modo implicito.
+
+Le opzioni di policy e budget esistenti non possono essere accettate e ignorate silenziosamente. La migrazione deve spiegare che il nuovo percorso è osservativo, mentre quello precedente offriva controlli. Nessuna reinstallazione automatica degli hook.
+
+## 7. Export e riproducibilità
+
+Il JSONL è l'evidenza ricaricabile; il report HTML è una rappresentazione consultabile offline. Entrambi devono includere stato della cattura, versione dello schema e dell'analisi e limiti dei dati disponibili.
+
+Il report può usare `<details>` nativi e collegamenti interni, senza JavaScript obbligatorio. Deve mantenere escaping e CSP, non includere risorse remote e non eseguire contenuti catturati. La selezione dei payload da condividere è esplicita; esportare un report non abilita upload o invii esterni.
