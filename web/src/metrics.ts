@@ -20,10 +20,9 @@ export interface Metrics {
 /** Metrics of retained tool events, not provider usage or billing. */
 export function computeMetrics(rows: Row[]): Metrics {
   const tools = rows.filter((r) => r.kind === "tool");
-  const durations = rows
-    // An interrupted call's duration is how long Sentinel waited to close it, not the tool's latency.
-    .filter((r) => r.kind === "tool" && r.durationMs !== undefined && Number.isFinite(r.durationMs) && r.durationMs >= 0 && (r.status === "ok" || r.status === "error") && r.request?.decision !== "approve")
-    .map((r) => r.durationMs!)
+  const durations = tools
+    .map(toolDuration)
+    .filter((duration): duration is number => duration !== undefined)
     .sort((a, b) => a - b);
   const at = (q: number) => (durations.length ? durations[Math.max(0, Math.ceil(durations.length * q) - 1)] : 0);
 
@@ -39,6 +38,12 @@ export function computeMetrics(rows: Row[]): Metrics {
     p50: at(0.5),
     p95: at(0.95),
   };
+}
+
+/** Shared eligibility for percentiles, rankings and inspector sorting. */
+export function toolDuration(row: Row): number | undefined {
+  if (row.kind !== "tool" || (row.status !== "ok" && row.status !== "error") || row.request?.decision === "approve") return undefined;
+  return row.durationMs !== undefined && Number.isFinite(row.durationMs) && row.durationMs >= 0 ? row.durationMs : undefined;
 }
 
 /** This measures the payload JSON available to the UI, not original wire size. */

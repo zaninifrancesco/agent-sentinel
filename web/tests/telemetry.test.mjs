@@ -6,6 +6,11 @@ let server;
 let computeMetrics;
 let journeyStops;
 let buildReportHtml;
+let buildProfile;
+let filterCalls;
+let sortCalls;
+let recordedSpan;
+let buildRows;
 
 before(async () => {
   // Use Vite's existing TypeScript loader without opening a listening socket.
@@ -13,6 +18,8 @@ before(async () => {
   ({ computeMetrics } = await server.ssrLoadModule("/src/metrics.ts"));
   ({ journeyStops } = await server.ssrLoadModule("/src/journey.ts"));
   ({ buildReportHtml } = await server.ssrLoadModule("/src/report.ts"));
+  ({ buildProfile, filterCalls, sortCalls, recordedSpan } = await server.ssrLoadModule("/src/profile.ts"));
+  ({ buildRows } = await server.ssrLoadModule("/src/useSentinel.ts"));
 });
 after(async () => { await server?.close(); });
 
@@ -59,4 +66,38 @@ test("offline reports escape captured text and retain historical decisions only 
   assert.ok(html.includes("Content-Security-Policy"));
   const historical = { ...row, status: "blocked", request: { ...row.request, decision: "block", rule: "old-rule" } };
   assert.ok(buildReportHtml({ ...input, rows: [historical] }).includes("Historical policy decisions"));
+});
+
+test("profile rankings distinguish unknown duration and absent responses from observed zero", () => {
+  const rows = [call(undefined, { key: "unknown", response: undefined }), call(0, { key: "zero" }), call(40, { key: "slow" }), call(500, { key: "interrupted", status: "interrupted" })];
+  const profile = buildProfile(rows);
+  assert.deepEqual(profile.longest.map((row) => row.key), ["slow", "zero"]);
+  assert.ok(!profile.largest.some((row) => row.key === "unknown"));
+  assert.equal(sortCalls(rows, "duration").at(-1).key, "interrupted");
+  assert.equal(profile.tools[0].metrics.calls, 4);
+  assert.equal(profile.tools[0].metrics.latencySamples, 2);
+});
+
+test("calls filter by exact tool, status and full captured arguments", () => {
+  const a = call(5, { key: "a", status: "error", subtitle: "truncated…", request: { toolName: "shell", payload: { command: "needle beyond the summary" } } });
+  const b = call(10, { key: "b", status: "ok", request: { toolName: "read_file" } });
+  assert.deepEqual(filterCalls([a, b], "errors", "shell", "NEEDLE").map((row) => row.key), ["a"]);
+  assert.equal(filterCalls([a, b], "open", "", "").length, 0);
+  assert.equal(filterCalls([a, b], "all", "read", "").length, 0);
+});
+
+test("missing source duration stays unavailable while explicit zero is preserved", () => {
+  const row = call(0);
+  const request = { ...row.request, rpcId: "same" };
+  const response = { ...row.response, rpcId: "same", durationMs: undefined };
+  assert.equal(buildRows([request, response])[0].durationMs, undefined);
+  assert.equal(buildRows([request, { ...response, durationMs: 0 }])[0].durationMs, 0);
+});
+
+test("recording span uses captured timestamps rather than the current clock", () => {
+  const row = call(5, { response: { timestamp: "2026-10-15T10:00:02Z" } });
+  const session = { startedAt: row.startedAt };
+  assert.equal(recordedSpan(session, [row]), 2_000);
+  assert.equal(recordedSpan(null, [row]), undefined);
+  assert.equal(recordedSpan({ startedAt: "invalid" }, [row]), undefined);
 });
