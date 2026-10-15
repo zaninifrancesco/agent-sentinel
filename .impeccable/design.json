@@ -333,9 +333,9 @@
       "name": "Rail navigation",
       "kind": "nav",
       "refersTo": "navigation-active",
-      "description": "Persistent navigation with a selected page and call count.",
+      "description": "Collapsible graphite navigation with a fine outlined selection and call count.",
       "html": "<nav class=\"ds-nav\" aria-label=\"Recording views\"><button aria-current=\"page\">Timeline <span>17</span></button><button>Tool profile</button><button>Event log</button></nav>",
-      "css": ".ds-nav{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:flex;flex-direction:column;gap:5px;width:162px;background:var(--rail,#17233d);padding:14px}.ds-nav button{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:flex;align-items:center;gap:10px;min-height:40px;padding:9px 11px;border:0;border-radius:7px;background:transparent;color:#b8c6e0;font-size:13px;line-height:19.5px;text-align:left;cursor:pointer}.ds-nav button:hover{background:#233352;color:#fff}.ds-nav button[aria-current]{background:var(--rail-active,#2c3d61);color:#fff}.ds-nav span{margin-left:auto;border-radius:4px;padding:0 5px;background:#405078;color:#dde6ff;font-size:11px}.ds-nav button:focus-visible{outline:2px solid var(--color-accent,#4f5fc7);outline-offset:3px}"
+      "css": ".ds-nav{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:flex;flex-direction:column;gap:4px;width:218px;background:var(--rail,#202123);padding:14px 12px;border-right:1px solid #393a3c}.ds-nav button{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:flex;align-items:center;gap:10px;min-height:40px;padding:8px 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:#b7b8bb;font-size:12px;line-height:18px;text-align:left;cursor:pointer}.ds-nav button:hover{background:#292a2c;color:#f5f5f6}.ds-nav button[aria-current]{border-color:#48494c;background:var(--rail-active,#303133);color:#fff}.ds-nav span{margin-left:auto;border:1px solid #505154;border-radius:5px;padding:0 5px;background:#3b3c3e;color:#e4e4e6;font-size:10px}.ds-nav button:focus-visible{outline:2px solid var(--color-accent,#4f5fc7);outline-offset:3px}"
     },
     {
       "name": "Status filters",
@@ -374,7 +374,7 @@
     "northStar": "Trace Atlas",
     "overview": "Trace Atlas treats a recording as navigable evidence. A navy navigation rail anchors a cool, layered workspace; compact measurements and aligned rows make dense captured data readable. Archivo carries the interface, with monospace reserved chiefly for captured arguments, identifiers and JSON.\n\nAnalytical cartography supplies the signature: the same selected call is registered in the recording map, call list and inspector. Tool series remain consistent across these regions. Borders and tonal changes give each region a clear job while the inspector preserves room for the evidence.",
     "keyCharacteristics": [
-      "Cool paper, white panels and a stable navy navigation rail.",
+      "Cool paper, white panels and a stable graphite navigation rail with fine borders.",
       "Periwinkle selection shared across map intervals, rows and filters.",
       "Tool series identify categories; amber and explicit status marks identify reported errors.",
       "Compact tabular measurements, readable captured payloads and restrained rounded geometry."

@@ -17,9 +17,12 @@ colors:
   ok: "#197e70"
   ok-soft: "#e8f5f1"
   warn: "#996019"
-  rail: "#17233d"
-  rail-muted: "#a6b5d1"
-  rail-active: "#2c3d61"
+  rail: "#202123"
+  rail-rule: "#393a3c"
+  rail-muted: "#b2b3b6"
+  rail-active: "#303133"
+  rail-active-rule: "#48494c"
+  rail-hover: "#292a2c"
   series-0: "#6574d9"
   series-1: "#258c83"
   series-2: "#9a6bb1"
@@ -162,19 +165,19 @@ components:
 
 **Creative North Star: "Trace Atlas"**
 
-Trace Atlas treats a recording as navigable evidence. A navy navigation rail anchors a cool, layered workspace; compact measurements and aligned rows make dense captured data readable. Archivo carries the interface, with monospace reserved chiefly for captured arguments, identifiers and JSON.
+Trace Atlas treats a recording as navigable evidence. A graphite navigation rail with hairline boundaries anchors a cool, layered workspace; compact measurements and aligned rows make dense captured data readable. Archivo carries the interface, with monospace reserved chiefly for captured arguments, identifiers and JSON.
 
 Analytical cartography supplies the signature: the same selected call is registered in the recording map, call list and inspector. Tool series remain consistent across these regions. Borders and tonal changes give each region a clear job while the inspector preserves room for the evidence.
 
 **Key Characteristics:**
-- Cool paper, white panels and a stable navy navigation rail.
+- Cool paper, white panels and a stable graphite navigation rail with a fine right-hand boundary.
 - Periwinkle selection shared across map intervals, rows and filters.
 - Tool series identify categories; amber and explicit status marks identify reported errors.
 - Compact tabular measurements, readable captured payloads and restrained rounded geometry.
 
 ## Colors
 
-Cool white and slate neutrals support a navy frame, periwinkle selection and categorical tool colours. Frontmatter records the light and dark values extracted from the stylesheet; `dark-` entries are theme counterparts, not extra accents.
+Cool white and slate neutrals support a graphite frame, periwinkle selection and categorical tool colours. Frontmatter records the light and dark values extracted from the stylesheet; `dark-` entries are theme counterparts, not extra accents.
 
 ### Primary
 - **Periwinkle Accent** (`accent`): active inspector tabs, focus outlines, map cursor and selected interval ring.
@@ -194,7 +197,7 @@ Cool white and slate neutrals support a navy frame, periwinkle selection and cat
 - **Sheet** (`sheet`): inspector, controls and panels; becomes a slate surface in dark mode.
 - **Slate Rules** (`rule`, `rule-strong`): panel divisions and stronger field/table boundaries.
 - **Ink** (`ink`, `ink-2`, `ink-3`): primary data, supporting labels and tertiary context.
-- **Navy Rail** (`rail`, `rail-muted`, `rail-active`): stable navigation frame across both themes.
+- **Graphite Rail** (`rail`, `rail-rule`, `rail-muted`, `rail-active`, `rail-active-rule`, `rail-hover`): neutral navigation frame with fine outlined selection, shared across both themes.
 - **Overlay Navy** (`overlay`): translucent dimming behind search and export dialogs.
 
 ### Named Rules
@@ -225,7 +228,7 @@ Cool white and slate neutrals support a navy frame, periwinkle selection and cat
 
 ## Layout
 
-The shell fills the dynamic viewport height. The desktop rail is 190px, expands to 210px from 1536px, and narrows to 160px below 1024px. A white recording header and compact measurement strip sit above the workspace. Common gutters are 16–24px, with 8–12px gaps inside controls and metadata groups; panel spacing uses the extracted 18–20px steps rather than a single invented grid unit.
+The shell fills the dynamic viewport height. The desktop rail is 218px, expands to 226px from 1536px, and narrows to 188px below 1024px; its 68px collapsed state shows icon navigation with tooltips, and the preference persists locally. A white recording header and compact measurement strip sit above the workspace. Common gutters are 16–24px, with 8–12px gaps inside controls and metadata groups; panel spacing uses the extracted 18–20px steps rather than a single invented grid unit.
 
 The call inspector normally splits a flexible list from a detail column with a 330px minimum and a 1 : 0.9 proportion. From 1536px, detail has a 440px minimum and a 1 : 0.8 proportion. In tall desktop windows, the map spans the workspace above this split. At widths of at least 1024px and heights no greater than 850px, the map and filtered list occupy the left column while the detail pane spans all four workspace rows on the right. This height-aware arrangement preserves payload reading space.
 
@@ -264,7 +267,7 @@ Inspector, recording map and profile panels use sheet fill, a rule border and 12
 Search fields and selects use sheet fill, a stronger rule border, 6px corners and 12px text, with a 36px minimum height. The call search adds a leading SVG search icon. Payload search uses a compact rule outline and reports match counts. Accent caret and global visible focus connect fields to the selection system.
 
 ### Navigation
-The navy rail contains 40px minimum-height links with a 7px radius and 13px labels. Active links use a lighter navy fill and white text; hover uses an intermediate navy. Small line SVG icons accompany the text, and Timeline carries a compact count badge. On mobile, links form a horizontal strip with 36px minimum height, 12px labels and rounded top corners. Inspector tabs use a 2px accent underline; inactive tabs use secondary ink.
+The graphite rail contains 40px minimum-height links with an 8px radius and 12px labels. Active links use a charcoal fill and fine outline; hover uses a slightly lighter neutral. Small line SVG icons accompany the text, and Timeline carries a compact count badge. The header control collapses the desktop rail to a 68px icon strip and remembers the preference. On mobile, the expanded links form a horizontal strip; the collapse control folds them away. Inspector tabs use a 2px accent underline; inactive tabs use secondary ink.
 
 ### Recording map (signature)
 Tool lanes align names, counts, gridlines and intervals. Lanes are 22px high; intervals are 12px high with a 7px minimum visible width, while errors are 14px high and amber. Selection adds the two-layer ring and a vertical accent cursor aligned across lanes. Hover raises opacity from 75% to full. Arrow keys move through the mapped sequence; selecting an interval opens the same call in list and detail. The map samples the latest 120 calls; up to six named lanes appear, or five plus Other tools when more than six tools exist. The complete list remains available.

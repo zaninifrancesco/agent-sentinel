@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { ArrowLeft, Download, Moon, Search, Sun, X, ChartNoAxesCombined, ListTree, ScanLine, Radio, FileJson, HardDrive, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, Download, Moon, Search, Sun, X, ChartNoAxesCombined, ListTree, ScanLine, Radio, FileJson, HardDrive, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useSentinel, type Connection } from "./useSentinel";
 import { useConfig } from "./useConfig";
 import { useTheme } from "./theme";
@@ -22,11 +22,17 @@ const VIEWS: { id: View; label: string }[] = [
 const FILTERS: { id: CallFilter; label: string }[] = [
   { id: "all", label: "All calls" }, { id: "errors", label: "Errors" }, { id: "open", label: "Open" }, { id: "interrupted", label: "Interrupted" },
 ];
+const RAIL_KEY = "sentinel-rail-collapsed";
+
+function initialRailCollapsed(): boolean {
+  try { return localStorage.getItem(RAIL_KEY) === "true"; } catch { return false; }
+}
 
 export default function App() {
   const { session, rows, connection } = useSentinel();
   const { config } = useConfig();
   const [theme, toggleTheme] = useTheme();
+  const [railCollapsed, setRailCollapsed] = useState(initialRailCollapsed);
   const [view, setView] = useState<View>("calls");
   const [filter, setFilter] = useState<CallFilter>("all");
   const [sort, setSort] = useState<CallSort>("time");
@@ -37,6 +43,10 @@ export default function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const replay = config.mode === "replay";
+
+  useEffect(() => {
+    try { localStorage.setItem(RAIL_KEY, String(railCollapsed)); } catch { /* preference is optional */ }
+  }, [railCollapsed]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -84,22 +94,27 @@ export default function App() {
   const subtitle = { calls: "Follow the sequence. Inspect every call.", overview: "Compare tool time, errors and retained output.", events: "Inspect protocol and recording lifecycle events." };
   return (
     <div className="app-shell">
-      <aside className="app-rail" aria-label="Workspace navigation">
-        <div className="wordmark"><span className="brand-mark"><ScanLine aria-hidden className="size-4" /></span>Agent Sentinel</div>
+      <aside className="app-rail" data-collapsed={railCollapsed} aria-label="Workspace navigation">
+        <div className="rail-top">
+          <div className="wordmark"><span className="brand-mark"><ScanLine aria-hidden className="size-4" /></span><span className="wordmark-label">Agent Sentinel</span></div>
+          <button className="rail-toggle" aria-label={railCollapsed ? "Expand sidebar" : "Collapse sidebar"} aria-expanded={!railCollapsed} aria-controls="recording-navigation" onClick={() => setRailCollapsed((value) => !value)} title={railCollapsed ? "Expand sidebar" : "Collapse sidebar"}>
+            {railCollapsed ? <PanelLeftOpen aria-hidden className="size-4" /> : <PanelLeftClose aria-hidden className="size-4" />}
+          </button>
+        </div>
         <div className="ml-auto text-[#b9c8e6] md:hidden"><ConnectionBadge state={connection} replay={replay} /></div>
-        <nav aria-label="Recording views" className="rail-nav">
-          {VIEWS.map((item) => { const Icon = viewIcons[item.id]; return <button key={item.id} aria-current={view === item.id ? "page" : undefined} onClick={() => changeView(item.id)} className="rail-link">
-            <Icon aria-hidden className="size-4" />{item.label}{item.id === "calls" && <span className="count">{metrics.calls}</span>}
+        <nav id="recording-navigation" aria-label="Recording views" className="rail-nav">
+          {VIEWS.map((item) => { const Icon = viewIcons[item.id]; return <button key={item.id} title={railCollapsed ? item.label : undefined} aria-label={item.label} aria-current={view === item.id ? "page" : undefined} onClick={() => changeView(item.id)} className="rail-link">
+            <Icon aria-hidden className="size-4" /><span className="rail-label">{item.label}</span>{item.id === "calls" && <span className="count">{metrics.calls}</span>}
           </button>; })}
         </nav>
-        <div className="rail-recording">
+        <div className="rail-recording" aria-hidden={railCollapsed}>
           <div className="mb-3 flex items-center gap-2 text-[#e0e8fa]"><Radio aria-hidden className="size-3.5" />Current recording</div>
           <p className="break-all font-mono text-[10px] text-[#b9c8e6]">{session?.id ?? "Waiting for connection"}</p>
           {session && <p className="mt-3">Started {formatTime(session.startedAt)}</p>}
           {span !== undefined && <p className="mt-1">{formatDuration(span)} captured span</p>}
           {!!session?.command?.length && <p className="mt-3 break-words" title={session.command.join(" ")}>{session.command.join(" ")}</p>}
         </div>
-        <div className="rail-foot"><ConnectionBadge state={connection} replay={replay} /><div className="mt-4 flex items-center gap-2 border-t border-[#354461] pt-4"><HardDrive aria-hidden className="size-3.5" />Stored locally</div><p className="mt-1">Observation only</p></div>
+        <div className="rail-foot"><ConnectionBadge state={connection} replay={replay} /><div className="rail-storage mt-4 flex items-center gap-2 border-t border-[#354461] pt-4"><HardDrive aria-hidden className="size-3.5" />Stored locally</div><p className="rail-observation mt-1">Observation only</p></div>
       </aside>
       <div className="app-workspace">
         <header className="workspace-header">
