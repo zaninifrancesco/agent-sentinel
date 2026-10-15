@@ -11,6 +11,8 @@ let filterCalls;
 let sortCalls;
 let recordedSpan;
 let buildRows;
+let buildTrace;
+let capturedInterval;
 
 before(async () => {
   // Use Vite's existing TypeScript loader without opening a listening socket.
@@ -19,6 +21,7 @@ before(async () => {
   ({ journeyStops } = await server.ssrLoadModule("/src/journey.ts"));
   ({ buildReportHtml } = await server.ssrLoadModule("/src/report.ts"));
   ({ buildProfile, filterCalls, sortCalls, recordedSpan } = await server.ssrLoadModule("/src/profile.ts"));
+  ({ buildTrace, capturedInterval } = await server.ssrLoadModule("/src/trace.ts"));
   ({ buildRows } = await server.ssrLoadModule("/src/useSentinel.ts"));
 });
 after(async () => { await server?.close(); });
@@ -100,4 +103,34 @@ test("recording span uses captured timestamps rather than the current clock", ()
   assert.equal(recordedSpan(session, [row]), 2_000);
   assert.equal(recordedSpan(null, [row]), undefined);
   assert.equal(recordedSpan({ startedAt: "invalid" }, [row]), undefined);
+});
+
+
+test("capture map uses observed timestamps instead of reported tool duration", () => {
+  const row = call(5000, { response: { timestamp: "2026-10-15T10:00:00.020Z" } });
+  const trace = buildTrace([row]);
+  assert.equal(trace.span, 20);
+  assert.equal(trace.timed[0].end - trace.timed[0].start, 20);
+  assert.equal(trace.timed[0].row.durationMs, 5000);
+  assert.equal(capturedInterval({ ...row, response: { timestamp: "2026-10-15T09:00:00Z" } }).end, undefined);
+  assert.equal(capturedInterval({ ...row, startedAt: "invalid" }), undefined);
+});
+
+test("capture map keeps pending calls as points and honours an observed zero span", () => {
+  const row = call(0);
+  assert.equal(buildTrace([row]).span, 0);
+  const pending = { ...row, response: undefined, status: "pending" };
+  assert.equal(buildTrace([pending]).timed[0].end, undefined);
+  assert.equal(buildTrace([]).timed.length, 0);
+});
+
+test("capture map bounds rendering while preserving all recent calls across tool lanes", () => {
+  const rows = Array.from({ length: 140 }, (_, i) => call(i, { key: String(i), request: { toolName: "tool-" + i % 8 } }));
+  const trace = buildTrace(rows);
+  assert.equal(trace.omitted, 20);
+  assert.equal(trace.timed.length, 120);
+  assert.equal(trace.lanes.length, 6);
+  assert.equal(trace.lanes.flatMap((lane) => lane.entries).length, 120);
+  assert.equal(trace.lanes.at(-1).name, "Other tools");
+  assert.equal(rows.length, 140);
 });
