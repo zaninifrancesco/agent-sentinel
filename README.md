@@ -15,17 +15,18 @@ Available now:
 - Passive Cursor and Claude Code hooks, with neutral responses even if the collector is offline.
 - A bounded hook-delivery deadline: one second by default, configurable up to five seconds.
 - MCP stdio proxying without a policy gate; requests and responses are forwarded unchanged.
-- A recording overview with per-tool activity, longest completed calls and largest retained responses, each linked to its captured evidence.
-- A call inspector with status/tool filters, full-argument search, duration/response-size sorting, available patch diffs and a separate event log.
+- A timeline with a selectable recording map grouped by tool. Captured request/response intervals stay distinct from reported execution durations.
+- A tool profile with per-tool activity, longest completed calls and largest retained responses, each linked to its captured evidence.
+- A call inspector with status/tool filters, full-argument search, duration/response-size sorting, payload text search, previous/next navigation, available patch diffs and a separate event log.
 - Counts of tool calls and errors, available duration percentiles and retained payload JSON size.
 - Local JSONL recordings and read-only replay, including older enforcement traces.
 - Standalone HTML session reports, without scripts or external assets.
 
 **Planned, not implemented yet:** waterfall, structured capture-quality metadata, session separation, original output-size measurements, repeated-call findings, schema diagnostics and a recording catalog. See the [implementation roadmap](docs/ROADMAP.md).
 
-![Profiler overview showing synthetic calls](docs/profiler.png)
+![Trace Atlas timeline showing synthetic calls](docs/profiler.png)
 
-This screenshot uses synthetic hook fixtures. No command shown in it was executed by the fixture generator. The previous enforcement cockpit is retained in `docs/cockpit.png` as historical material.
+This screenshot uses a synthetic JSONL recording. No command shown in it was executed by the fixture generator. The previous enforcement cockpit is retained in `docs/cockpit.png` as historical material.
 
 ## Build
 

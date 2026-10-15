@@ -12,12 +12,14 @@ Branch: `telemetry-profiler`. Aggiornamento: 15 ottobre 2026.
 - Cockpit e report si concentrano sulle chiamate e sugli esiti; rimosse approvazioni, modifica dei budget e stime monetarie/token derivate da prezzi fissi.
 - Le vecchie tracce restano leggibili, con decisioni storiche quando presenti. Gli eventi senza policy non mostrano una valutazione inventata.
 
-## Cockpit — Primo profilo di analisi implementato
+## Cockpit — Trace Atlas implementato
 
-- Overview iniziale con attività aggregata per tool: chiamate, errori segnalati, mediana/p95 disponibili e JSON conservato.
+- Nuova identità Trace Atlas: navigazione indaco, superfici fredde, colori per tool e selezione sincronizzata. Sui desktop bassi la mappa resta sopra la lista e l’inspector usa tutta l’altezza disponibile.
+- Timeline come vista iniziale, con mappa selezionabile per tool. Gli intervalli derivano dai timestamp catturati, separati dalla durata riportata; risposte senza timestamp valido restano punti. Ultime 120 chiamate nella mappa, tutte nella lista.
+- Tool profile con attività aggregata per tool: chiamate, errori segnalati, mediana/p95 disponibili e JSON conservato.
 - Classifiche delle cinque chiamate completate più lente e delle cinque risposte conservate più grandi. Ogni voce apre gli eventi da cui deriva; selezionare un tool filtra le sue chiamate.
 - Calls con filtri per esito e tool, ricerca negli argomenti conservati e ordinamento per cattura, durata o dimensione della risposta. Event log separato per osservazioni di protocollo e ciclo di vita.
-- Inspector compatto con argomenti/risultato in primo piano, JSON evento secondario e patch quando disponibile. Su mobile passaggio lista/dettaglio con ritorno, senza pannelli compressi.
+- Inspector con argomenti/risultato, evidenziazione sintattica sicura, ricerca testuale con conteggio dei risultati, navigazione precedente/successivo, JSON evento secondario e patch quando disponibile. Su mobile passaggio lista/dettaglio con ritorno, senza pannelli compressi.
 - Navigazione da tastiera confinata alla lista attiva; focus contenuto nei dialoghi e ripristinato alla chiusura.
 - Durate assenti conservate come sconosciute; zero esplicito rimane un campione valido. L’intervallo della registrazione deriva dai timestamp catturati e non cresce col tempo trascorso nel browser.
 
@@ -29,16 +31,18 @@ Queste aggregazioni sono calcolate nel frontend sui dati disponibili: anticipano
 - Test del client hook contro collector chiuso, risposte legacy e server in stallo su header o body; nessuna attesa illimitata o override dei permessi di Claude Code.
 - Test frontend di percentili, durata zero, esclusione di chiamate interrotte/RPC, byte UTF-8 conservati, journey senza policy, ranking/filtri, durate mancanti, intervallo catturato e HTML con contenuti ostili resi inerti.
 - Smoke test locale con binario temporaneo: config osservativa e tre coppie sintetiche richiesta/risposta Cursor/Claude registrate con esito `ok` e senza policy. Nessun comando contenuto nei payload è stato eseguito.
-- Ispezione del cockpit su desktop e viewport mobile da 390 px, inclusi stato vuoto, filtri senza risultati, classifica → dettaglio, errori e dialogo export con focus da tastiera. `profiler.png` mostra la nuova overview con 15 chiamate sintetiche (due errori e una aperta); `cockpit.png` resta la schermata storica. Nessun comando dei fixture viene eseguito.
+- Ispezione del cockpit su desktop 1440/1280 px e mobile da 390 px, nei temi chiaro/scuro, inclusi filtri senza risultati, mappa → chiamata → dettaglio, ricerca payload, precedente/successivo, classifica → dettaglio, errori e dialogo export con focus da tastiera. `profiler.png` mostra la nuova timeline Trace Atlas con 17 chiamate sintetiche (due errori e una aperta); `cockpit.png` resta la schermata storica. Nessun comando dei fixture viene eseguito.
 
-Check di chiusura passati: `make test` (vet, race test, typecheck e otto test frontend) e `cd web && npm run build`. Verificati anche link locali e whitespace. Non sono benchmark di performance né una verifica live delle versioni correnti degli agenti esterni.
+Revisione del redesign: il problema materiale dell’altezza del payload sui laptop è stato corretto e verificato dal revisore come risolto.
+
+Check di chiusura passati: `make test` (vet, race test, typecheck e undici test frontend) e `cd web && npm run build`. Verificati anche link locali e whitespace. Non sono benchmark di performance né una verifica live delle versioni correnti degli agenti esterni.
 
 ## Limiti ancora aperti
 
 - Il recorder mantiene il modello precedente: una registrazione per processo, correlazione e metadati incompleti, possibili perdite dello stream non segnalate e scrittura del sink sincrona. La fase 2 risolve questi aspetti.
 - `JSON retained` misura solo i payload conservati e riserializzati, non il traffico originale. Gli adattatori possono ridurre o omettere contenuti. Profili di redazione configurabili non ancora implementati.
 - Metriche ancora calcolate nel frontend; il motore Go unico viene introdotto nelle fasi successive.
-- Nessuna waterfall, analisi automatica delle ripetizioni, occupazione del contesto, usage nativo, diagnostica degli schemi o catalogo multi-sessione implementati in questa fase.
+- La mappa mostra soltanto intervalli di cattura, non una waterfall completa di turni LLM/tool. Nessuna analisi automatica delle ripetizioni, occupazione del contesto, usage nativo, diagnostica degli schemi o catalogo multi-sessione implementati in questa fase.
 - Il package di policy e le sue regressioni interne restano nel repository, ma la CLI nuova non offre enforcement. La loro eliminazione non è un prerequisito per osservare passivamente.
 - Il binario installato e gli hook reali dell'utente non sono stati cambiati. La migrazione di un'installazione esistente è un'operazione separata ed esplicita.
 - Landing page invariata.

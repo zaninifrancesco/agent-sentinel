@@ -38,6 +38,7 @@ Thumbs.db
 .codex/
 .cursor/
 .impeccable/questions/
+.impeccable/review/
 
 # IDE & Editors
 .vscode/
