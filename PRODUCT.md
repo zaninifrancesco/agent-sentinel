@@ -27,14 +27,16 @@ The Local Profiler & Flight Recorder for AI Agents. A single Go binary with an e
 - The hook collector normally listens on `127.0.0.1:8848`; sessions stream to the cockpit over WebSocket and are stored in local JSONL files.
 - Cursor and Claude Code hooks acknowledge neutrally, including when the collector is unavailable. Delivery has a one-second default HTTP timeout, configurable up to five seconds.
 - MCP stdio traffic is forwarded unchanged in the observation path. A transport-process crash can still interrupt the connection.
-- J/K and arrow keys navigate calls; Cmd/Ctrl+K searches. Export downloads a self-contained HTML report.
+- J/K and arrow keys navigate the focused call list; Cmd/Ctrl+K searches. Export downloads a self-contained HTML report.
 - Existing hook installations and installed executables require an explicit migration; normal development must not modify them silently.
 
 ## Capabilities and Constraints
 
 Implemented in the first pivot phase:
 
-- Live timeline, payload inspector, patch viewer where patch data exists, event search and dark/light themes.
+- Overview as the default view: per-tool activity, top five completed calls by available duration and top five retained responses by JSON size. Every entry opens its captured calls.
+- Calls with exact tool and status filters, search across captured arguments, and sorting by capture order, duration or retained response size. Event log keeps lifecycle and protocol observations accessible separately.
+- Compact arguments/result inspector, secondary event JSON, patch viewer where patch data exists, event search and dark/light themes. On mobile, opening a call replaces the list and provides a back action.
 - Tool-call counts, reported errors, available duration percentiles and retained payload JSON size. No fixed-price token or dollar estimates.
 - Local JSONL recordings, replay of new and old traces, and an offline HTML report with expandable calls. Report payloads remain summarized.
 - Historical risk and policy decisions remain readable only where recorded; there are no live approval or budget controls.
@@ -49,6 +51,12 @@ The current data does not reveal model reasoning, actual context occupancy, prov
 `examples/demo-session.jsonl` is a historical enforcement trace. Synthetic hook fixtures and fake MCP servers exercise passive capture without running the commands in their payloads. `docs/profiler.png` shows a synthetic passive session; `docs/cockpit.png` is historical.
 
 No customer results, performance claims or savings measurements may be fabricated.
+
+## Cockpit Information Hierarchy
+
+Start with the recording summary, then inspect evidence. Navigation is Overview, Calls and Event log. Recording identity, capture connection and available metric sample counts stay visible. The overview exposes observed activity, not automated diagnoses. Missing measurements remain unavailable, and retained JSON is never called context usage. Historical policy data is secondary and appears only when captured.
+
+Keyboard shortcuts belong to the focused list. Search and export overlays contain keyboard focus and restore it when closed.
 
 ## Product Principles
 

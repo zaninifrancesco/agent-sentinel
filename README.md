@@ -15,14 +15,15 @@ Available now:
 - Passive Cursor and Claude Code hooks, with neutral responses even if the collector is offline.
 - A bounded hook-delivery deadline: one second by default, configurable up to five seconds.
 - MCP stdio proxying without a policy gate; requests and responses are forwarded unchanged.
-- Live event timeline, payload inspector, available patch diffs and search.
+- A recording overview with per-tool activity, longest completed calls and largest retained responses, each linked to its captured evidence.
+- A call inspector with status/tool filters, full-argument search, duration/response-size sorting, available patch diffs and a separate event log.
 - Counts of tool calls and errors, available duration percentiles and retained payload JSON size.
 - Local JSONL recordings and read-only replay, including older enforcement traces.
 - Standalone HTML session reports, without scripts or external assets.
 
-**Planned, not implemented yet:** waterfall, structured capture-quality metadata, session separation, output-size analysis, repeated-call findings, schema diagnostics and a recording catalog. See the [implementation roadmap](docs/ROADMAP.md).
+**Planned, not implemented yet:** waterfall, structured capture-quality metadata, session separation, original output-size measurements, repeated-call findings, schema diagnostics and a recording catalog. See the [implementation roadmap](docs/ROADMAP.md).
 
-![Passive cockpit showing synthetic calls](docs/profiler.png)
+![Profiler overview showing synthetic calls](docs/profiler.png)
 
 This screenshot uses synthetic hook fixtures. No command shown in it was executed by the fixture generator. The previous enforcement cockpit is retained in `docs/cockpit.png` as historical material.
 
@@ -101,7 +102,7 @@ The cockpit's Export button downloads an offline HTML report with summary figure
 
 Durations are those available from the adapter or proxy; they are not the model's thinking time. Median and p95 include completed tool calls with available nonnegative durations, excluding interrupted calls and legacy approval-held spans. Zero milliseconds is valid; absent samples display as unavailable.
 
-**Payload JSON** measures UTF-8 bytes of retained tool payloads reserialized for display. Some hook payloads are synthesized, omitted or truncated. This is neither original wire volume nor actual model tokens or context usage. Sentinel no longer calculates dollars from fixed token-price assumptions.
+**JSON retained** measures UTF-8 bytes of retained tool payloads reserialized for display. Some hook payloads are synthesized, omitted or truncated. This is neither original wire volume nor actual model tokens or context usage. Sentinel no longer calculates dollars from fixed token-price assumptions.
 
 Capture-quality metadata and better treatment of missing/ambiguous timing are planned in the next phase. Current logs do not reconstruct the full model conversation, task boundaries or the workspace state. Local recordings can contain commands, source text and tool output; inspect them before sharing. Configurable capture/redaction profiles are planned, not shipped in this phase.
 
