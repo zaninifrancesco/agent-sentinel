@@ -13,6 +13,8 @@ let recordedSpan;
 let buildRows;
 let buildTrace;
 let capturedInterval;
+let recordingScopes;
+let filterScope;
 
 before(async () => {
   // Use Vite's existing TypeScript loader without opening a listening socket.
@@ -23,6 +25,7 @@ before(async () => {
   ({ buildProfile, filterCalls, sortCalls, recordedSpan } = await server.ssrLoadModule("/src/profile.ts"));
   ({ buildTrace, capturedInterval } = await server.ssrLoadModule("/src/trace.ts"));
   ({ buildRows } = await server.ssrLoadModule("/src/useSentinel.ts"));
+  ({ recordingScopes, filterScope } = await server.ssrLoadModule("/src/scopes.ts"));
 });
 after(async () => { await server?.close(); });
 
@@ -133,4 +136,77 @@ test("capture map bounds rendering while preserving all recent calls across tool
   assert.equal(trace.lanes.flatMap((lane) => lane.entries).length, 120);
   assert.equal(trace.lanes.at(-1).name, "Other tools");
   assert.equal(rows.length, 140);
+});
+
+function event(seq, type, overrides = {}) {
+  return { seq, schemaVersion: 2, sessionId: "recording", recordingId: "recording", source: "claude-hook", sourceId: "collector/claude", agentSessionId: "session", timestamp: `2026-10-15T10:00:${String(seq).padStart(2,"0")}Z`, type, toolName: "shell", risk: "none", status: type.endsWith("Request") ? "pending" : "ok", ...overrides };
+}
+
+test("v2 projection uses stable scoped identities and exact evidence, not reused RPC IDs", () => {
+  const a = event(1,"ToolCallRequest",{callId:"a",rpcId:"same"});
+  const b = event(2,"ToolCallRequest",{callId:"b",rpcId:"same",agentSessionId:"other"});
+  const resB = event(3,"ToolCallResponse",{callId:"b",rpcId:"same",agentSessionId:"other",correlation:{method:"native",quality:"exact",requestSeq:2},timing:{durationMs:0,source:"source-reported"}});
+  const resA = event(4,"ToolCallResponse",{callId:"a",rpcId:"same",correlation:{method:"native",quality:"exact",requestSeq:1},timing:{durationMs:7,source:"source-reported"}});
+  const rows = buildRows([a,b,resB,resA]);
+  assert.equal(rows.length,2);
+  assert.equal(rows[0].response.seq,4);
+  assert.equal(rows[1].response.seq,3);
+  assert.equal(rows[1].durationMs,0);
+  const wrongScope = buildRows([a,{...resA,agentSessionId:"other"}]);
+  assert.equal(wrongScope.length,2);
+  assert.equal(wrongScope[0].response,undefined);
+});
+
+test("ambiguous evidence never acquires a result, duration or fabricated capture span", () => {
+  const requests = [event(1,"ToolCallRequest",{callId:"a"}),event(2,"ToolCallRequest",{callId:"b"})];
+  const correlation = {method:"fallback",quality:"ambiguous",candidateCallIds:["a","b"]};
+  const rows=buildRows([...requests,event(3,"CaptureDiagnostic",{correlation}),event(4,"ToolCallResponse",{callId:"partial",correlation,durationMs:500})]);
+  assert.deepEqual(rows.slice(0,2).map((r)=>r.status),["unknown","unknown"]);
+  assert.ok(rows.slice(0,2).every((r)=>!r.response && r.durationMs===undefined));
+  assert.equal(computeMetrics(rows).latencySamples,0);
+  assert.equal(rows[3].kind,"rpc");
+  assert.equal(capturedInterval(rows[3]),undefined);
+  assert.equal(buildProfile(rows).longest.length,0);
+  assert.equal(filterCalls(rows.filter((r)=>r.kind==="tool"),"unresolved","","").length,2);
+});
+
+test("legacy RPC pairing respects origin and keeps overlapping IDs ambiguous", () => {
+  const req=event(1,"ToolCallRequest",{schemaVersion:undefined,source:undefined,callId:undefined,rpcId:"1",direction:"client->server"});
+  const opposite={...req,seq:2,direction:"server->client",type:"Request"};
+  const answer={...req,seq:3,type:"ToolCallResponse",direction:"server->client",status:"ok"};
+  const rows=buildRows([req,opposite,answer]);
+  assert.equal(rows[0].response.seq,3);
+  assert.equal(rows[1].response,undefined);
+  const ambiguous=buildRows([req,{...req,seq:2},answer,{...answer,seq:4}]);
+  assert.equal(ambiguous.length,4);
+  assert.ok(ambiguous.slice(0,2).every((r)=>r.status==="unknown" && !r.response));
+});
+
+test("synthesized interruptions preserve the request but do not measure execution time", () => {
+  const rows=buildRows([event(1,"ToolCallRequest",{callId:"a"}),event(2,"ToolCallResponse",{callId:"a",status:"interrupted",durationMs:999,correlation:{method:"native",quality:"exact",requestSeq:1,synthetic:true}})]);
+  assert.equal(rows.length,1);
+  assert.equal(rows[0].durationMs,undefined);
+  assert.equal(capturedInterval(rows[0]).end,undefined);
+  assert.equal(journeyStops(rows[0]).at(-1).title,"Capture closed");
+});
+
+test("session scopes isolate agents with the same native session ID and retain unknown events", () => {
+  const rows=buildRows([event(1,"ToolCallRequest",{callId:"a"}),event(2,"ToolCallRequest",{callId:"b",source:"cursor-hook",sourceId:"collector/cursor"}),event(3,"FutureCaptureEvent",{payload:{kept:true}})]);
+  const scopes=recordingScopes(rows);
+  assert.equal(scopes.length,2);
+  const claude=scopes.find((s)=>s.label.startsWith("Claude Code"));
+  const scoped=filterScope(rows,claude.id);
+  assert.equal(computeMetrics(scoped).calls,1);
+  assert.equal(scoped[1].title,"FutureCaptureEvent");
+  assert.deepEqual(scoped[1].event.payload,{kept:true});
+});
+
+test("reports retain session identity, safe capture diagnostics and unresolved pairing", () => {
+  const correlation={method:"fallback",quality:"ambiguous",candidateCallIds:["a","b"]};
+  const rows=buildRows([event(1,"ToolCallRequest",{callId:"a",agentSessionId:"<script>session</script>"}),event(2,"CaptureDiagnostic",{correlation,agentSessionId:"<script>session</script>"})]);
+  const html=buildReportHtml({session:{id:"recording",command:[],startedAt:rows[0].startedAt},rows,config:{mode:"observe"},exportedAt:new Date("2026-10-15T10:01:00Z")});
+  assert.ok(html.includes("UNRESOLVED"));
+  assert.ok(html.includes("Pairing unresolved"));
+  assert.ok(html.includes("&lt;script&gt;session&lt;/script&gt;"));
+  assert.ok(!html.includes("<script>"));
 });

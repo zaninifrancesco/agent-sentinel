@@ -10,7 +10,9 @@ export type EventType =
   | "ToolCallResponse"
   | "RawOutput"
   | "ApprovalResolved"
-  | "BudgetChanged";
+  | "BudgetChanged"
+  | "CaptureDiagnostic"
+  | (string & {}); // future event types remain inspectable
 
 export type Status =
   | "pending"
@@ -19,10 +21,22 @@ export type Status =
   | "error"
   | "blocked"
   | "rejected"
-  | "interrupted";
+  | "interrupted"
+  | "unknown";
 export type Risk = "none" | "low" | "medium" | "high" | "critical";
 
 export interface SentinelEvent {
+  schemaVersion?: number;
+  recordingId?: string;
+  source?: string;
+  sourceId?: string;
+  agentSessionId?: string;
+  connectionId?: string;
+  projectRef?: string;
+  callId?: string;
+  nativeCallId?: { type: "string" | "number" | "null"; value: string };
+  correlation?: Correlation;
+  timing?: { durationMs: number; source: "proxy-monotonic" | "source-reported" };
   seq: number;
   sessionId: string;
   timestamp: string;
@@ -40,6 +54,14 @@ export interface SentinelEvent {
   payload?: unknown;
 }
 
+export interface Correlation {
+  method: "native" | "fallback" | "none";
+  quality: "exact" | "ambiguous" | "unmatched";
+  requestSeq?: number;
+  candidateCallIds?: string[];
+  synthetic?: boolean;
+}
+
 export interface Session {
   id: string;
   command: string[] | null;
@@ -53,6 +75,7 @@ export type ServerMessage =
 
 /** One row of the timeline: a request merged with its response, or a standalone event. */
 export interface Row {
+  correlation?: Correlation;
   key: string;
   kind: "tool" | "rpc" | "notification" | "raw" | "session";
   title: string;

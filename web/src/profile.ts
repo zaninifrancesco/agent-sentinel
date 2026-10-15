@@ -1,7 +1,7 @@
 import type { Row, Session } from "./types";
 import { computeMetrics, payloadSize, toolDuration, type Metrics } from "./metrics";
 
-export type CallFilter = "all" | "errors" | "open" | "interrupted";
+export type CallFilter = "all" | "errors" | "open" | "interrupted" | "unresolved";
 export type CallSort = "time" | "duration" | "response";
 
 export interface ToolActivity {
@@ -53,6 +53,7 @@ export function filterCalls(rows: Row[], filter: CallFilter, tool: string, query
     if (filter === "errors" && row.status !== "error") return false;
     if (filter === "open" && row.status !== "pending") return false;
     if (filter === "interrupted" && row.status !== "interrupted") return false;
+    if (filter === "unresolved" && row.status !== "unknown") return false;
     if (!q) return true;
     return `${row.title} ${row.subtitle ?? ""} ${JSON.stringify(row.request?.payload) ?? ""}`.toLocaleLowerCase().includes(q);
   });

@@ -21,6 +21,8 @@ export function StatusIcon({ status }: { status: Status }) {
       return <CircleSlash aria-label="rejected" className={`${cls} text-signal`} />;
     case "interrupted":
       return <CircleDashed aria-label="interrupted" className={`${cls} text-ink-2`} />;
+    case "unknown":
+      return <CircleDashed aria-label="unresolved pairing" className={`${cls} text-warn`} />;
     default:
       return <TriangleAlert aria-label="error" className={`${cls} text-warn`} />;
   }

@@ -11,6 +11,7 @@ export function statusText(s: Row["status"]): string {
     blocked: "Blocked by policy",
     rejected: "Rejected",
     interrupted: "Interrupted",
+    unknown: "Unresolved pairing",
   }[s];
 }
 
@@ -74,7 +75,7 @@ export function journeyStops(row: Row): Stop[] {
 
   if (row.response) {
     stops.push({
-      title: "Answered",
+      title: row.response.correlation?.synthetic ? "Capture closed" : "Answered",
       at: row.response.timestamp,
       text:
         row.status === "blocked" || row.status === "rejected"
@@ -97,6 +98,8 @@ export function journeyStops(row: Row): Stop[] {
               ? "quiet"
               : "alert",
     });
+  } else if (row.correlation?.quality === "ambiguous") {
+    stops.push({ title: "Pairing unresolved", text: "Overlapping calls share the same identity. No result or duration is assigned to this request.", tone: "warn" });
   } else if (row.status === "pending") {
     stops.push({ title: "Answered", text: "Running…", tone: "quiet" });
   }

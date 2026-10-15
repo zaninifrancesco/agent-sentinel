@@ -75,7 +75,7 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
 
           <div className="space-y-2 rounded-sm border border-rule bg-paper p-4">
             <Line label="Session" value={session?.id || "active"} />
-            <Line label="Events" value={String(rows.length)} />
+            <Line label="Entries" value={String(rows.length)} />
             <Line label="Tool calls" value={String(m.calls)} />
             <Line label="Tool errors" value={String(m.errors)} />
             {m.refused > 0 && <Line label="Historical refusals" value={String(m.refused)} />}
@@ -84,7 +84,7 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
           </div>
 
           <p>
-            Payloads are left out: the report shows each call's arguments as summarised in the cockpit, not the full
+            The report includes the whole recording, across every agent session and connection. Payloads are left out: the report shows each call's arguments as summarised in the cockpit, not the full
             request and response bodies. The report does not estimate model cost or context usage.
           </p>
         </div>

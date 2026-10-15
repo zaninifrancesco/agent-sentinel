@@ -2,9 +2,10 @@ import type { Row } from "./types";
 
 /** Capture intervals are separate from adapter-reported execution durations. */
 export function capturedInterval(row: Row): { start: number; end?: number } | undefined {
+  if (!row.request) return undefined;
   const start = Date.parse(row.startedAt);
   if (!Number.isFinite(start)) return undefined;
-  const end = row.response ? Date.parse(row.response.timestamp) : NaN;
+  const end = row.response && !row.response.correlation?.synthetic ? Date.parse(row.response.timestamp) : NaN;
   return { start, end: Number.isFinite(end) && end >= start ? end : undefined };
 }
 

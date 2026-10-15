@@ -33,6 +33,9 @@ export function Detail({ row }: { row: Row | null }) {
   const interval = capturedInterval(row);
   const capturedMs = interval?.end === undefined ? undefined : interval.end - interval.start;
   const historical = !!row.request?.decision || !!row.resolution || row.risk !== "none";
+  const evidence = row.request ?? row.response ?? row.event;
+  const correlation = row.correlation ?? evidence?.correlation;
+  const timingSource = row.response?.timing?.source;
   const tabs: { id: Tab; label: string }[] = [
     { id: "payload", label: row.kind === "tool" ? "Arguments & result" : "Payload" },
     ...(diffText !== null ? [{ id: "diff" as Tab, label: "Patch" }] : []),
@@ -55,7 +58,7 @@ export function Detail({ row }: { row: Row | null }) {
       <p className="mt-1 truncate font-mono text-[11px] text-ink-2" title={row.subtitle}>{row.subtitle ?? "Captured event"}</p>
       <dl className="my-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
         <Field label="Captured at" value={formatTime(row.startedAt)} figure />
-        <Field label="Reported duration" value={row.durationMs === undefined ? "Not available" : formatDuration(row.durationMs)} figure />
+        <Field label={timingSource === "proxy-monotonic" ? "Proxy round trip" : timingSource === "source-reported" ? "Reported duration" : "Recorded duration"} value={row.durationMs === undefined ? "Not available" : formatDuration(row.durationMs)} figure />
         <Field label="Response JSON" value={bytes === undefined ? "Not available" : formatBytes(bytes)} figure />
         <Field label="Status" value={row.kind === "tool" && row.status === "ok" && !row.response ? "Recorded without result" : statusText(row.status)} />
       </dl>
@@ -69,6 +72,10 @@ export function Detail({ row }: { row: Row | null }) {
       <Search aria-hidden className="size-3.5 text-ink-3" /><input aria-label="Find in captured payload" placeholder="Find in payload…" value={query} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent text-xs" /><span aria-live="polite" className="shrink-0 text-[10px] text-ink-2">{matches === undefined ? "" : matches === 0 ? "No matches" : `${matches} found`}</span>
     </label>}
     <div className="min-h-0 flex-1 select-text overflow-y-auto">
+      {correlation?.quality === "ambiguous" && <p className="mx-4 mt-3 rounded-md border border-rule bg-paper p-3 text-xs leading-relaxed text-warn">Ambiguous pairing. {correlation.candidateCallIds?.length ?? "Several"} overlapping calls share the same identity. Results and durations are not assigned to individual requests.</p>}
+      {!row.request && row.response && <p className="mx-4 mt-3 rounded-md border border-rule bg-paper p-3 text-xs leading-relaxed text-ink-2">Response captured without a matched request. Its start time and request → response interval are unavailable.</p>}
+      {row.request && row.status === "unknown" && correlation?.quality === "unmatched" && <p className="mx-4 mt-3 rounded-md border border-rule bg-paper p-3 text-xs leading-relaxed text-ink-2">No reliable session or call identity was available. A later result cannot be paired with this request safely.</p>}
+      {row.response?.correlation?.synthetic && <p className="mx-4 mt-3 rounded-md border border-rule bg-paper p-3 text-xs leading-relaxed text-ink-2">The agent ended the turn or session before a result was matched. This interruption is synthesized; no tool duration is measured.</p>}
       {tab === "diff" && diffText ? <div className="p-4 sm:p-6"><DiffViewer text={diffText} filename={diffFilename(diffText)} /></div> : tab === "raw" ? (
         <div className="p-4 sm:p-6"><p className="mb-3 text-xs text-ink-2">Captured event data, including normalized fields and any historical policy metadata.</p><pre className="json-code"><JsonView text={JSON.stringify(row, null, 2)} query={query} /></pre></div>
       ) : <>
@@ -76,10 +83,19 @@ export function Detail({ row }: { row: Row | null }) {
           <div className="payload-label"><span className="font-semibold">{label}<span className="ml-2 font-normal text-ink-3">#{event.seq}</span></span><span className="text-ink-2">{event.direction === "client->server" ? "Request" : event.direction === "server->client" ? "Response" : "Observation"}</span></div>
           <pre className="json-code"><JsonView text={pretty(payload)} query={query} /></pre>
         </section>)}
-        {row.kind === "tool" && !row.response && <p className="px-4 py-4 text-sm text-ink-2 sm:px-6">{row.status === "pending" ? "No response received yet. Duration and response size remain unavailable." : "No tool result was captured for this observation."}</p>}
+        {row.kind === "tool" && !row.response && <p className="px-4 py-4 text-sm text-ink-2 sm:px-6">{row.status === "pending" ? "No response received yet. Duration and response size remain unavailable." : row.status === "unknown" ? "No result can be matched safely to this request. Inspect unassigned responses in Event log." : "No tool result was captured for this observation."}</p>}
         <details className="border-b border-rule px-4 py-4 text-xs sm:px-6">
           <summary className="w-fit cursor-pointer py-1 font-medium">Capture details</summary>
-          <dl className="mt-3 grid grid-cols-2 gap-4"><Field label="Call ID" value={row.request?.rpcId ?? row.response?.rpcId ?? "Not available"} /><Field label="Recorded status" value={row.status} /></dl>
+          <dl className="mt-3 grid grid-cols-2 gap-4">
+            <Field label="Recording" value={evidence?.recordingId ?? evidence?.sessionId ?? "Not available"} />
+            <Field label="Source" value={evidence?.source ?? "Legacy / unknown"} />
+            <Field label="Agent session" value={evidence?.agentSessionId ?? "Not available"} />
+            <Field label="Connection" value={evidence?.connectionId ?? "Not available"} />
+            <Field label="Call ID" value={evidence?.callId ?? evidence?.rpcId ?? "Not available"} />
+            <Field label="Native call ID" value={evidence?.nativeCallId === undefined ? "Not available" : `${evidence.nativeCallId.type} · ${evidence.nativeCallId.type === "string" ? JSON.stringify(evidence.nativeCallId.value) : evidence.nativeCallId.type === "null" ? "null" : evidence.nativeCallId.value}`} />
+            <Field label="Pairing" value={correlation ? `${correlation.method} · ${correlation.quality}` : "Legacy / unspecified"} />
+            <Field label="Request evidence" value={row.response?.correlation?.requestSeq ? `#${row.response.correlation.requestSeq}` : row.request ? `#${row.request.seq}` : "Not available"} />
+          </dl>
           <p className="mt-3 max-w-prose leading-relaxed text-ink-2">Payloads may be normalized, omitted or truncated by the adapter. Response JSON is the retained envelope size, not original tool output or model context usage. Missing timing is not a measured zero.</p>
         </details>
         {historical && <details className="px-4 py-4 sm:px-6"><summary className="mb-3 w-fit cursor-pointer py-1 text-xs font-medium">Historical policy and call history</summary><Journey row={row} /></details>}

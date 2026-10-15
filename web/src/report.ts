@@ -35,6 +35,7 @@ const STATUS_MARK: Record<Status, { glyph: string; word: string; tone: Tone }> =
   blocked: { glyph: "⊘", word: "BLOCKED", tone: "alert" },
   rejected: { glyph: "✕", word: "REJECTED", tone: "alert" },
   interrupted: { glyph: "◌", word: "INTERRUPTED", tone: "warn" },
+  unknown: { glyph: "?", word: "UNRESOLVED", tone: "warn" },
 };
 
 /** How a policy decision ended, in one phrase. Undefined when policy had nothing to say. */
@@ -85,12 +86,16 @@ function rowHtml(row: Row, hasPolicy: boolean): string {
   const mark = STATUS_MARK[row.status];
   const refused = row.status === "blocked" || row.status === "rejected";
   const policy = [row.request?.rule ? `<code>${esc(row.request.rule)}</code>` : "", riskChip(row.risk)].join("");
+  const event = row.request ?? row.response ?? row.event;
+  const correlation = row.correlation ?? event?.correlation;
+  const context = [event?.source, event?.agentSessionId ? `agent session ${event.agentSessionId}` : event?.connectionId ? `connection ${event.connectionId}` : undefined, event?.callId, correlation ? `${correlation.method} / ${correlation.quality}` : undefined, event?.timing?.source, row.response?.timing?.source].filter(Boolean).join(" · ");
   const cells = `
       <span class="fig t">${esc(formatTime(row.startedAt))}</span>
       <span class="status tone-${mark.tone}"><span aria-hidden="true">${mark.glyph}</span> ${mark.word}</span>
       <span class="ev kind-${row.kind}${refused ? " refused" : ""}">
         <span class="title">${esc(row.title)}</span>
         ${row.subtitle ? `<span class="sub">${esc(row.subtitle)}</span>` : ""}
+        ${context ? `<span class="sub">${esc(context)}</span>` : ""}
       </span>
       ${hasPolicy ? `<span class="pol">${policy}</span>` : ""}
       <span class="fig took">${row.durationMs !== undefined ? esc(formatDuration(row.durationMs)) : ""}</span>`;
@@ -276,6 +281,8 @@ export function buildReportHtml({ session, rows, config, exportedAt }: ReportInp
     fact("Ended", end ? `${esc(stamp(end))}${lasted ? ` (${esc(lasted)})` : ""}` : "still running when exported"),
     fact("Mode", mode),
     fact("Tool calls", String(m.calls)),
+    ...(tools.some((row) => row.correlation?.quality === "ambiguous") ? [fact("Unresolved call pairing", String(tools.filter((row) => row.correlation?.quality === "ambiguous").length))] : []),
+    ...(rows.some((row) => row.response && !row.request) ? [fact("Responses without a matched request", String(rows.filter((row) => row.response && !row.request).length))] : []),
     ...(m.refused > 0 ? [fact("Historical refusals", String(m.refused))] : []),
     ...(held.length > 0 ? [fact("Historical approval holds", esc(heldText))] : []),
     fact("Tool errors", String(m.errors)),
@@ -305,7 +312,7 @@ export function buildReportHtml({ session, rows, config, exportedAt }: ReportInp
     ${decisionsHtml(rows)}` : ""}
 
     <h2>Timetable</h2>
-    <p class="lede">Every event of the session, in order. Open a tool call to follow its journey.</p>
+    <p class="lede">Requests paired with their results, plus standalone captured events. Open a tool call to inspect its history.</p>
     <div class="table">
       <div class="head${hasPolicy ? " with-policy" : ""}"><span>Time</span><span>Status</span><span>Event</span>${hasPolicy ? `<span class="pol">Historical policy</span>` : ""}<span>Took</span></div>
       ${rows.length === 0 ? `<p class="quiet" style="padding:12px 16px">No events were recorded.</p>` : rows.map((row) => rowHtml(row, hasPolicy)).join("")}

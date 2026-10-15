@@ -14,6 +14,7 @@ import { computeMetrics } from "./metrics";
 import { buildProfile, filterCalls, recordedSpan, sortCalls, type CallFilter, type CallSort } from "./profile";
 import { formatDuration, formatTime } from "./format";
 import type { Row } from "./types";
+import { filterScope, recordingScopes } from "./scopes";
 
 type View = "overview" | "calls" | "events";
 const VIEWS: { id: View; label: string }[] = [
@@ -21,6 +22,7 @@ const VIEWS: { id: View; label: string }[] = [
 ];
 const FILTERS: { id: CallFilter; label: string }[] = [
   { id: "all", label: "All calls" }, { id: "errors", label: "Errors" }, { id: "open", label: "Open" }, { id: "interrupted", label: "Interrupted" },
+  { id: "unresolved", label: "Unresolved" },
 ];
 const RAIL_KEY = "sentinel-rail-collapsed";
 
@@ -29,11 +31,14 @@ function initialRailCollapsed(): boolean {
 }
 
 export default function App() {
-  const { session, rows, connection } = useSentinel();
+  const { session, rows: allRows, connection } = useSentinel();
   const { config } = useConfig();
   const [theme, toggleTheme] = useTheme();
   const [railCollapsed, setRailCollapsed] = useState(initialRailCollapsed);
   const [view, setView] = useState<View>("calls");
+  const [scope, setScope] = useState("");
+  const scopes = useMemo(() => recordingScopes(allRows), [allRows]);
+  const rows = useMemo(() => filterScope(allRows, scope), [allRows, scope]);
   const [filter, setFilter] = useState<CallFilter>("all");
   const [sort, setSort] = useState<CallSort>("time");
   const [tool, setTool] = useState("");
@@ -47,6 +52,10 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem(RAIL_KEY, String(railCollapsed)); } catch { /* preference is optional */ }
   }, [railCollapsed]);
+
+  useEffect(() => {
+    if (scope && !scopes.some((item) => item.id === scope)) setScope("");
+  }, [scope, scopes]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -118,7 +127,8 @@ export default function App() {
       </aside>
       <div className="app-workspace">
         <header className="workspace-header">
-          <div><div className="flex items-center gap-3"><h1>{VIEWS.find((item) => item.id === view)?.label}</h1><span className="recording-id">{session?.id ?? "Connecting"}</span></div><p className="workspace-caption">{subtitle[view]}</p></div>
+          <div className="min-w-0"><div className="flex flex-wrap items-center gap-3"><h1>{VIEWS.find((item) => item.id === view)?.label}</h1><span className="recording-id">{session?.id ?? "Connecting"}</span></div><p className="workspace-caption">{subtitle[view]}</p></div>
+          {scopes.some((item) => item.id !== "unattributed") && <select aria-label="Filter agent session or connection" title={scopes.find((item) => item.id === scope)?.label ?? "All captured sessions and connections"} value={scope} onChange={(event) => { setScope(event.target.value); setDetailOpen(false); setSelectedKey(null); setQuery(""); setTool(""); setFilter("all"); }} className="field-input max-w-64 min-w-0 flex-1 sm:flex-none"><option value="">All sessions & connections</option>{scopes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}
           <div className="flex items-center gap-2">
             <button disabled={!rows.length} onClick={() => setIsCommandPaletteOpen(true)} aria-label="Search events" className="icon-button"><Search aria-hidden className="size-4" /></button>
             <button onClick={toggleTheme} aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"} className="icon-button">{theme === "dark" ? <Sun aria-hidden className="size-4" /> : <Moon aria-hidden className="size-4" />}</button>
@@ -159,7 +169,7 @@ export default function App() {
       </div>
       <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} rows={rows}
         onSelectRow={(key) => { const row = rows.find((entry) => entry.key === key); if (row) inspect(row); }} onExport={() => setIsExportModalOpen(true)} />
-      <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} session={session} rows={rows} config={config} />
+      <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} session={session} rows={allRows} config={config} />
     </div>
   );
 }
