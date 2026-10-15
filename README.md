@@ -21,10 +21,11 @@ Available now:
 - Recording-scoped call identities and separate agent sessions/connections, with a cockpit scope selector.
 - Explicit native/fallback pairing, ambiguous-call filtering and orphan responses preserved in Event log.
 - Counts of tool calls and errors, available duration percentiles and retained payload JSON size.
+- Capture profiles with limits and transformation metadata: observed source bytes, normalized/stored JSON, redaction, truncation and omission, visible in the inspector and report.
 - Local JSONL recordings and read-only replay, including older enforcement traces.
 - Standalone HTML session reports, without scripts or external assets.
 
-**Planned, not implemented yet:** a full waterfall, payload/capture-gap metadata, original output-size measurements, repeated-call findings, schema diagnostics and a recording catalog. See the [implementation roadmap](docs/ROADMAP.md).
+**Planned, not implemented yet:** a full waterfall, bounded queues and capture-gap recovery, repeated-call findings, schema diagnostics and a recording catalog. See the [implementation roadmap](docs/ROADMAP.md).
 
 ![Trace Atlas timeline showing synthetic calls](docs/profiler.png)
 
@@ -90,6 +91,19 @@ The proxy writes protocol traffic to stdout and its own diagnostics to stderr. I
 
 Without `--ui`, it records without opening a cockpit listener. Use `--log /path/to/trace.jsonl` for a chosen log or `--log -` to disable file logging.
 
+## Capture profiles
+
+`serve` and `mcp` default to `--capture standard`: recognized sensitive fields and text patterns are redacted before storage and streaming; each retained payload is limited to 64 KiB of JSON. This is best-effort recognition, not a guarantee that every secret is removed. Standard capture also omits read contents and summarizes some hook results.
+
+Choose `--capture full` explicitly to retain more of the supplied hook content, without redaction and with a default limit of 1 MiB per payload. It cannot recover content omitted or shortened before it reached the collector. Both profiles accept `--max-payload-bytes N` (256–16,777,216 bytes; zero selects the profile default).
+
+```bash
+~/.sentinel/bin/sentinel serve --capture standard --max-payload-bytes 32768
+~/.sentinel/bin/sentinel mcp --capture full --ui -- /path/to/mcp-server
+```
+
+The selected settings are saved in the recording and exposed by `/api/config`. Limits apply to the retained payload value, not the whole event, incoming transport, queues or total recording memory. The MCP bytes forwarded to the agent/server are unchanged. Existing recordings are replayed as stored; replay does not apply the new redaction policy retroactively.
+
 ## Replay and export
 
 ```bash
@@ -99,7 +113,7 @@ Without `--ui`, it records without opening a cockpit listener. Use `--log /path/
 
 The first opens the latest recording; the second opens the selected file. Replay never executes captured commands. Historical blocks, holds and human decisions remain visible in old recordings, without approval controls.
 
-The cockpit's Export button always exports the whole recording, including all captured sessions and connections. It downloads an offline HTML report with summary figures and expandable call history. It includes argument summaries, not full request/response payloads. The original JSONL is the trace for detailed local replay; a dedicated JSONL export flow is planned. `sentinel export` and `sentinel run` are not implemented.
+The cockpit's Export button always exports the whole recording, including all captured sessions and connections. It downloads an offline HTML report with summary figures, capture settings, payload-coverage summaries and expandable call history. It includes argument summaries, not full request/response payloads. The original JSONL is the trace for detailed local replay; a dedicated JSONL export flow is planned. `sentinel export` and `sentinel run` are not implemented.
 
 A synthetic multi-session recording is included at [`testdata/telemetry-v2.jsonl`](testdata/telemetry-v2.jsonl): seven observed requests, two ambiguous responses, one orphan response and one synthetic interruption. Open it with `sentinel ui testdata/telemetry-v2.jsonl`; its command strings were never executed.
 
@@ -107,9 +121,11 @@ A synthetic multi-session recording is included at [`testdata/telemetry-v2.jsonl
 
 Durations are those available from the adapter or proxy; they are not the model's thinking time. Median and p95 include completed tool calls with available nonnegative durations, excluding interrupted calls and legacy approval-held spans. Zero milliseconds is valid; absent samples display as unavailable.
 
-**JSON retained** measures UTF-8 bytes of retained tool payloads reserialized for display. Some hook payloads are synthesized, omitted or truncated. This is neither original wire volume nor actual model tokens or context usage. Sentinel no longer calculates dollars from fixed token-price assumptions.
+**JSON retained** sums stored request and matched-response payload JSON bytes for the displayed tool calls. Unassigned responses are excluded. Legacy recordings use reserialized payload JSON where a stored measurement is absent. Some hook payloads are synthesized, omitted or truncated. This is neither original wire volume nor actual model tokens or context usage. Sentinel no longer calculates dollars from fixed token-price assumptions.
 
-New JSONL events use schema v2, retaining `sessionId` as the recording identity for compatibility. Native IDs keep their type and exact value; an ambiguous response is never assigned to an arbitrary request. Missing requests are not fabricated. Duration provenance and explicit zero are preserved in `timing`; synthetic turn-end closures have no execution duration. Payload-completeness metadata and capture-gap diagnostics remain planned. Current logs do not reconstruct the full model conversation, task boundaries or the workspace state. Local recordings can contain commands, source text and tool output; inspect them before sharing. Configurable capture/redaction profiles are planned, not shipped in this phase.
+New JSONL events use schema v2, retaining `sessionId` as the recording identity for compatibility. Native IDs keep their type and exact value unless standard capture recognizes a credential-like string: those identities become stable opaque values within the recording, with affected fields declared. An ambiguous response is never assigned to an arbitrary request. Missing requests are not fabricated. Duration provenance and explicit zero are preserved in `timing`; synthetic turn-end closures have no execution duration.
+
+The inspector distinguishes the adapter's observed source value (a named text/JSON field or MCP frame), normalized JSON and stored JSON. Hook-client reported sizes remain separate from collector measurements. Completeness applies to that source value, not the entire model conversation; legacy original sizes stay unknown. Current logs do not reconstruct full model context, task boundaries or workspace state. Capture-gap diagnostics remain planned. Local recordings can contain commands, source text and tool output; inspect them before sharing.
 
 ## Migrating from enforcement releases
 

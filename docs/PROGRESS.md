@@ -37,7 +37,17 @@ Queste aggregazioni sono calcolate nel frontend sui dati disponibili: anticipano
 - Selettore di sessione/connessione nel cockpit; mappa, profilo, lista e metriche seguono lo scope. Filtro Unresolved, dettagli di correlazione, risposte non abbinate nell’Event log e report con identità/qualità. L’export include l’intera registrazione anche con un filtro attivo.
 - Replay dei log precedenti senza riscritture; tipi di evento sconosciuti restano ispezionabili. Major di schema non supportate, identità di registrazione miste e sequenze v2 non crescenti vengono rifiutate.
 
-Questa è una parte della fase 2: le garanzie su payload, persistenza e stream restano da completare. Le diagnostiche di correlazione non sono il motore di findings R1–R4.
+Questa è una parte della fase 2: persistenza e stream restano da completare. Le diagnostiche di correlazione non sono il motore di findings R1–R4.
+
+## Fase 2 — Profili e qualità dei payload implementati
+
+- `serve` e `mcp` accettano `--capture standard|full` e `--max-payload-bytes N`. Standard è predefinito: 64 KiB per payload e redazione `structured-text-v1`; full è esplicito, senza redazione, con 1 MiB. Limite personalizzato tra 256 e 16.777.216 byte; zero usa il default del profilo. Le opzioni invalide vengono rifiutate prima di aprire log o trasporto.
+- Redazione centrale prima di memoria, JSONL e subscriber live, seguita da un limite che conserva JSON valido e UTF-8. La copia inoltrata dal proxy MCP e il comando reale del server restano invariati. La redazione riconosce campi strutturati e pattern testuali: è best effort, non garantisce di trovare ogni segreto.
+- Metadati `capture` separano il valore osservato dall’adattatore (campo e unità testo/JSON/frame), JSON normalizzato e JSON conservato. Le dimensioni dichiarate dal client hook restano distinte dalle misure del collector. Uno zero non diventa assenza; la dimensione originale non misurata resta sconosciuta.
+- Completezza `complete|partial|omitted|unknown`, rappresentazione, profilo e trasformazioni versionate: normalizzazione, redazione, troncamento e omissione con stadio e quantità quando note. I limiti a monte restano dichiarati anche in full.
+- Standard omette i contenuti delle letture Cursor e sintetizza alcune risposte Claude; full conserva il contenuto ricevuto e l’intero valore `tool_response` dei PostToolUse. Non implica la cattura di tutto il body hook o del transcript del modello.
+- Metadati testuali sensibili riconosciuti vengono redatti; identità che corrispondono a pattern sensibili diventano HMAC opachi per registrazione, con campi modificati dichiarati. Il tracker mantiene correlazione e chiusura delle sessioni senza collassare ID distinti.
+- Configurazione persistita all’inizio della registrazione e disponibile in sessione e `/api/config`; replay senza nuova redazione dei log esistenti. Inspector e patch mostrano qualità e misure con dettaglio espandibile; sidebar e report indicano il profilo. Le classifiche rimangono basate sul JSON conservato.
 
 ## Verifiche riproducibili
 
@@ -49,19 +59,21 @@ Questa è una parte della fase 2: le garanzie su payload, persistenza e stream r
 
 - Nuove regressioni su sessioni con ID uguali, richieste MCP bidirezionali e su connessioni distinte, ID grandi, chiamate concorrenti, durate zero/assenti, risposte orfane e ambiguità legacy.
 - Smoke test CLI con binario temporaneo: cattura HTTP di 18 eventi e sette richieste su tre scope nativi, due risposte ambigue, una orfana e una chiusura sintetica; replay JSONL riuscito. Fixture sanitizzata in `testdata/telemetry-v2.jsonl`. Controllati selettore, durata zero, filtro Unresolved, Event log e scope dell’export su desktop, dettaglio mobile a 390 px. Corretto il layout mobile del dettaglio dopo l’introduzione della sidebar richiudibile. Tutti i server temporanei vengono chiusi al termine.
+- Regressioni di cattura: segreti sintetici assenti da JSONL e stream standard, redazione prima del limite, JSON valido entro soglia con Unicode e strutture grandi, numeri esatti, nessuna modifica dell’input del chiamante, full senza redazione e impostazioni ripristinate dal replay. Proxy con fake server che restituisce la richiesta ricevuta: frame inoltrati integri mentre la registrazione è ridotta/redatta.
+- Smoke CLI standard/full su porte effimere: output sintetico UTF-8 da 9.036 byte ridotto a massimo 2.048 byte JSON, redazione e troncamento dichiarati, lettura omessa con dimensione riferita dal client separata, zero esplicito, tool response full conservata, profilo ripristinato nel replay. Controllati dettaglio espandibile desktop 1280×800 e mobile 390×844. Nessun comando nei payload eseguito; collector e replay temporanei chiusi.
 
 Revisione del redesign: il problema materiale dell’altezza del payload sui laptop è stato corretto e verificato dal revisore come risolto.
 
-Check di chiusura passati: `make test` (vet, race test, typecheck e diciassette test frontend) e `cd web && npm run build`. Verificati anche link locali e whitespace. Non sono benchmark di performance né una verifica live delle versioni correnti degli agenti esterni.
+Check di chiusura passati: `make test` (vet, race test, typecheck e venti test frontend) e `cd web && npm run build`. Detector UI senza segnalazioni. Verificati anche link locali e whitespace. Non sono benchmark di performance né una verifica live delle versioni correnti degli agenti esterni.
 
 ## Limiti ancora aperti
 
 - Il recorder mantiene in memoria l’intera registrazione e scrive il sink in modo sincrono. Code limitate, errori del sink, gap dello stream e recupero della coda incompleta restano aperti nella fase 2. Gli endpoint HTTP correnti continuano a servire una registrazione per processo, senza paginazione.
-- `JSON retained` misura solo i payload conservati e riserializzati, non il traffico originale. Gli adattatori possono ridurre o omettere contenuti. Profili di redazione configurabili non ancora implementati.
+- `JSON retained` misura il JSON conservato di richieste e risposte abbinate nelle chiamate visualizzate, non il traffico originale; per i log precedenti viene riserializzato. Gli adattatori possono ridurre o omettere contenuti. Le dimensioni della sorgente non ricostruiscono ciò che non è arrivato al punto di cattura. Il limite per payload non limita envelope, input, code o memoria totale della registrazione.
 - Metriche ancora calcolate nel frontend; il motore Go unico viene introdotto nelle fasi successive.
 - La mappa mostra soltanto intervalli di cattura, non una waterfall completa di turni LLM/tool. Nessuna analisi automatica delle ripetizioni, occupazione del contesto, usage nativo, diagnostica degli schemi o catalogo multi-sessione implementati in questa fase.
 - Il package di policy e le sue regressioni interne restano nel repository, ma la CLI nuova non offre enforcement. La loro eliminazione non è un prerequisito per osservare passivamente.
 - Il binario installato e gli hook reali dell'utente non sono stati cambiati. La migrazione di un'installazione esistente è un'operazione separata ed esplicita.
 - Landing page invariata.
 
-Prossimo passo: completare la qualità della cattura nella fase 2, iniziando da dimensioni e completezza dei payload e redazione prima della persistenza, quindi code limitate, gap e API paginata prima dei findings.
+Prossimo passo: proseguire la fase 2 con code e memoria limitate, errori del sink, gap distinguibili e recupero della coda JSONL; quindi capability e API paginata prima dei findings.

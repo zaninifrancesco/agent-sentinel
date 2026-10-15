@@ -1,6 +1,6 @@
 # Roadmap del pivot
 
-Stato: la fase 1 è implementata sul branch `telemetry-profiler`; la fase 2 è in corso, con identità, correlazione e selezione delle sessioni implementate. Le fasi 3–5 non sono ancora complete. Evidenze e limiti in [PROGRESS.md](PROGRESS.md). Vedi [direzione](PRODUCT_DIRECTION.md), [architettura](ARCHITECTURE.md), [telemetria](TELEMETRY_SPEC.md) e [analisi](ANALYSIS_SPEC.md).
+Stato: la fase 1 è implementata sul branch `telemetry-profiler`; la fase 2 è in corso, con identità, correlazione, selezione delle sessioni, profili e qualità dei payload implementati. Le fasi 3–5 non sono ancora complete. Evidenze e limiti in [PROGRESS.md](PROGRESS.md). Vedi [direzione](PRODUCT_DIRECTION.md), [architettura](ARCHITECTURE.md), [telemetria](TELEMETRY_SPEC.md) e [analisi](ANALYSIS_SPEC.md).
 
 Non vengono assegnate date arbitrarie. Ogni fase ha una condizione di uscita verificabile e prepara quella successiva.
 
@@ -36,9 +36,9 @@ Accettazione:
 
 Obiettivo: costruire una base che non confonda conversazioni, tempi e payload.
 
-Completato: envelope v2 additivo, identità di sorgente/sessione/connessione/chiamata, ID nativi con tipo e valore esatto, correlazione dichiarata e filtri per sessione nel cockpit. Le chiamate indistinguibili concorrenti restano ambigue; le risposte orfane non generano richieste inventate. Durata e sua provenienza sono separate dagli intervalli osservati.
+Completato: envelope v2 additivo, identità di sorgente/sessione/connessione/chiamata, ID nativi tipizzati, correlazione dichiarata e filtri per sessione nel cockpit. Le chiamate indistinguibili concorrenti restano ambigue; le risposte orfane non generano richieste inventate. Durata e sua provenienza sono separate dagli intervalli osservati. Profili standard/full, redazione prima di persistenza/stream e limiti per payload dichiarati; misure della sorgente con unità separate dal JSON normalizzato/conservato, omissioni e trasformazioni visibili in inspector e report. Il replay preserva queste informazioni senza modificare vecchi log.
 
-Ancora aperto: profili di cattura/redazione, dimensioni originali e completezza dei payload, code limitate, errori del sink e gap, recupero della coda JSONL e API HTTP versionata/paginata. La fase non è chiusa.
+Ancora aperto: capability esplicite, code e memoria totale limitate, errori del sink e gap, recupero della coda JSONL e API HTTP versionata/paginata. Le dimensioni originali sono note solo per i valori effettivamente misurati o dichiarati dalla sorgente; full non recupera omissioni a monte. La fase non è chiusa.
 
 Lavoro:
 

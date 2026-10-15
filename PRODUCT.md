@@ -43,9 +43,11 @@ Implemented on the telemetry branch:
 - Historical risk and policy decisions remain readable only where recorded; there are no live approval or budget controls.
 - Schema v2 recording/source/session/connection/call identity, type-preserving native IDs, explicit correlation quality and duration provenance. Concurrent indistinguishable calls stay unresolved; orphan responses remain inspectable.
 - A session/connection selector scopes the map, list, profile and metrics; reports retain the whole recording.
+- Standard capture redacts recognized sensitive fields/text before storage and streaming, with a 64 KiB default payload limit. Explicit full capture retains more hook content without redaction, bounded at 1 MiB by default. Limits are configurable per recording.
+- Inspector and reports distinguish observed source units, normalized/stored JSON, client-reported sizes and declared transformations. Missing original measurements stay unknown; full capture cannot recover upstream omissions.
 - The frontend remains embedded, with local fonts and no required external assets.
 
-Planned, not implemented: payload completeness and capture-gap metadata, a complete waterfall, an analysis engine with evidence-linked findings, original payload-size measurements, recording catalog, configurable redaction/capture profiles and a JSONL export flow. See `docs/ROADMAP.md` and `docs/PROGRESS.md` for status.
+Planned, not implemented: bounded queues, sink-error and capture-gap diagnostics/recovery, a complete waterfall, an analysis engine with evidence-linked findings, recording catalog and a JSONL export flow. See `docs/ROADMAP.md` and `docs/PROGRESS.md` for status. Per-payload limits do not bound total recording memory. Standard redaction is best effort; existing recordings are not scrubbed on replay.
 
 The current data does not reveal model reasoning, actual context occupancy, provider billing or a full workspace history. Some hook payloads are synthesized, reduced or omitted. Retained JSON size must never be labelled original wire traffic or model usage. Absence of a duration or an error signal does not prove zero execution time or success.
 

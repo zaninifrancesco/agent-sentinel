@@ -4,7 +4,7 @@ Stato: contratto di destinazione con un sottoinsieme implementato dichiarato sot
 
 ## 0. Contratto v2 attualmente implementato
 
-La nuova scrittura è un’estensione additiva dell’envelope precedente. Non introduce ancora l’envelope `data`, capability, paginazione o profili di cattura descritti più avanti.
+La nuova scrittura è un’estensione additiva dell’envelope precedente. Identità, correlazione e profili di cattura sono implementati; non introduce ancora l’envelope `data`, capability o paginazione descritti più avanti.
 
 - `schemaVersion: 2`, `recordingId`, `seq`; `sessionId` mantiene il significato storico di registrazione Sentinel ed è uguale a `recordingId`.
 - `timestamp` rimane il nome serializzato dell’istante UTC di osservazione locale. `observedAt`, timestamp nativi e turni non sono ancora normalizzati.
@@ -14,6 +14,22 @@ La nuova scrittura è un’estensione additiva dell’envelope precedente. Non i
 - `correlation` espone `method`, `quality`, `requestSeq` quando la risposta è abbinata, `candidateCallIds` per le sovrapposizioni e `synthetic` per le chiusure ricostruite. Gli eventi `CaptureDiagnostic` dichiarano le ambiguità senza mutare gli eventi precedenti.
 - `timing` contiene `durationMs`, incluso zero, e `source: source-reported|proxy-monotonic`. Il vecchio campo `durationMs` resta un alias non autorevole per compatibilità. Senza `timing`, una durata legacy assente resta sconosciuta.
 - I campi esistenti `type`, `direction`, `method`, `toolName`, `rpcId`, `status` e `payload` restano leggibili. `rpcId` negli hook è un alias sintetico storico, distinto dall’ID nativo.
+- `SessionStarted.captureSettings` e `Session.capture` conservano `{profile, maxPayloadBytes, redaction}`. La stessa configurazione è disponibile in `/api/config.capture`, anche nel replay. Un log precedente senza configurazione resta senza configurazione dichiarata.
+- Ogni payload nuovo ha `capture`: `representation` (`hook-normalized`, `mcp-frame`, `text` o `unspecified`), `completeness` (`complete`, `partial`, `omitted`, `unknown`), `profile`, `normalizedBytes` e `storedBytes`.
+- Quando misurabile, `observedBytes` ha `observedUnit` (`utf8-text`, `json-value`, `mcp-frame`) e `observedField` per gli hook. Misura il valore selezionato dall’adattatore prima della normalizzazione: non l’intero body HTTP o il contesto del modello. Nel proxy misura il frame prima dei delimitatori di riga. Uno zero esplicito resta valido.
+- `sourceReportedBytes` e `sourceReportedUnit` descrivono una misura trasmessa dal client hook, distinta dai byte arrivati al collector. Se il client ha già accorciato il contenuto, il profilo full non lo ricostruisce.
+- `normalizedBytes` e `storedBytes` usano il valore JSON del payload, escluso l’envelope dell’evento. `changes` dichiara `kind` (`normalized`, `redacted`, `truncated`, `omitted`), `stage` (`hook-client`, `adapter`, `recorder`), `method`, conteggio e byte prima/dopo quando disponibili.
+- Il profilo standard redige i campi strutturati e i pattern testuali riconosciuti prima di memoria, sink e subscriber live. Le stringhe di identità che corrispondono ai pattern sensibili diventano HMAC opachi con chiave casuale per registrazione, mantenendo distinte le identità; `metadataRedactedFields` dichiara i campi modificati. La chiave non viene persistita. Gli ID numerici conservano la precisione.
+
+### Profili e limiti implementati
+
+`serve` e `mcp` accettano `--capture standard|full` e `--max-payload-bytes N`. Standard è predefinito: limite 65.536 byte e redazione `structured-text-v1`; full è esplicito: limite 1.048.576 byte e `redaction: none`. Un limite esplicito deve essere tra 256 e 16.777.216 byte; zero sceglie il default del profilo. Sono limiti per singolo payload conservato, non della memoria totale o dell’input ricevuto.
+
+La redazione è best effort su nomi sensibili e pattern riconoscibili, non una garanzia di rilevare tutti i segreti. Avviene prima del limite `json-prefix-v1`: il valore conservato resta JSON valido e UTF-8, con stringhe abbreviate e possibili elementi/proprietà omessi in ordine deterministico. La qualità dichiara questa perdita; non viene inserito un campo fittizio nel risultato del tool. L’inoltro MCP rimane invariato.
+
+Standard omette il contenuto delle letture Cursor e sintetizza le risposte Read/Edit di Claude; full conserva il contenuto ricevuto e l’intero valore `tool_response` dei PostToolUse. Le richieste e alcuni risultati degli hook restano normalizzati: quando non è garantita la conservazione del valore osservato la copertura è `unknown`. `complete` si riferisce solo al valore e all’unità dichiarati.
+
+Il cockpit mostra qualità e misure per richiesta/risposta, anche accanto alle patch. Le classifiche continuano a usare il JSON conservato, senza confrontarlo implicitamente con testo o frame originali. Il report HTML conserva profilo e sintesi della copertura, con escaping e CSP. Il replay non redige nuovamente o riscrive log precedenti; dimensioni originali e qualità assenti restano sconosciute.
 
 Una richiesta con identità disponibile può iniziare con qualità `exact` e rimanere in attesa della risposta. Se compare una sovrapposizione, la diagnostica marca l’intero gruppo come ambiguo nella proiezione. `exact` indica un abbinamento univoco rispetto alle evidenze disponibili; con `method: fallback` rimane un’inferenza, non un ID nativo.
 
@@ -142,11 +158,11 @@ Una capability descrive sia ciò che l'adattatore sa leggere sia ciò che questa
 
 ## 9. Cattura, conservazione e dati locali
 
-Prevedere due profili: `standard`, con limiti e redazione dei campi sensibili riconoscibili; `full`, scelto esplicitamente per conservare payload più completi. Anche il profilo full dichiara limiti di risorse ed eventuali omissioni a monte: non garantisce una cattura illimitata.
+I due profili implementati sono descritti nella sezione 0: `standard`, con limiti e redazione dei campi sensibili riconoscibili; `full`, scelto esplicitamente per conservare payload più completi senza redazione. Anche full dichiara limiti per payload ed eventuali omissioni a monte: non garantisce una cattura illimitata.
 
 Redazione e limiti avvengono prima della persistenza e della trasmissione alla UI. I byte del traffico inoltrato restano intatti. Ogni trasformazione registra motivo, quantità quando nota e metodo; non promettere di rilevare tutti i segreti. Evitare di conservare copie raw parallele che aggirino il profilo scelto.
 
-Le soglie di payload, coda e conservazione devono essere esplicite nella configurazione e riportate nella traccia. Il dettaglio paginato può mostrare tutto il contenuto **conservato** senza troncarlo silenziosamente a schermo.
+Le soglie di payload sono già esplicite e persistite. Soglie di coda e conservazione totale restano da implementare, insieme al dettaglio paginato. Quest’ultimo deve mostrare tutto il contenuto **conservato** senza troncarlo silenziosamente a schermo.
 
 La cattura non legge file solo per completare un diff o indagare il repository. Usa quanto ricevuto; futuri snapshot del workspace richiedono una funzione separata e consapevole.
 
