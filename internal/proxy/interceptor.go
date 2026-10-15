@@ -21,17 +21,22 @@ type pendingCall struct {
 // Interceptor turns raw wire lines into recorder events and correlates
 // requests with their responses by JSON-RPC id.
 type Interceptor struct {
-	rec     *recorder.Recorder
-	mu      sync.Mutex
-	pending map[string]pendingCall
-	now     func() time.Time
+	rec          *recorder.Recorder
+	mu           sync.Mutex
+	pending      map[string]pendingCall
+	now          func() time.Time
+	calls        *recorder.CallTracker
+	connectionID string
+	legacy       bool // internal gate regression path only
 }
 
 func NewInterceptor(rec *recorder.Recorder) *Interceptor {
 	return &Interceptor{
-		rec:     rec,
-		pending: make(map[string]pendingCall),
-		now:     time.Now,
+		rec:          rec,
+		pending:      make(map[string]pendingCall),
+		now:          time.Now,
+		calls:        recorder.NewCallTracker(rec),
+		connectionID: rec.NewIdentity("connection"),
 	}
 }
 
@@ -59,7 +64,7 @@ func (i *Interceptor) Observe(dir recorder.Direction, line []byte) {
 		// Free text (logs, banners...) mixed into the stream: record it as
 		// raw output, never drop it silently.
 		payload, _ := json.Marshal(string(frame))
-		i.rec.Record(recorder.Event{
+		i.record(recorder.Event{
 			Type:      recorder.EventRawOutput,
 			Direction: dir,
 			Status:    recorder.StatusOK,
@@ -72,7 +77,7 @@ func (i *Interceptor) Observe(dir recorder.Direction, line []byte) {
 	case protocol.KindRequest:
 		i.onRequest(dir, msg, frame, nil)
 	case protocol.KindNotification:
-		i.rec.Record(recorder.Event{
+		i.record(recorder.Event{
 			Type:      recorder.EventNotification,
 			Direction: dir,
 			Method:    msg.Method,
@@ -82,6 +87,18 @@ func (i *Interceptor) Observe(dir recorder.Direction, line []byte) {
 	case protocol.KindResponse, protocol.KindError:
 		i.onResponse(dir, msg, frame)
 	}
+}
+
+func (i *Interceptor) envelope(e recorder.Event) recorder.Event {
+	e.Source, e.SourceID, e.ConnectionID = "mcp-stdio", i.connectionID, i.connectionID
+	return e
+}
+
+func (i *Interceptor) record(e recorder.Event) {
+	if !i.legacy {
+		e = i.envelope(e)
+	}
+	i.rec.Record(e)
 }
 
 func (i *Interceptor) onRequest(dir recorder.Direction, msg *protocol.Message, frame []byte, ann *annotation) recorder.Event {
@@ -101,6 +118,11 @@ func (i *Interceptor) onRequest(dir recorder.Direction, msg *protocol.Message, f
 			ev.ToolName = p.Name
 			call.toolName = p.Name
 		}
+	}
+	if !i.legacy && ann == nil {
+		ev = i.envelope(ev)
+		ev.NativeCallID = recorder.NativeIDFromJSON(msg.IDString())
+		return i.calls.Begin(ev, msg.IDString(), "native")
 	}
 
 	var hook func(recorder.Event)
@@ -141,6 +163,10 @@ func (i *Interceptor) peek(id string) (pendingCall, bool) {
 }
 
 func (i *Interceptor) onResponse(dir recorder.Direction, msg *protocol.Message, frame []byte) {
+	if !i.legacy {
+		i.observedResponse(dir, msg, frame)
+		return
+	}
 	id := msg.IDString()
 
 	i.mu.Lock()
@@ -174,4 +200,19 @@ func (i *Interceptor) onResponse(dir recorder.Direction, msg *protocol.Message, 
 	}
 
 	i.rec.Record(ev)
+}
+
+func (i *Interceptor) observedResponse(dir recorder.Direction, msg *protocol.Message, frame []byte) {
+	e := i.envelope(recorder.Event{Type: recorder.EventResponse, Direction: dir, RPCID: msg.IDString(), NativeCallID: recorder.NativeIDFromJSON(msg.IDString()), Status: recorder.StatusOK, Payload: json.RawMessage(frame)})
+	if msg.Kind() == protocol.KindError {
+		e.Status = recorder.StatusError
+	}
+	i.calls.End(e, msg.IDString(), "native", true, func(e recorder.Event) recorder.Event {
+		if e.Type == recorder.EventToolCallResponse && msg.Kind() != protocol.KindError {
+			if result, err := msg.AsCallToolResult(); err == nil && result.IsError {
+				e.Status = recorder.StatusError
+			}
+		}
+		return e
+	})
 }

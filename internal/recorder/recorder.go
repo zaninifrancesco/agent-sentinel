@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -13,13 +14,23 @@ import (
 // everything in memory (for the future WebSocket stream and replay) and can
 // optionally mirror each event to a JSONL writer for persistence.
 type Recorder struct {
-	mu      sync.RWMutex
-	session Session
-	events  []Event
-	seq     uint64
-	sink    *json.Encoder
-	subs    []chan Event
-	closed  bool
+	mu          sync.RWMutex
+	session     Session
+	events      []Event
+	seq         uint64
+	identitySeq uint64
+	sink        *json.Encoder
+	subs        []chan Event
+	closed      bool
+}
+
+// NewIdentity reserves a recording-scoped identity, serialized in the log so
+// replay never has to reconstruct it from tool names or payloads.
+func (r *Recorder) NewIdentity(kind string) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.identitySeq++
+	return fmt.Sprintf("%s/%s/%d", r.session.ID, kind, r.identitySeq)
 }
 
 // New creates a recorder for a new session. sink may be nil.
@@ -64,6 +75,8 @@ func (r *Recorder) RecordHook(e Event, hook func(Event)) Event {
 	r.seq++
 	e.Seq = r.seq
 	e.SessionID = r.session.ID
+	e.SchemaVersion = 2
+	e.RecordingID = r.session.ID
 	if e.Timestamp.IsZero() {
 		e.Timestamp = time.Now().UTC()
 	}

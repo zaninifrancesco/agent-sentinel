@@ -11,16 +11,17 @@ import (
 type EventType string
 
 const (
-	EventSessionStarted   EventType = "SessionStarted"
-	EventSessionCompleted EventType = "SessionCompleted"
-	EventRequest          EventType = "Request"          // generic MCP/JSON-RPC request
-	EventResponse         EventType = "Response"         // generic response
-	EventNotification     EventType = "Notification"     // JSON-RPC notification
-	EventToolCallRequest  EventType = "ToolCallRequest"  // tools/call
-	EventToolCallResponse EventType = "ToolCallResponse" // result of tools/call
-	EventRawOutput        EventType = "RawOutput"        // non JSON-RPC line seen on the wire
-	EventApprovalResolved EventType = "ApprovalResolved" // a held call was approved, rejected or timed out
-	EventBudgetChanged    EventType = "BudgetChanged"    // a human changed the session budget from the cockpit
+	EventSessionStarted    EventType = "SessionStarted"
+	EventSessionCompleted  EventType = "SessionCompleted"
+	EventRequest           EventType = "Request"          // generic MCP/JSON-RPC request
+	EventResponse          EventType = "Response"         // generic response
+	EventNotification      EventType = "Notification"     // JSON-RPC notification
+	EventToolCallRequest   EventType = "ToolCallRequest"  // tools/call
+	EventToolCallResponse  EventType = "ToolCallResponse" // result of tools/call
+	EventRawOutput         EventType = "RawOutput"        // non JSON-RPC line seen on the wire
+	EventApprovalResolved  EventType = "ApprovalResolved" // a held call was approved, rejected or timed out
+	EventBudgetChanged     EventType = "BudgetChanged"    // a human changed the session budget from the cockpit
+	EventCaptureDiagnostic EventType = "CaptureDiagnostic"
 )
 
 // Direction is the way a frame travelled through the proxy.
@@ -31,8 +32,7 @@ const (
 	ServerToClient Direction = "server->client"
 )
 
-// RiskLevel is assigned by the policy engine (Milestone 3). Until then
-// everything is RiskNone.
+// RiskLevel retains historical policy results. Observers use RiskNone.
 type RiskLevel string
 
 const (
@@ -61,24 +61,73 @@ const (
 
 // Event is the immutable record of one thing that happened in a session.
 type Event struct {
-	Seq        uint64          `json:"seq"`
-	SessionID  string          `json:"sessionId"`
-	Timestamp  time.Time       `json:"timestamp"`
-	Type       EventType       `json:"type"`
-	Direction  Direction       `json:"direction,omitempty"`
-	Method     string          `json:"method,omitempty"`
-	ToolName   string          `json:"toolName,omitempty"`
-	RPCID      string          `json:"rpcId,omitempty"`
-	Risk       RiskLevel       `json:"risk"`
-	Decision   string          `json:"decision,omitempty"` // policy outcome: allow|warn|approve|block
-	Rule       string          `json:"rule,omitempty"`     // id of the rule that fired
-	Reason     string          `json:"reason,omitempty"`   // human-readable why
-	Status     Status          `json:"status"`
-	DurationMs int64           `json:"durationMs,omitempty"` // set on responses
-	Payload    json.RawMessage `json:"payload,omitempty"`    // raw frame, or JSON string for RawOutput
+	SchemaVersion  int             `json:"schemaVersion,omitempty"`
+	RecordingID    string          `json:"recordingId,omitempty"`
+	Source         string          `json:"source,omitempty"`
+	SourceID       string          `json:"sourceId,omitempty"`
+	AgentSessionID string          `json:"agentSessionId,omitempty"`
+	ConnectionID   string          `json:"connectionId,omitempty"`
+	ProjectRef     string          `json:"projectRef,omitempty"`
+	CallID         string          `json:"callId,omitempty"`
+	NativeCallID   *NativeID       `json:"nativeCallId,omitempty"`
+	Correlation    *Correlation    `json:"correlation,omitempty"`
+	Timing         *Timing         `json:"timing,omitempty"`
+	Seq            uint64          `json:"seq"`
+	SessionID      string          `json:"sessionId"`
+	Timestamp      time.Time       `json:"timestamp"`
+	Type           EventType       `json:"type"`
+	Direction      Direction       `json:"direction,omitempty"`
+	Method         string          `json:"method,omitempty"`
+	ToolName       string          `json:"toolName,omitempty"`
+	RPCID          string          `json:"rpcId,omitempty"`
+	Risk           RiskLevel       `json:"risk"`
+	Decision       string          `json:"decision,omitempty"` // policy outcome: allow|warn|approve|block
+	Rule           string          `json:"rule,omitempty"`     // id of the rule that fired
+	Reason         string          `json:"reason,omitempty"`   // human-readable why
+	Status         Status          `json:"status"`
+	DurationMs     int64           `json:"durationMs,omitempty"` // set on responses
+	Payload        json.RawMessage `json:"payload,omitempty"`    // raw frame, or JSON string for RawOutput
 }
 
-// Session groups the events of one supervised agent run.
+// Correlation explains a pairing without rewriting the original observations.
+// CandidateCallIDs names every request affected by an ambiguous overlap.
+type Correlation struct {
+	Method           string   `json:"method"`  // native, fallback, none
+	Quality          string   `json:"quality"` // exact, ambiguous, unmatched
+	RequestSeq       uint64   `json:"requestSeq,omitempty"`
+	CandidateCallIDs []string `json:"candidateCallIds,omitempty"`
+	Synthetic        bool     `json:"synthetic,omitempty"`
+}
+
+// Timing preserves measured zero separately from missing legacy durationMs.
+type Timing struct {
+	DurationMs int64  `json:"durationMs"`
+	Source     string `json:"source"` // proxy-monotonic or source-reported
+}
+
+// NativeID keeps both type and exact value. Numbers are text so a browser's
+// JSON parser cannot round an identifier larger than Number.MAX_SAFE_INTEGER.
+type NativeID struct {
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
+func NativeIDFromJSON(raw string) *NativeID {
+	if raw == "" {
+		return nil
+	}
+	if raw == "null" {
+		return &NativeID{Type: "null"}
+	}
+	var value string
+	if json.Unmarshal([]byte(raw), &value) == nil {
+		return &NativeID{Type: "string", Value: value}
+	}
+	return &NativeID{Type: "number", Value: raw}
+}
+
+// Session is recording metadata (the name is retained for API compatibility).
+// One recording can contain several native agent sessions.
 type Session struct {
 	ID        string    `json:"id"`
 	Command   []string  `json:"command"`

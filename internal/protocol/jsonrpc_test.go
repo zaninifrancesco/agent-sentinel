@@ -89,3 +89,20 @@ func TestNewErrorResponseRoundTrip(t *testing.T) {
 		t.Fatalf("unexpected: %s", b)
 	}
 }
+
+func TestNullAndInvalidIDTypes(t *testing.T) {
+	for _, frame := range []string{
+		`{"jsonrpc":"2.0","id":null,"method":"request"}`,
+		`{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"parse error"}}`,
+	} {
+		msg, err := Parse([]byte(frame))
+		if err != nil || msg.ID == nil || msg.IDString() != "null" || msg.Kind() == KindNotification {
+			t.Fatalf("explicit null lost: %+v (%v)", msg, err)
+		}
+	}
+	for _, id := range []string{`true`, `[]`, `{}`} {
+		if _, err := Parse([]byte(`{"jsonrpc":"2.0","id":` + id + `,"method":"request"}`)); err == nil {
+			t.Fatalf("invalid id accepted: %s", id)
+		}
+	}
+}

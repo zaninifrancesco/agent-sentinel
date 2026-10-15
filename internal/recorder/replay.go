@@ -21,11 +21,27 @@ func Load(r io.Reader) (*Recorder, error) {
 			if jerr := json.Unmarshal(line, &e); jerr != nil {
 				return nil, fmt.Errorf("line %d: %w", lineNo, jerr)
 			}
+			if e.SchemaVersion < 0 || e.SchemaVersion > 2 {
+				return nil, fmt.Errorf("line %d: unsupported event schema version %d", lineNo, e.SchemaVersion)
+			}
+			id := e.SessionID // historical name for the Sentinel recording
+			if e.SchemaVersion == 2 {
+				if e.RecordingID == "" || (e.SessionID != "" && e.SessionID != e.RecordingID) {
+					return nil, fmt.Errorf("line %d: invalid recording identity", lineNo)
+				}
+				if e.Seq <= rec.seq {
+					return nil, fmt.Errorf("line %d: event sequence is not increasing", lineNo)
+				}
+				id = e.RecordingID
+			}
+			if rec.session.ID != "" && id != rec.session.ID {
+				return nil, fmt.Errorf("line %d: multiple recording identities in one log", lineNo)
+			}
 			rec.events = append(rec.events, e)
 			if e.Seq > rec.seq {
 				rec.seq = e.Seq
 			}
-			rec.session.ID = e.SessionID
+			rec.session.ID = id
 			switch e.Type {
 			case EventSessionStarted:
 				rec.session.StartedAt = e.Timestamp

@@ -220,7 +220,7 @@ func (h *Handler) claudeAfter(in input, failed bool) {
 	default:
 		text = rawText(in.ToolResponse)
 	}
-	h.completeSized(in, claudeKey(in), tool, args, text, size, status, int64(in.DurationMS))
+	h.completeSized(in, claudeKey(in), tool, args, text, size, status, legacyDuration(in.DurationMS))
 }
 
 // bashResult reads Bash's tool_response: stdout and stderr, and whether the
@@ -262,7 +262,12 @@ func (h *Handler) claudeClose(in input) {
 			why += " (" + in.EndReason + ")"
 		}
 	}
-	n := h.closeOpen(in.SessionID, why)
+	n := 0
+	if h.observeOnly {
+		n = h.calls.Interrupt("claude-hook", in.SessionID, why)
+	} else {
+		n = h.closeOpen(in.SessionID, why)
+	}
 	if h.Logf != nil {
 		h.Logf("Claude Code sent %s for session %s; closed %d unfinished call(s)", in.Event, in.SessionID, n)
 	}

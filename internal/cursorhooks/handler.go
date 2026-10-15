@@ -52,6 +52,7 @@ type Handler struct {
 	next        uint64
 	open        map[string][]openCall // in-flight calls awaiting their "after" hook
 	observeOnly bool
+	calls       *recorder.CallTracker
 }
 
 type openCall struct {
@@ -72,7 +73,7 @@ func New(rec *recorder.Recorder, engine *policy.Engine, budget *policy.Budget, a
 // dependencies. Claude Code receives no permission override; Cursor receives
 // its normal non-blocking hook acknowledgement.
 func NewObserver(rec *recorder.Recorder) *Handler {
-	return &Handler{Rec: rec, observeOnly: true, open: make(map[string][]openCall)}
+	return &Handler{Rec: rec, observeOnly: true, calls: recorder.NewCallTracker(rec), open: make(map[string][]openCall)}
 }
 
 // input is the union of the fields of the hooks we handle.
@@ -82,7 +83,7 @@ type input struct {
 	Command        string          `json:"command"`
 	Cwd            string          `json:"cwd"`
 	Output         string          `json:"output"`
-	Duration       float64         `json:"duration"`
+	Duration       *float64        `json:"duration"`
 	ToolName       string          `json:"tool_name"`
 	ToolInput      json.RawMessage `json:"tool_input"`
 	MCPServer      string          `json:"mcp_server_name"`
@@ -100,7 +101,7 @@ type input struct {
 	ToolResponse json.RawMessage `json:"tool_response"`
 	Error        string          `json:"error"`
 	IsInterrupt  bool            `json:"is_interrupt"`
-	DurationMS   float64         `json:"duration_ms"`
+	DurationMS   *float64        `json:"duration_ms"`
 	EndReason    string          `json:"reason"` // SessionEnd
 }
 
@@ -281,17 +282,16 @@ func (h *Handler) before(ctx context.Context, in input, tool string, args map[st
 // has no after-hook, so it is recorded as an observation without a duration.
 func (h *Handler) observeBefore(in input, tool string, args map[string]any, key string) Response {
 	id := h.newID()
-	req := recorder.Event{
-		Type: recorder.EventToolCallRequest, Direction: recorder.ClientToServer,
-		Method: "tools/call", ToolName: tool, RPCID: id,
-		Payload: requestPayload(id, tool, args), Status: recorder.StatusPending,
-	}
+	req := h.hookEnvelope(in)
+	req.Type, req.Direction = recorder.EventToolCallRequest, recorder.ClientToServer
+	req.Method, req.ToolName, req.RPCID = "tools/call", tool, id
+	req.Payload, req.Status = requestPayload(id, tool, args), recorder.StatusPending
+	identity, method := hookIdentity(in, tool)
 	if in.Event == EventBeforeRead {
 		req.Status = recorder.StatusOK
-	} else {
-		h.trackOpen(in, key, id, tool)
+		identity = "" // this hook observes a read, without a result hook
 	}
-	h.Rec.Record(req)
+	h.calls.Begin(req, identity, method)
 	return allow()
 }
 
@@ -484,6 +484,10 @@ func (h *Handler) complete(in input, key, tool string, args map[string]any, text
 // back to the model: a file read goes to the model whole, but its content must
 // not land in the session log. resultBytes is what the budget counts.
 func (h *Handler) completeSized(in input, key, tool string, args map[string]any, text string, resultBytes int, status recorder.Status, durationMs int64) {
+	if h.observeOnly {
+		h.observeComplete(in, tool, text, status)
+		return
+	}
 	c, ok := h.takeOpen(in, key)
 	if !ok {
 		c = openCall{id: h.newID(), tool: tool}
@@ -511,7 +515,12 @@ func (h *Handler) stop(in input) {
 	if in.StopStatus != "" {
 		why += " (" + in.StopStatus + ")"
 	}
-	n := h.closeOpen(in.ConversationID, why)
+	n := 0
+	if h.observeOnly {
+		n = h.calls.Interrupt("cursor-hook", in.ConversationID, why)
+	} else {
+		n = h.closeOpen(in.ConversationID, why)
+	}
 	if h.Logf != nil {
 		h.Logf("Cursor sent stop (%s) for conversation %s; closed %d unfinished call(s)", in.StopStatus, in.ConversationID, n)
 	}
@@ -544,7 +553,7 @@ func (h *Handler) closeOpen(conversation, why string) int {
 }
 
 func (h *Handler) afterShell(in input) {
-	h.complete(in, in.Command, "shell", shellArgs(in), in.Output, recorder.StatusOK, int64(in.Duration))
+	h.complete(in, in.Command, "shell", shellArgs(in), in.Output, recorder.StatusOK, legacyDuration(in.Duration))
 }
 
 func (h *Handler) afterMCP(in input) {
@@ -556,7 +565,7 @@ func (h *Handler) afterMCP(in input) {
 	if json.Unmarshal([]byte(in.ResultJSON), &res) == nil && res.IsError {
 		status = recorder.StatusError
 	}
-	h.complete(in, in.ToolName+"\x00"+string(in.ToolInput), tool, args, in.ResultJSON, status, int64(in.Duration))
+	h.complete(in, in.ToolName+"\x00"+string(in.ToolInput), tool, args, in.ResultJSON, status, legacyDuration(in.Duration))
 }
 
 // afterEdit records a file the agent wrote, with its diff. The edit has
@@ -589,7 +598,13 @@ func (h *Handler) afterEdit(in input) {
 	if h.Budget != nil {
 		h.Budget.AddOutput(len(ev.Payload))
 	}
-	h.Rec.Record(ev)
+	if h.observeOnly {
+		meta := h.hookEnvelope(in)
+		ev.Source, ev.SourceID, ev.AgentSessionID, ev.ProjectRef = meta.Source, meta.SourceID, meta.AgentSessionID, meta.ProjectRef
+		h.calls.Begin(ev, "", "none")
+	} else {
+		h.Rec.Record(ev)
+	}
 }
 
 // editDiff renders Cursor's search/replace edits as a unified diff the cockpit

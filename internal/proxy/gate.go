@@ -68,12 +68,14 @@ func newGate(ctx context.Context, p *StdioProxy, toServer, toClient io.Writer) *
 	if timeout <= 0 {
 		timeout = DefaultApprovalTimeout
 	}
+	icpt := NewInterceptor(p.Rec)
+	icpt.legacy = true
 	return &Gate{
 		engine:    p.Policy,
 		budget:    p.Budget,
 		approvals: p.Approvals,
 		timeout:   timeout,
-		icpt:      NewInterceptor(p.Rec),
+		icpt:      icpt,
 		rec:       p.Rec,
 		toServer:  toServer,
 		toClient:  toClient,

@@ -76,6 +76,17 @@ func (i ID) MarshalJSON() ([]byte, error) {
 }
 
 func (i *ID) UnmarshalJSON(b []byte) error {
+	var value any
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.UseNumber()
+	if err := decoder.Decode(&value); err != nil {
+		return err
+	}
+	switch value.(type) {
+	case nil, string, json.Number:
+	default:
+		return fmt.Errorf("invalid JSON-RPC id: expected string, number or null")
+	}
 	i.raw = append(i.raw[:0], bytes.TrimSpace(b)...)
 	return nil
 }
@@ -148,6 +159,21 @@ func Parse(frame []byte) (*Message, error) {
 	var m Message
 	if err := json.Unmarshal(frame, &m); err != nil {
 		return nil, err
+	}
+	// encoding/json sets a pointer to nil for an explicit null. It is still
+	// an ID on JSON-RPC replies (including parse errors), not an absent field.
+	if m.ID == nil {
+		var fields struct {
+			ID json.RawMessage `json:"id"`
+		}
+		_ = json.Unmarshal(frame, &fields)
+		if len(fields.ID) > 0 {
+			id := &ID{}
+			if err := id.UnmarshalJSON(fields.ID); err != nil {
+				return nil, err
+			}
+			m.ID = id
+		}
 	}
 	if m.JSONRPC != Version {
 		return nil, fmt.Errorf("unsupported jsonrpc version %q", m.JSONRPC)
