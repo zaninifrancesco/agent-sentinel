@@ -151,7 +151,7 @@ components:
     padding: "18px"
   map-interval:
     rounded: "{rounded.span}"
-    height: "12px"
+    height: "18px"
   payload-section:
     backgroundColor: "{colors.sheet}"
     textColor: "{colors.ink}"
@@ -167,11 +167,11 @@ components:
 
 Trace Atlas treats a recording as navigable evidence. A graphite navigation rail with hairline boundaries anchors a cool, layered workspace; compact measurements and aligned rows make dense captured data readable. Archivo carries the interface, with monospace reserved chiefly for captured arguments, identifiers and JSON.
 
-Analytical cartography supplies the signature: the same selected call is registered in the recording map, call list and inspector. Tool series remain consistent across these regions. Borders and tonal changes give each region a clear job while the inspector preserves room for the evidence.
+Analytical cartography supplies the signature: one labelled waterfall row combines each call’s identity and captured interval, registered with the inspector. Tool series remain consistent across these regions. Borders and tonal changes give each region a clear job while the inspector preserves room for the evidence.
 
 **Key Characteristics:**
 - Cool paper, white panels and a stable graphite navigation rail with a fine right-hand boundary.
-- Periwinkle selection shared across map intervals, rows and filters.
+- Periwinkle selection shared across waterfall intervals, rows and filters.
 - Tool series identify categories; amber and explicit status marks identify reported errors.
 - Compact tabular measurements, readable captured payloads and restrained rounded geometry.
 
@@ -180,7 +180,7 @@ Analytical cartography supplies the signature: the same selected call is registe
 Cool white and slate neutrals support a graphite frame, periwinkle selection and categorical tool colours. Frontmatter records the light and dark values extracted from the stylesheet; `dark-` entries are theme counterparts, not extra accents.
 
 ### Primary
-- **Periwinkle Accent** (`accent`): active inspector tabs, focus outlines, map cursor and selected interval ring.
+- **Periwinkle Accent** (`accent`): active inspector tabs, focus outlines, selected waterfall interval outline.
 - **Selection Periwinkle** (`yellow`, `yellow-soft`): the source retains legacy variable names; these now represent indigo and pale periwinkle. The soft surface marks selected rows, filters and search matches.
 
 ### Secondary
@@ -202,7 +202,7 @@ Cool white and slate neutrals support a graphite frame, periwinkle selection and
 
 ### Named Rules
 
-**The Registered Selection Rule.** A selected call uses the same identity in the map, list and inspector; periwinkle communicates selection rather than tool category.
+**The Registered Selection Rule.** A selected call uses the same identity in the labelled waterfall row and inspector; periwinkle communicates selection rather than tool category.
 
 ## Typography
 
@@ -230,18 +230,17 @@ Cool white and slate neutrals support a graphite frame, periwinkle selection and
 
 The shell fills the dynamic viewport height. The desktop rail is 218px, expands to 226px from 1536px, and narrows to 188px below 1024px; its 68px collapsed state shows icon navigation with tooltips, and the preference persists locally. A white recording header and compact measurement strip sit above the workspace. Common gutters are 16–24px, with 8–12px gaps inside controls and metadata groups; panel spacing uses the extracted 18–20px steps rather than a single invented grid unit.
 
-The call inspector normally splits a flexible list from a detail column with a 330px minimum and a 1 : 0.9 proportion. From 1536px, detail has a 440px minimum and a 1 : 0.8 proportion. In tall desktop windows, the map spans the workspace above this split. At widths of at least 1024px and heights no greater than 850px, the map and filtered list occupy the left column while the detail pane spans all four workspace rows on the right. This height-aware arrangement preserves payload reading space.
+The call inspector splits an integrated labelled waterfall from a detail column with a 340px minimum and a 1.2 : 0.8 proportion. From 1536px, detail has a 440px minimum and a 1 : 0.8 proportion. Search and status filters span the workspace above the split. The waterfall fills the remaining pane height; there is no separate top map or duplicate call list, and no height-specific layout.
 
-Below 1024px, opening detail replaces the list and map, with an explicit back action. Below 768px, the rail becomes a top navigation strip; recording identity moves out of the dense header, the heading reduces in size and panel margins become 12px. The optional retained-response list column appears from 640px. Tool profile uses a two-column 3 : 2 layout from 1280px, with a 1600px maximum content width.
+Below 1024px, opening detail replaces the waterfall, with an explicit back action. Below 768px, the rail becomes a top navigation strip; recording identity moves out of the dense header, the heading reduces in size and panel margins become 12px. Tool profile uses a two-column 3 : 2 layout from 1280px, with a 1600px maximum content width.
 
-List and inspector payload regions scroll independently. Headers, selection metadata, inspector tabs and payload search stay outside the payload scroller. Search and export use bounded, internally scrollable dialogs with contained focus and focus restoration.
+Waterfall and inspector payload regions scroll independently. The waterfall has one row per call with a sticky label column (166px; 132px below 768px), a proportional interval region and a sticky tool-time column (68px; 58px below 768px). Headers, selection metadata, inspector tabs and payload search stay outside the payload scroller. Search and export use bounded, internally scrollable dialogs with contained focus and focus restoration.
 
 ## Elevation & Depth
 
-The workspace is flat and layered by tone, hairline borders and containment. Panels do not cast ambient shadows. Dialogs dim the workspace with translucent navy and have no backdrop blur. Map selection uses a sheet-coloured inner ring plus an accent outer ring; selected rows use an inset bottom rule.
+The workspace is flat and layered by tone, hairline borders and containment. Panels do not cast ambient shadows. Dialogs dim the workspace with translucent navy and have no backdrop blur. Selected waterfall rows use a pale-periwinkle surface and their intervals receive a 1px accent outline offset by 2px. Event-log selected rows use an inset bottom rule.
 
 ### Shadow Vocabulary
-- **Map selection ring:** `0 0 0 2px var(--color-sheet), 0 0 0 3px var(--color-accent)`.
 - **Selected row rule:** `inset 0 -1px var(--color-rule)`.
 
 ### Named Rules
@@ -250,7 +249,7 @@ The workspace is flat and layered by tone, hairline borders and containment. Pan
 
 ## Shapes
 
-Rounded rectangles structure the workspace: panel corners are 12px, payload blocks 8px, navigation items 7px, controls 6px and compact filters 5px. Small map intervals use 3px corners and 6px series dots use a 2px radius. These are precise containers, not pill-shaped cards. Open or invalid-ended map intervals use a dashed circular marker; circles also serve status dots and historical journey stops. SVG icons carry interface actions and status, while native HTML/CSS geometry carries the map.
+Rounded rectangles structure the workspace: panel corners are 12px, payload blocks 8px, navigation items 7px, controls 6px and compact filters 5px. Small map intervals use 3px corners and 6px series dots use a 2px radius. These are precise containers, not pill-shaped cards. Open waterfall intervals use a hollow dashed rectangular point marker; circles also serve status dots and historical journey stops. SVG icons carry interface actions and status, while native HTML/CSS geometry carries the map.
 
 ## Components
 
@@ -261,7 +260,7 @@ Restrained controls with explicit purpose. Outlined actions use sheet fill, stro
 Status filters have 5px corners, 5px × 9px padding and 11px labels. Selected filters use pale periwinkle, accent text, a rule border and semibold weight. Historical risk chips remain available only with historical data: filled rose for critical, rose outline for high and neutral outlines for medium/low. Their uppercase treatment labels recorded risk; it does not establish a general heading style.
 
 ### Cards / Containers
-Inspector, recording map and profile panels use sheet fill, a rule border and 12px corners. Profile panels have 18px padding, reducing to 14px on mobile. Payload blocks use an 8px outline container, cool label strip and 12px × 14px code padding. Panel hierarchy comes from boundaries and interior rhythm rather than shadow.
+Inspector workspace and profile panels use sheet fill, a rule border and 12px corners. The waterfall is integrated into the workspace rather than a separately bordered map panel. Profile panels have 18px padding, reducing to 14px on mobile. Payload blocks use an 8px outline container, cool label strip and 12px × 14px code padding. Panel hierarchy comes from boundaries and interior rhythm rather than shadow.
 
 ### Inputs / Fields
 Search fields and selects use sheet fill, a stronger rule border, 6px corners and 12px text, with a 36px minimum height. The call search adds a leading SVG search icon. Payload search uses a compact rule outline and reports match counts. Accent caret and global visible focus connect fields to the selection system.
@@ -270,19 +269,19 @@ Search fields and selects use sheet fill, a stronger rule border, 6px corners an
 The graphite rail contains 40px minimum-height links with an 8px radius and 12px labels. Active links use a charcoal fill and fine outline; hover uses a slightly lighter neutral. Small line SVG icons accompany the text, and Timeline carries a compact count badge. The header control collapses the desktop rail to a 68px icon strip and remembers the preference. On mobile, the expanded links form a horizontal strip; the collapse control folds them away. Inspector tabs use a 2px accent underline; inactive tabs use secondary ink.
 
 ### Call timeline (signature)
-Captured calls share one horizontal time axis. Chronological calls reuse the first available track; overlapping intervals spill into additional 32px tracks, regardless of tool type. Touching intervals reuse a track. Unknown ends remain hollow point markers; coincident points occupy separate tracks to remain inspectable and do not imply measured concurrency. Tool colours match the list and profile, with names inside sufficiently wide bars and a persistent legend. Error bars have a dashed amber outline. Selection outlines the interval and opens the same call in the inspector. Hover and keyboard focus show the call summary and captured interval below the chart.
+Captured calls share one horizontal time axis, with one selectable row per call (56px minimum). Fixed labels keep the tool name and monospace argument preview readable independently of interval width; tool duration occupies a separate column. Captured intervals use proportional 18px-high bars with 3px corners. Zero-length intervals use 8px point markers; unknown ends remain hollow dashed markers, and missing timestamps show “Time unavailable” in a selectable row. Tool colours match the profile. Error bars have a dashed amber border. Selection colours the full row and outlines its interval, opening that same call in the inspector. Calls never share packed tracks.
 
-Fit shows the current page window; 4×, 16× and 64× zoom preserve that time scale inside a horizontal scroll area. Arrow keys follow chronological calls and reveal the selected interval. A grey strip indicates unattributed time. Matched coverage and peak concurrency describe the whole selected scope; track count describes the current page and includes point collisions. Reported tool duration remains separate from captured timing. The canvas scrolls within 180px, preserving inspector space. List paging continues to pin the recording revision.
+Fit shows the current page window; 4×, 16× and 64× zoom preserve that time scale inside the scrolling canvas, with labels and tool time sticky at either edge. Arrow keys move through page rows and reveal the selected interval. A grey strip indicates unattributed time. Matched coverage and peak concurrency describe the whole selected scope, independently of filters and page. Reported tool duration remains separate from captured timing. Paging continues to pin the recording revision.
 
-### Call list and inspector
-Rows use ruled columns for time, status, tool/arguments, duration and optional retained response size. Tool titles are semibold; captured summaries are monospace. Selection uses a full pale-periwinkle row. Success, error, interrupted and historical refusal each have an SVG status mark as well as accessible text. J/K and vertical arrows navigate only the focused list; horizontal arrows belong to the map.
+### Inspector and event list
+The Event log retains ruled list columns and focused-list J/K and arrow navigation. The call waterfall uses all four arrow keys for row selection. Status marks combine SVG icons with accessible text; tool names are semibold and argument previews are monospace.
 
 The inspector keeps tool name, captured time, reported duration, response JSON size and status in fixed positions. A compact text row labels the observed interval. Tool and argument summary share a header row; metrics stay in a small responsive grid. Arguments/result lead, with Patch only when actual patch data exists and Event JSON secondary. Safe text-node syntax colouring and match highlighting preserve readable captured data. Capture limitations and historical metadata use disclosure sections.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** keep each tool’s series colour consistent across the map, list and profile.
+- **Do** keep each tool’s series colour consistent across the waterfall and profile.
 - **Do** pair status colour with a readable label or SVG status icon.
 - **Do** align times, counts and sizes with tabular figures.
 - **Do** keep the selected call and its captured payload readable at laptop and mobile sizes.

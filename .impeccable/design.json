@@ -237,27 +237,12 @@
     },
     "shadows": [
       {
-        "name": "map-selection-ring",
-        "value": "0 0 0 2px var(--color-sheet), 0 0 0 3px var(--color-accent)",
-        "purpose": "Registers the selected map interval."
-      },
-      {
         "name": "selected-row-rule",
         "value": "inset 0 -1px var(--color-rule)",
         "purpose": "Subtle boundary on the selected list row."
       }
     ],
     "motion": [
-      {
-        "name": "map-cursor",
-        "value": "left 160ms cubic-bezier(.16,1,.3,1)",
-        "purpose": "Registers a new selected call across map lanes."
-      },
-      {
-        "name": "map-interval",
-        "value": "opacity 160ms ease-out, box-shadow 160ms ease-out",
-        "purpose": "Map hover and selection states."
-      },
       {
         "name": "row-selection",
         "value": "background-color 160ms ease-out",
@@ -271,20 +256,12 @@
     ],
     "breakpoints": [
       {
-        "name": "response-column",
-        "value": "640px"
-      },
-      {
         "name": "top-navigation",
         "value": "max-width: 767px"
       },
       {
         "name": "split-inspector",
         "value": "1024px"
-      },
-      {
-        "name": "short-desktop",
-        "value": "(min-width: 1024px) and (max-height: 850px)"
       },
       {
         "name": "profile-columns",
@@ -334,7 +311,7 @@
       "kind": "nav",
       "refersTo": "navigation-active",
       "description": "Collapsible graphite navigation with a fine outlined selection and call count.",
-      "html": "<nav class=\"ds-nav\" aria-label=\"Recording views\"><button aria-current=\"page\">Timeline <span>17</span></button><button>Tool profile</button><button>Event log</button></nav>",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Recording views\"><button aria-current=\"page\">Timeline <span>17</span></button><button>Sessions</button><button>Statistics</button><button>Tool profile</button><button>Event log</button></nav>",
       "css": ".ds-nav{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:flex;flex-direction:column;gap:4px;width:218px;background:var(--rail,#202123);padding:14px 12px;border-right:1px solid #393a3c}.ds-nav button{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:flex;align-items:center;gap:10px;min-height:40px;padding:8px 10px;border:1px solid transparent;border-radius:8px;background:transparent;color:#b7b8bb;font-size:12px;line-height:18px;text-align:left;cursor:pointer}.ds-nav button:hover{background:#292a2c;color:#f5f5f6}.ds-nav button[aria-current]{border-color:#48494c;background:var(--rail-active,#303133);color:#fff}.ds-nav span{margin-left:auto;border:1px solid #505154;border-radius:5px;padding:0 5px;background:#3b3c3e;color:#e4e4e6;font-size:10px}.ds-nav button:focus-visible{outline:2px solid var(--color-accent,#4f5fc7);outline-offset:3px}"
     },
     {
@@ -354,12 +331,12 @@
       "css": ".ds-panel{font-family:var(--font-sans, 'Archivo Variable', sans-serif);width:300px;padding:18px;border:1px solid var(--color-rule,#e3e8f1);border-radius:12px;background:var(--color-sheet,#fff);color:var(--color-ink,#202d45)}.ds-panel h2{margin:0 0 12px;padding-bottom:12px;border-bottom:1px solid var(--color-rule,#e3e8f1);font-size:16px;line-height:24px;font-weight:600}.ds-tool{display:flex;justify-content:space-between;gap:12px;font-size:14px;line-height:20px}.ds-tool span{color:var(--color-ink-2,#58677f);font-variant-numeric:tabular-nums}.ds-track{height:5px;margin-top:8px;border-radius:3px;background:var(--color-paper,#f3f6fb);overflow:hidden}.ds-track span{display:block;height:100%;width:41%;border-radius:inherit;background:var(--series-1,#258c83)}.ds-panel p{margin:12px 0 0;color:var(--color-ink-2,#58677f);font-size:12px;line-height:19.5px}"
     },
     {
-      "name": "Registered map intervals",
+      "name": "Labelled call waterfall",
       "kind": "custom",
       "refersTo": "map-interval",
-      "description": "Tool intervals, an amber error, a selected ring and an open marker.",
-      "html": "<div class=\"ds-map\"><span>shell <small>3</small></span><div class=\"ds-lane\"><i></i><button class=\"ds-interval ds-selected\" aria-label=\"shell: captured interval 1.7 seconds, tool error\" aria-pressed=\"true\"></button><button class=\"ds-interval ds-success\" aria-label=\"shell: captured interval 9.4 seconds\"></button><button class=\"ds-interval ds-open\" aria-label=\"shell: no valid captured response time\"></button></div></div>",
-      "css": ".ds-map{font-family:var(--font-sans, 'Archivo Variable', sans-serif);display:grid;grid-template-columns:76px minmax(0,1fr);gap:12px;width:340px;padding:12px;background:var(--color-sheet,#fff);color:var(--color-ink,#202d45);font-size:11px;line-height:22px}.ds-map small{float:right;color:var(--color-ink-3,#65758d)}.ds-lane{position:relative;height:22px;overflow:hidden;background:linear-gradient(90deg,transparent 49.6%,var(--color-rule,#e3e8f1) 50%,transparent 50.4%)}.ds-lane i{position:absolute;left:10%;top:0;bottom:0;width:1px;background:var(--color-accent,#4f5fc7);opacity:.5}.ds-interval{position:absolute;top:5px;min-width:7px;height:12px;padding:0;border:0;border-radius:3px;opacity:.75;cursor:pointer;transition:opacity 160ms ease-out,box-shadow 160ms ease-out}.ds-interval:hover{opacity:1}.ds-selected{left:10%;width:10%;top:4px;height:14px;background:var(--color-warn,#996019);opacity:1;box-shadow:0 0 0 2px var(--color-sheet,#fff),0 0 0 3px var(--color-accent,#4f5fc7)}.ds-success{left:35%;width:48%;background:var(--series-1,#258c83)}.ds-open{left:94%;width:7px;border:1px dashed var(--color-ink-2,#58677f);border-radius:50%;background:var(--color-sheet,#fff)}.ds-interval:focus-visible{outline:2px solid var(--color-accent,#4f5fc7);outline-offset:3px}@media(prefers-reduced-motion:reduce){.ds-interval{transition:none}}"
+      "description": "One readable row per call, with captured interval and available tool duration kept separate; selection opens the same call in the inspector.",
+      "html": "<div class=\"ds-waterfall\"><div class=\"ds-head\"><span>Tool / arguments</span><span>Captured time</span><span>Tool time</span></div><button class=\"ds-call\" aria-pressed=\"true\"><span class=\"ds-label\"><strong>shell</strong><small>echo synthetic-demo-only</small></span><span class=\"ds-track\"><i class=\"ds-bar\"></i></span><span class=\"ds-duration\">173 ms</span></button><button class=\"ds-call\" aria-pressed=\"false\"><span class=\"ds-label\"><strong>read_file</strong><small>README.md</small></span><span class=\"ds-track\"><span class=\"ds-unknown\">Time unavailable</span></span><span class=\"ds-duration\">–</span></button></div>",
+      "css": ".ds-waterfall{font-family:var(--font-sans,\"Archivo Variable\",sans-serif);width:100%;min-width:300px;color:var(--color-ink,#202d45);background:var(--color-sheet,#fff)}.ds-head,.ds-call{display:grid;grid-template-columns:166px minmax(0,1fr) 68px;align-items:center}.ds-head{min-height:36px;background:var(--color-paper,#f3f6fb);font-size:10px;color:var(--color-ink-2,#58677f)}.ds-head>span{padding:8px 12px}.ds-call{width:100%;min-height:56px;border:0;border-bottom:1px solid var(--color-rule,#e3e8f1);background:var(--color-sheet,#fff);color:inherit;text-align:left;cursor:pointer}.ds-call:hover{background:var(--color-paper,#f3f6fb)}.ds-call[aria-pressed=true]{background:var(--color-yellow-soft,#edf0ff)}.ds-label{min-width:0;padding:8px 12px}.ds-label strong{display:block;font-size:12px;font-weight:600}.ds-label small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:4px;color:var(--color-ink-2,#58677f);font:10px/1.5 var(--font-mono,monospace)}.ds-track{position:relative;align-self:stretch;min-width:0;margin:0 6px;border-inline:1px solid var(--color-rule,#e3e8f1)}.ds-bar{position:absolute;top:18px;left:20%;width:25%;height:18px;border:1px solid var(--series-1,#258c83);border-radius:3px;background:color-mix(in srgb,var(--series-1,#258c83) 30%,var(--color-sheet,#fff))}.ds-call[aria-pressed=true] .ds-bar{outline:1px solid var(--color-accent,#4f5fc7);outline-offset:2px;background:color-mix(in srgb,var(--series-1,#258c83) 45%,var(--color-sheet,#fff))}.ds-duration{padding:8px 12px 8px 6px;text-align:right;white-space:nowrap;font-size:10px;font-variant-numeric:tabular-nums;color:var(--color-ink-2,#58677f)}.ds-unknown{position:absolute;top:20px;left:6px;white-space:nowrap;font-size:10px;color:var(--color-ink-3,#65758d)}.ds-call:focus-visible{outline:2px solid var(--color-accent,#4f5fc7);outline-offset:-2px}@media(max-width:767px){.ds-head,.ds-call{grid-template-columns:132px minmax(0,1fr) 58px}}"
     },
     {
       "name": "Captured payload",
@@ -372,17 +349,17 @@
   ],
   "narrative": {
     "northStar": "Trace Atlas",
-    "overview": "Trace Atlas treats a recording as navigable evidence. A navy navigation rail anchors a cool, layered workspace; compact measurements and aligned rows make dense captured data readable. Archivo carries the interface, with monospace reserved chiefly for captured arguments, identifiers and JSON.\n\nAnalytical cartography supplies the signature: the same selected call is registered in the recording map, call list and inspector. Tool series remain consistent across these regions. Borders and tonal changes give each region a clear job while the inspector preserves room for the evidence.",
+    "overview": "Trace Atlas treats a recording as navigable evidence. A navy navigation rail anchors a cool, layered workspace; compact measurements and aligned rows make dense captured data readable. Archivo carries the interface, with monospace reserved chiefly for captured arguments, identifiers and JSON.\n\nAnalytical cartography supplies the signature: one labelled waterfall row combines each call’s identity and captured interval, registered with the inspector. Tool series remain consistent across these regions. Borders and tonal changes give each region a clear job while the inspector preserves room for the evidence.",
     "keyCharacteristics": [
       "Cool paper, white panels and a stable graphite navigation rail with fine borders.",
-      "Periwinkle selection shared across map intervals, rows and filters.",
+      "Periwinkle selection shared across waterfall intervals, rows and filters.",
       "Tool series identify categories; amber and explicit status marks identify reported errors.",
       "Compact tabular measurements, readable captured payloads and restrained rounded geometry."
     ],
     "rules": [
       {
         "name": "The Registered Selection Rule",
-        "body": "A selected call uses the same identity in the map, list and inspector; periwinkle communicates selection rather than tool category.",
+        "body": "A selected call uses the same identity in the labelled waterfall row and inspector; periwinkle communicates selection rather than tool category.",
         "section": "colors"
       },
       {
@@ -397,7 +374,7 @@
       }
     ],
     "dos": [
-      "Do keep each tool’s series colour consistent across the map, list and profile.",
+      "Do keep each tool’s series colour consistent across the waterfall and profile.",
       "Do pair status colour with a readable label or SVG status icon.",
       "Do align times, counts and sizes with tabular figures.",
       "Do keep the selected call and its captured payload readable at laptop and mobile sizes.",
