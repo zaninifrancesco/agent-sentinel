@@ -129,6 +129,20 @@ func (r *Recorder) Events() []Event {
 	return out
 }
 
+// Snapshot returns metadata and evidence under the same lock. Profiling pages
+// pin the returned revision so later responses cannot change earlier pages.
+func (r *Recorder) Snapshot() (Session, []Event, uint64) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.session, append([]Event(nil), r.events...), r.seq
+}
+
+func (r *Recorder) Revision() uint64 {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.seq
+}
+
 // Subscribe returns a channel receiving every future event. Events are
 // dropped for subscribers whose buffer is full.
 func (r *Recorder) Subscribe(buffer int) <-chan Event {

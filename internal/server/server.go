@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/coder/websocket"
@@ -36,8 +37,10 @@ type eventMsg struct {
 
 // Server serves one recorder (one session).
 type Server struct {
-	rec    *recorder.Recorder
-	assets fs.FS // built SPA (index.html + assets); may be nil/empty
+	profilerMu    sync.Mutex
+	profilerCache *profilerSnapshot
+	rec           *recorder.Recorder
+	assets        fs.FS // built SPA (index.html + assets); may be nil/empty
 
 	// AllowedOrigins lists extra browser origins (host[:port] patterns) allowed
 	// to open the WebSocket, on top of the server's own origin. Only meant for
@@ -89,6 +92,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/session", s.handleSession)
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("GET /api/config", s.handleConfig)
+	mux.HandleFunc("GET /api/v1/profiler", s.handleProfiler)
+	mux.HandleFunc("GET /api/v1/rows/{key}", s.handleRow)
+	mux.HandleFunc("GET /api/v1/report", s.handleReportData)
 	mux.HandleFunc("POST /api/approvals/{seq}", s.handleApproval)
 	mux.HandleFunc("POST /api/budget", s.handleBudget)
 	mux.HandleFunc("POST /api/hook", s.handleHook)
