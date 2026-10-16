@@ -15,7 +15,7 @@ Branch: `telemetry-profiler`. Aggiornamento: 16 ottobre 2026.
 ## Cockpit — Trace Atlas implementato
 
 - Nuova identità Trace Atlas: navigazione grafite richiudibile, superfici fredde, colori per tool e selezione sincronizzata. Sui desktop bassi la mappa resta sopra la lista e l’inspector usa tutta l’altezza disponibile.
-- Timeline come vista iniziale, ora con waterfall per singola chiamata. La finestra segue la pagina corrente; sovrapposizioni e intervalli non attribuiti condividono l’asse temporale. Le durate riportate rimangono separate dagli intervalli catturati.
+- Timeline come vista iniziale, con timeline compatta a tracce riutilizzabili. La finestra segue la pagina corrente; sovrapposizioni e intervalli non attribuiti condividono l’asse temporale. Le durate riportate rimangono separate dagli intervalli catturati.
 - Tool profile con attività aggregata per tool: chiamate, errori segnalati, mediana/p95 disponibili e JSON conservato.
 - Classifiche delle cinque chiamate completate più lente e delle cinque risposte conservate più grandi. Ogni voce apre gli eventi da cui deriva; selezionare un tool filtra le sue chiamate.
 - Calls con filtri per esito e tool, ricerca negli argomenti conservati e ordinamento per cattura, durata o dimensione della risposta. Event log separato per osservazioni di protocollo e ciclo di vita.
@@ -52,7 +52,7 @@ Questa è una parte della fase 2: persistenza e stream restano da completare. Le
 ## Profiler — Waterfall, paginazione e metriche Go implementati
 
 - `internal/analysis`, versione `profiler-v1`: proiezione delle chiamate v2 e legacy, scope, conteggi, percentili nearest rank, classifiche e misure temporali. Eliminati la seconda proiezione e i calcoli delle metriche dal browser. Durate sconosciute e zero espliciti restano distinti; attese storiche non separabili e interruzioni non entrano nei percentili.
-- Waterfall con una riga per chiamata e finestra della pagina corrente, selezione sincronizzata con lista/inspector, sovrapposizioni visibili e controllo di espansione. Copertura = unione degli intervalli tool abbinati; tempo non attribuito = complemento nell’intervallo osservato. Massima concorrenza su intervalli positivi, senza doppio conteggio del tempo trascorso.
+- Timeline con finestra della pagina corrente: chiamate sequenziali sulla stessa traccia, sovrapposte su tracce aggiuntive, colori e nomi per tool, zoom Fit/4×/16×/64× e selezione sincronizzata con lista/inspector. Osservazioni puntuali coincidenti restano separatamente ispezionabili; il numero di tracce non è una misura di concorrenza. Copertura = unione degli intervalli tool abbinati; tempo non attribuito = complemento nell’intervallo osservato. Massima concorrenza su intervalli positivi, senza doppio conteggio del tempo trascorso.
 - Incomplete, ambigue, osservazioni senza risposta e chiusure sintetiche non inventano una fine. Il confine dello snapshot deriva dalle evidenze conservate, senza crescita dipendente dall’orologio del browser. Nessuno span di ragionamento o turno LLM viene ricostruito.
 - [API profiler v1](PROFILER_API.md): elenco di sintesi paginato (default 50, massimo 200), ricerca sugli argomenti conservati, filtri e ordinamento nel server. Cursori legati a registrazione/revisione/query, stabili quando arrivano nuovi eventi. Il dettaglio completo arriva solo per la chiamata selezionata.
 - Metriche, profilo per tool e totali temporali seguono l’intero scope selezionato; filtri e pagine agiscono sull’elenco. Le classifiche e la ricerca aprono direttamente la pagina della chiamata. Stato di caricamento, errore e recupero con Refresh latest/Retry espliciti.
@@ -80,7 +80,7 @@ Ambiente della prova: macOS arm64, Go 1.27.1, Node 26.4.0. Una prima risposta HT
 
 Revisione del redesign: il problema materiale dell’altezza del payload sui laptop è stato corretto e verificato dal revisore come risolto.
 
-Check di chiusura passati: `make test` (vet, race test, typecheck e sette test frontend; proiezione e calcoli spostati nei test Go) e `cd web && npm run build`. Detector UI senza segnalazioni. Verificati anche link locali e whitespace. Non sono benchmark di performance né una verifica live delle versioni correnti degli agenti esterni.
+Check di chiusura passati: `make test` (vet, race test, typecheck e nove test frontend; proiezione e calcoli spostati nei test Go) e `cd web && npm run build`. Detector UI senza segnalazioni. Verificati anche link locali e whitespace. Non sono benchmark di performance né una verifica live delle versioni correnti degli agenti esterni.
 
 ## Limiti ancora aperti
 
