@@ -1,6 +1,15 @@
 # Stato dell'implementazione
 
-Branch: `telemetry-profiler`. Aggiornamento: 16 ottobre 2026.
+Aggiornamento: 16 ottobre 2026.
+
+## Verifica reale del cockpit e correzioni del rebuild
+
+- Corretti il crash dell'inspector con payload assente, il journey che mostrava un completamento senza risposta assegnata, la ricerca nella registrazione storica e la sovrapposizione dei focus trap. La timeline rimane raggiungibile tramite scorrimento su mobile basso; zoom da tastiera ed Escape corrispondono alla guida. Copertura e scope span condividono il denominatore; i gap non vengono attribuiti a ragionamento o generazione del modello.
+- `make test` e build frontend passati, con tredici test frontend. Verifica browser dei casi interrotti/irrisolti, ricerca storica, overlay e mobile 390×667; nessun overflow orizzontale globale nel campione verificato.
+- Sessione reale con `gpt-5.6-terra` e proxy MCP observation: nove richieste e nove risposte abbinate, sei letture, una scrittura e due esecuzioni dei test di un progetto temporaneo. L'agente ha corretto un calcolo; tre test falliti prima della modifica e tre superati dopo, confermati anche da un'esecuzione indipendente.
+- I tre errori osservati sono letture di percorsi inesistenti: uno richiesto dal test e due tentativi iniziali poi corretti dall'agente. Il risultato dei test è nel payload di `run_tests`; il suo `exitCode` non viene automaticamente interpretato come errore MCP quando il server non dichiara `isError`.
+- JSONL e profiler live concordano su nove chiamate completate, tre errori, nessuna chiamata aperta o irrisolta. Configurazione verificata: `mode=observe`, `policy=off`, approvazioni e budget disattivati; nessun campo decisione/regola negli eventi del campione.
+- Il binario locale è stato aggiornato alla versione observation con autorizzazione esplicita. La prova riguarda i tool del server MCP collegato; non certifica la cattura delle operazioni native dell'agente, delle sue altre connessioni o del suo consumo di token. Nessun hook Cursor o Claude installato durante questa prova.
 
 ## Primo MVP analytics — implementato
 
