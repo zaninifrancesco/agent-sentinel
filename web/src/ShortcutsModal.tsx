@@ -15,7 +15,7 @@ export function ShortcutsModal({ isOpen, onClose }: Props) {
     { key: "↓ / ↑ or J / K", desc: "Navigate calls in timeline" },
     { key: "Enter / Space", desc: "Inspect selected call" },
     { key: "⌘ K / Ctrl K", desc: "Open command palette & search" },
-    { key: "Esc", desc: "Close detail pane or modal" },
+    { key: "Esc", desc: "Close modal or return to timeline on small screens" },
     { key: "1 / 2 / 4", desc: "Quick timeline zoom (Fit, 2×, 4×)" },
     { key: "?", desc: "Toggle keyboard shortcuts guide" },
   ];

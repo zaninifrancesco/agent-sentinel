@@ -129,6 +129,7 @@ export default function App() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key === "k" && !isExportModalOpen) {
         event.preventDefault();
+        setIsShortcutsModalOpen(false);
         setIsCommandPaletteOpen((prev) => !prev);
       } else if (event.key === "?" && !isCommandPaletteOpen && !isExportModalOpen) {
         const target = event.target as HTMLElement | null;
@@ -136,11 +137,13 @@ export default function App() {
           event.preventDefault();
           setIsShortcutsModalOpen((prev) => !prev);
         }
+      } else if (event.key === "Escape" && !isCommandPaletteOpen && !isExportModalOpen && !isShortcutsModalOpen) {
+        setDetailOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isExportModalOpen, isCommandPaletteOpen]);
+  }, [isExportModalOpen, isCommandPaletteOpen, isShortcutsModalOpen]);
 
   useEffect(() => {
     if (!loading && !focusKey && !analyticsView && view !== "overview" && !visible.some((row) => row.key === selectedKey)) {
@@ -760,6 +763,7 @@ export default function App() {
         onClose={() => setIsCommandPaletteOpen(false)}
         rows={visible}
         scope={scope}
+        recordingId={session?.id ?? ""}
         onSelectRow={inspect}
         onExport={() => setIsExportModalOpen(true)}
       />

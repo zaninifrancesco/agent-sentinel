@@ -107,7 +107,6 @@ export function Detail({ row }: { row: Row | null }) {
   const bytes = responseSize(row);
   const interval = capturedInterval(row);
   const capturedMs = interval?.end === undefined ? undefined : interval.end - interval.start;
-  const historical = !!row.request?.decision || !!row.resolution || row.risk !== "none";
   const evidence = row.request ?? row.response ?? row.event;
   const correlation = row.correlation ?? evidence?.correlation;
   const timingSource = row.response?.timing?.source;
@@ -283,20 +282,12 @@ export function Detail({ row }: { row: Row | null }) {
           <div className="p-4 sm:p-6">
             <h3 className="text-xs font-semibold uppercase tracking-wider text-ink-3">Execution Journey</h3>
             <p className="mt-1 text-xs text-ink-2">
-              Step-by-step telemetry trace showing when the request was dispatched, observed, executed, and completed.
+              Recorded request, outcome and any historical decisions. Missing stages remain unknown.
             </p>
             <div className="mt-4">
-              <CallJourneyTimeline row={row} intervalMs={capturedMs} />
+              <Journey row={row} />
             </div>
 
-            {historical && (
-              <div className="mt-6 border-t border-rule pt-4">
-                <h4 className="text-xs font-semibold text-ink">Historical Policy Decisions</h4>
-                <div className="mt-3">
-                  <Journey row={row} />
-                </div>
-              </div>
-            )}
           </div>
         ) : tab === "raw" ? (
           /* Tab: Raw Event JSON */
@@ -464,67 +455,6 @@ function MetricTile({ label, value, figure }: { label: string; value: string; fi
   );
 }
 
-function CallJourneyTimeline({ row, intervalMs }: { row: Row; intervalMs?: number }) {
-  const reqTime = row.request ? formatTime(row.request.timestamp) : undefined;
-  const resTime = row.response ? formatTime(row.response.timestamp) : undefined;
-
-  return (
-    <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-rule">
-      {/* 1. Request dispatched */}
-      <div className="relative flex items-start gap-3">
-        <span className="absolute -left-6 top-1 size-4 rounded-full border-2 border-accent bg-sheet flex items-center justify-center">
-          <span className="size-1.5 rounded-full bg-accent" />
-        </span>
-        <div className="text-xs">
-          <p className="font-semibold text-ink">Request Dispatched by Agent</p>
-          <p className="text-[11px] text-ink-2">
-            Tool <strong className="text-ink">{row.title}</strong> initiated {reqTime ? `at ${reqTime}` : ""}
-          </p>
-          {row.request?.seq && (
-            <span className="mt-1 inline-block font-mono text-[10px] text-ink-3">Event #{row.request.seq}</span>
-          )}
-        </div>
-      </div>
-
-      {/* 2. Tool Execution */}
-      <div className="relative flex items-start gap-3">
-        <span className="absolute -left-6 top-1 size-4 rounded-full border-2 border-rule-strong bg-paper flex items-center justify-center">
-          <Clock aria-hidden className="size-2.5 text-ink-2" />
-        </span>
-        <div className="text-xs">
-          <p className="font-semibold text-ink">Tool Execution</p>
-          <p className="text-[11px] text-ink-2">
-            Tool duration: <strong className="text-ink">{row.durationMs !== undefined ? formatDuration(row.durationMs) : "Unknown"}</strong>
-            {intervalMs !== undefined && (
-              <span className="text-ink-3"> (observed span: {formatDuration(intervalMs)})</span>
-            )}
-          </p>
-        </div>
-      </div>
-
-      {/* 3. Response Received */}
-      <div className="relative flex items-start gap-3">
-        <span className={`absolute -left-6 top-1 size-4 rounded-full border-2 flex items-center justify-center ${
-          row.status === "error" ? "border-warn bg-warn/20" : "border-ok bg-ok/20"
-        }`}>
-          <span className={`size-1.5 rounded-full ${row.status === "error" ? "bg-warn" : "bg-ok"}`} />
-        </span>
-        <div className="text-xs">
-          <p className={`font-semibold ${row.status === "error" ? "text-warn" : "text-ink"}`}>
-            {row.status === "error" ? "Tool Error Returned" : "Tool Response Completed"}
-          </p>
-          <p className="text-[11px] text-ink-2">
-            Status: <strong className="text-ink">{statusText(row.status)}</strong> {resTime ? `at ${resTime}` : ""}
-          </p>
-          {row.response?.seq && (
-            <span className="mt-1 inline-block font-mono text-[10px] text-ink-3">Event #{row.response.seq}</span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function argumentsOf(payload: unknown): unknown {
   if (!payload || typeof payload !== "object") return payload;
   const params = (payload as { params?: { arguments?: unknown } }).params;
@@ -539,6 +469,7 @@ function resultOf(payload: unknown): unknown {
 }
 
 function pretty(value: unknown): string {
+  if (value === undefined) return "(no payload)";
   if (typeof value === "string") return value;
   try {
     return JSON.stringify(value, null, 2);
@@ -601,6 +532,7 @@ function Journey({ row }: { row: Row }) {
             />
           )}
           <p className="font-semibold text-ink">{stop.title}</p>
+          {stop.at && <time className="font-mono text-[10px] text-ink-3" dateTime={stop.at}>{formatTime(stop.at)}</time>}
           <p className="text-ink-2">{stop.text}</p>
           {stop.detail && <p className="mt-0.5 text-[11px] text-ink-3">{stop.detail}</p>}
         </li>

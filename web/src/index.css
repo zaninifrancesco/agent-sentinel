@@ -288,5 +288,9 @@ a { text-underline-offset: 3px; }
   .waterfall-columns { grid-template-columns: 132px minmax(0,1fr) 58px; }
   .waterfall-label { padding-inline: 10px; } .waterfall-duration { padding-right: 8px; } .timeline-axis > span:nth-child(2):not(:last-child) { display: none; }
   .inspector-workspace { margin: 12px; } .inspector-toolbar { padding: 10px; } .profile-panel { padding: 14px; }
+  .app-shell { height: auto; min-height: 100dvh; }
+  .inspector-split { flex: 1 0 auto; min-height: 340px; }
+  .event-list-pane { min-height: 340px; }
+  .timeline-scroll { min-height: 240px; max-height: 60dvh; }
 }
 @media(prefers-reduced-motion:reduce) { *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }

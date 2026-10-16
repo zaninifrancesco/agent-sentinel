@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { after, before, test } from "node:test";
 import { createServer } from "vite";
 
-let server, report, journeyStops, captureSummary, capturedInterval, responseSize, toolDuration, waterfallInterval, TraceMap, periodChange;
+let server, report, journeyStops, captureSummary, capturedInterval, responseSize, toolDuration, waterfallInterval, TraceMap, Detail, periodChange;
 const backendMetrics = { calls: 17, waiting: 0, running: 0, refused: 0, errors: 2, interrupted: 0, payloadBytes: 8192, latencySamples: 12, p50: 333, p95: 987 };
 const timeline = { startMs: 0, endMs: 1000, spanMs: 1000, coveredMs: 600, unattributedMs: 400, overlapMs: 200, peakConcurrency: 2, incompleteCalls: 0, gapCount: 1, gaps: [{ startMs: 600, endMs: 1000 }] };
 
@@ -17,6 +17,7 @@ before(async () => {
   ({ responseSize } = await server.ssrLoadModule("/src/profile.ts"));
   ({ toolDuration } = await server.ssrLoadModule("/src/metrics.ts"));
   ({ TraceMap } = await server.ssrLoadModule("/src/TraceMap.tsx"));
+  ({ Detail } = await server.ssrLoadModule("/src/Detail.tsx"));
   ({ periodChange } = await server.ssrLoadModule("/src/Analytics.tsx"));
 });
 after(async () => { await server?.close(); });
@@ -129,4 +130,29 @@ test("waterfall keeps each call labelled and selectable, including missing times
   assert.ok(html.includes("Time unavailable"));
   assert.ok(html.includes("Capture end unavailable"));
   assert.ok(html.includes('aria-pressed="true"'));
+});
+
+test("inspector renders interrupted calls and lifecycle events without payloads", () => {
+  const interrupted = call({ status: "interrupted", response: { ...call().response, status: "interrupted", correlation: { synthetic: true } } });
+  const html = renderToStaticMarkup(createElement(Detail, { row: interrupted }));
+  assert.ok(html.includes("(no payload)"));
+  assert.ok(html.includes("This interruption is synthesized"));
+  const event = { key: "start", kind: "event", title: "SessionStarted", status: "ok", risk: "none", event: { ...call().request, type: "SessionStarted" } };
+  assert.ok(renderToStaticMarkup(createElement(Detail, { row: event })).includes("(no payload)"));
+});
+
+test("journey distinguishes unresolved, running and synthesized closure from answered calls", () => {
+  const unresolved = call({ status: "unknown", response: undefined, correlation: { quality: "ambiguous" } });
+  assert.deepEqual(journeyStops(unresolved).map(stop => stop.title), ["Requested", "Pairing unresolved"]);
+  const running = call({ status: "pending", response: undefined });
+  assert.equal(journeyStops(running).at(-1).text, "Running…");
+  const interrupted = call({ status: "interrupted", response: { ...call().response, correlation: { synthetic: true } } });
+  assert.equal(journeyStops(interrupted).at(-1).title, "Capture closed");
+});
+
+test("scope coverage keeps its denominator when the visible page has a shorter window", () => {
+  const html = renderToStaticMarkup(createElement(TraceMap, { rows: [call({ span: { startMs: 100, endMs: 110 } })], timeline: { ...timeline, windowStartMs: 100, windowEndMs: 110 }, selectedKey: null, onSelect() {}, loading: false, emptyTitle: "Empty", emptyDescription: "No calls" }));
+  assert.match(html, /Scope span:[\s\S]*?1\.0 s/);
+  assert.ok(html.includes("Cause not observed"));
+  assert.ok(!html.includes("model generation"));
 });

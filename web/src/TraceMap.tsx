@@ -69,6 +69,11 @@ export function TraceMap({
   }, [selectedKey, zoom]);
 
   const navigate = (event: KeyboardEvent) => {
+    if (["1", "2", "4"].includes(event.key)) {
+      event.preventDefault();
+      setZoom(Number(event.key));
+      return;
+    }
     if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "j", "k", "Home", "End"].includes(event.key) || !calls.length) return;
     event.preventDefault();
     const index = calls.findIndex((row) => row.key === selectedKey);
@@ -231,7 +236,7 @@ export function TraceMap({
               </span>
               {span > 0 && (
                 <span className="text-ink-3">
-                  Total span: <strong className="text-ink">{formatDuration(span)}</strong>
+                  Scope span: <strong className="text-ink">{formatDuration(timeline.spanMs)}</strong>
                 </span>
               )}
             </div>
@@ -356,7 +361,7 @@ export function TraceMap({
                     <span
                       key={i}
                       className="gap-span absolute top-0.5 h-1 min-w-[2px] rounded-xs bg-rule-strong"
-                      title={`Unattributed ${formatDuration(gap.endMs - gap.startMs)} (Agent thinking / model generation / prompt time)`}
+                      title={`Unattributed ${formatDuration(gap.endMs - gap.startMs)}. Cause not observed.`}
                       style={{
                         left: `${position(gap.startMs)}%`,
                         width: `${span ? ((gap.endMs - gap.startMs) / span) * 100 : 0}%`,
@@ -407,10 +412,10 @@ export function TraceMap({
                     <span className="waterfall-tool flex items-center gap-1.5 min-w-0">
                       <StatusIcon status={row.status} />
                       <i aria-hidden className="series-dot size-1.5 rounded-xs shrink-0" style={{ background: callToolColor }} />
-                      <Icon aria-hidden className="size-3.5 shrink-0 text-ink-2" />
+                      <Icon aria-hidden className="hidden size-3.5 shrink-0 text-ink-2 sm:block" />
                       <strong className="truncate text-xs font-semibold text-ink">{row.title}</strong>
                       {row.request?.seq && (
-                        <span className="ml-0.5 rounded px-1 py-0.2 text-[9px] font-mono text-ink-3">
+                        <span className="ml-0.5 hidden rounded px-1 py-0.2 text-[9px] font-mono text-ink-3 sm:inline">
                           #{row.request.seq}
                         </span>
                       )}

@@ -11,25 +11,26 @@ interface Props {
   rows: Row[];
   onSelectRow: (row: Row) => void;
   scope: string;
+  recordingId: string;
   onExport: () => void;
 }
 
-export function CommandPalette({ isOpen, onClose, rows, scope, onSelectRow, onExport }: Props) {
+export function CommandPalette({ isOpen, onClose, rows, scope, recordingId, onSelectRow, onExport }: Props) {
   const dialog = useDialogFocus(isOpen);
   const [results, setResults] = useState<Row[]>(rows);
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !recordingId) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      const params = new URLSearchParams({ view: "events", scope, q: query, limit: "15" });
+      const params = new URLSearchParams({ view: "events", scope, recordingId, q: query, limit: "15" });
       void readJSON<ProfilerPage>(`/api/v1/profiler?${params}`, controller.signal)
         .then((page) => { if (!controller.signal.aborted) { setResults(page.rows); setError(""); } })
         .catch((cause: unknown) => { if (!controller.signal.aborted) { setResults([]); setError(cause instanceof Error ? cause.message : "Search unavailable"); } });
     }, 150);
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [isOpen, scope, query]);
+  }, [isOpen, scope, recordingId, query]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -39,10 +40,11 @@ export function CommandPalette({ isOpen, onClose, rows, scope, onSelectRow, onEx
   useEffect(() => {
     if (isOpen) {
       setQuery("");
+      setResults(rows);
       setSelectedIndex(0);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [isOpen]);
+  }, [isOpen, recordingId]);
 
   const items = useMemo(() => {
     const list: Array<{
