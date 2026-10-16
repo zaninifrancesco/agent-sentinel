@@ -32,9 +32,9 @@ Reviewer e colleghi possono consultare report esportati. Il monitoraggio parte l
 
 Lo sviluppatore collega un progetto con gli hook oppure configura un server MCP tramite proxy. Avvia la registrazione e continua a usare l'agente normalmente.
 
-La pagina iniziale è una Analytics overview con periodo, progetto e agente selezionabili. Mostra sessioni e chiamate osservate, errori con denominatore, distribuzione dei tempi disponibili, volumi e trend giornalieri. Ogni aggregazione conduce alle sessioni e alle chiamate che la compongono.
+La home è la Timeline per analizzare le chiamate: una riga leggibile per ogni tool, argomenti a fianco dell’intervallo catturato, durata disponibile e selezione collegata all’inspector. Le statistiche generali sono nella vista separata Statistics, con periodo, progetto e agente selezionabili, trend compatti e accesso alle sessioni sottostanti. Questa gerarchia riflette la correzione esplicita dell’utente del 16 ottobre 2026.
 
-La navigazione di destinazione comprende Overview, Sessions, Diagnostics, Usage e Compare. La timeline e l’inspector sono l’approfondimento di una sessione. Le sezioni Usage e Compare dichiarano dati disponibili e copertura; i dettagli dell’interfaccia verranno progettati durante l’implementazione.
+La navigazione attuale comprende Timeline, Sessions, Statistics, Tool profile ed Event log. Diagnostica, Usage e Compare estenderanno il percorso di analisi. Le sezioni Usage e Compare dichiarano dati disponibili e copertura; i dettagli dell’interfaccia verranno progettati durante l’implementazione.
 
 Dentro una sessione trova:
 

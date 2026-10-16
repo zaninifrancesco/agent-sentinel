@@ -12,7 +12,8 @@ This branch starts the telemetry pivot with **passive capture**. Sentinel no lon
 
 Available now:
 
-- Analytics as the starting view: 24-hour, 7-day and 30-day filters, daily UTC call/error trends and breakdowns by agent, project and tool.
+- Timeline as the starting view, with readable per-call labels, proportional captured intervals and available tool durations. Select a row to inspect its arguments and result.
+- Statistics as a separate historical view: 24-hour, 7-day and 30-day filters, daily UTC call/error trends and breakdowns by agent, project and tool.
 - A historical catalog rebuilt from local JSONL files, with native-session/connection drill-down and 25-row session pages. Identical file copies count once; conflicting copies are excluded with a notice.
 - Shared historical metrics with explicit error denominators, duration samples, retained JSON and previous-period call comparison.
 - Visible sink-write errors and read-only recovery of a malformed final JSONL fragment at EOF; corruption in complete lines still fails.
@@ -116,7 +117,7 @@ The selected settings are saved in the recording and exposed by `/api/config`. L
 ~/.sentinel/bin/sentinel ui /path/to/trace.jsonl
 ```
 
-The first opens the latest recording; the second opens the selected file. Both start on Analytics, which includes `~/.sentinel/sessions/*.jsonl` and the explicitly opened file. The current collector also appears even without a file log. Custom log directories are not recursively discovered. Replay never executes captured commands. Historical blocks, holds and human decisions remain visible in old recordings, without approval controls.
+The first opens the latest recording; the second opens the selected file. Both start on Timeline. The separate Statistics view includes `~/.sentinel/sessions/*.jsonl` and the explicitly opened file. The current collector also appears even without a file log. Custom log directories are not recursively discovered. Replay never executes captured commands. Historical blocks, holds and human decisions remain visible in old recordings, without approval controls.
 
 The cockpit's Export button uses a backend snapshot and always exports the whole recording, including all captured sessions and connections. It downloads an offline HTML report with summary figures, capture settings, payload-coverage summaries and expandable call history. It includes argument summaries, not full request/response payloads. The original JSONL is the trace for detailed local replay; a dedicated JSONL export flow is planned. `sentinel export` and `sentinel run` are not implemented.
 

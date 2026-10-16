@@ -34,7 +34,8 @@ An analytics platform for monitoring and analyzing AI agent usage and metrics. L
 
 Implemented on the telemetry branch:
 
-- Analytics as the default view: local JSONL history plus current recording, period/agent/project filters, daily UTC calls/errors, previous-period call deltas, per-agent/project/tool breakdowns and native-session/connection drill-down. Session lists render 25 rows at a time.
+- Timeline as the default workspace for call analysis, with one labelled row per call beside captured intervals and tool durations. Selection opens the inspector; below 1024px detail replaces the timeline with a Back action.
+- Statistics as the dedicated historical analytics view: local JSONL history plus current recording, period/agent/project filters, daily UTC calls/errors, previous-period call deltas, per-agent/project/tool breakdowns and native-session/connection drill-down. Session lists render 25 rows at a time.
 - Read-only recovery of a malformed final JSONL fragment at EOF and visible sink-write errors. Complete corrupt lines still fail. The catalog deduplicates identical copies and excludes conflicting identities with a notice.
 - Timeline as the call-level view, with a call waterfall that zooms to the current 50-row page. Each call has a lane, with overlaps, incomplete points and unattributed intervals. Scope totals use interval union, independently of list filters; source-reported duration remains separate.
 - Tool profile: per-tool activity, top five completed calls by available duration and top five retained responses by JSON size. Every entry opens its captured calls.
@@ -62,11 +63,11 @@ No customer results, performance claims or savings measurements may be fabricate
 
 ## Cockpit Information Hierarchy
 
-Target hierarchy: start with Analytics overview, with time/project/agent filters and drill-down into Sessions, Diagnostics, Usage and Compare. Every aggregate must lead to supporting sessions and calls. Historical dashboards and trends are core to the analytics MVP. Native usage and comparisons are explicit product workstreams; unavailable data remains unavailable.
+Target hierarchy: start with call analysis in Timeline, with readable per-call timing and direct evidence inspection. Keep general historical metrics in Statistics with time/project/agent filters and session drill-down. Diagnostics, Usage and Compare extend that analysis. Every aggregate must lead to supporting sessions and calls. Historical dashboards and trends are core to the analytics MVP. Native usage and comparisons are explicit product workstreams; unavailable data remains unavailable.
 
 Current implemented hierarchy:
 
-Start with Analytics and monitor activity across recordings. Navigation is Analytics, Sessions, Timeline, Tool profile and Event log. Period, agent and project filters scope the historical totals; daily chart selection narrows the session list. Opening a session preserves the live collector and shows its entire captured scope. The existing timeline supports call-level inspection. The recording map, selected list row and inspector refer to the same call. A collapsible graphite rail separates navigation from the cool layered workspace. Recording identity, capture connection and available metric sample counts stay accessible. Tool profile exposes observed activity, not automated diagnoses. Missing measurements remain unavailable, and retained JSON is never called context usage. Historical policy data is secondary and appears only when captured.
+Start with Timeline and inspect calls. Navigation is Timeline, Sessions, Statistics, Tool profile and Event log. Statistics monitors activity across recordings. Period, agent and project filters scope the historical totals; daily chart selection narrows the session list. Opening a session preserves the live collector and shows its entire captured scope. The existing timeline supports call-level inspection. The labelled waterfall row and inspector refer to the same call; the former compact map and duplicate list have been consolidated. A collapsible graphite rail separates navigation from the cool layered workspace. Recording identity, capture connection and available metric sample counts stay accessible. Tool profile exposes observed activity, not automated diagnoses. Missing measurements remain unavailable, and retained JSON is never called context usage. Historical policy data is secondary and appears only when captured.
 
 Keyboard shortcuts belong to the focused list. Search and export overlays contain keyboard focus and restore it when closed.
 

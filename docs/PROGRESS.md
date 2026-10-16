@@ -4,7 +4,7 @@ Branch: `telemetry-profiler`. Aggiornamento: 16 ottobre 2026.
 
 ## Primo MVP analytics — implementato
 
-- Analytics è la vista iniziale: filtri 24h/7d/30d, agente e progetto; trend giornalieri UTC di chiamate/errori, classifiche per agente/progetto/tool e confronto del volume col periodo precedente.
+- Statistics contiene le analytics storiche; la home è ora Timeline su indicazione dell’utente: filtri 24h/7d/30d, agente e progetto; trend giornalieri UTC di chiamate/errori, classifiche per agente/progetto/tool e confronto del volume col periodo precedente.
 - Catalogo ricostruibile dai JSONL in `~/.sentinel/sessions` e dal file scelto esplicitamente. Cache in memoria delle proiezioni senza payload, invalidata da dimensione/mtime; nessun database o dipendenza aggiunta. Copie identiche contate una volta, identità con copie diverse escluse con avviso.
 - Elenco di sessioni native/connessioni con 25 righe per pagina UI; selezionare un giorno restringe l’elenco senza cambiare i totali del periodo. Registrazioni senza chiamate restano raggiungibili.
 - Apertura di uno scope storico nelle API profiler/dettaglio/report tramite `recordingId`, senza sostituire il recorder attivo. Le risposte profiler dichiarano `readOnly`; il frontend non segue in polling le registrazioni storiche. Il report della registrazione selezionata resta disponibile.
@@ -12,6 +12,13 @@ Branch: `telemetry-profiler`. Aggiornamento: 16 ottobre 2026.
 - Il recorder espone errori di scrittura e ultimo `seq` del prefisso scritto senza errore, senza promettere fsync. Il replay recupera un frammento JSON finale malformato solo a EOF, marcando `recoveredTail`; una riga completa corrotta rimane fatale. Nessuna riscrittura del log.
 - Contratto e limiti in [ANALYTICS_API.md](ANALYTICS_API.md). Uso nativo/token/costi, findings, confronto A/B e heatmap annuale restano previsti.
 - Verifiche: test di catalogo/duplicati/conflitti/riavvio/crescita, denominatori/filtri/finestre/sessioni senza chiamate, guasto del sink e recupero EOF; regressione di drill-down HTTP storico e conservazione del collector. `make test` e build frontend passati, dieci test frontend. Smoke browser con 12 registrazioni sintetiche/318 chiamate, filtri, apertura della sessione storica da 25 chiamate, desktop 1280×800 e mobile 390×844, chiaro/scuro. Nessun comando dei fixture eseguito. Nessun binario installato o hook reale modificato.
+
+## Analisi delle chiamate come home
+
+- Timeline è la vista iniziale e la prima voce di navigazione. Le statistiche generali sono nella vista dedicata Statistics; il grafico giornaliero è stato compattato.
+- Waterfall integrata nell’elenco chiamate: una riga per tool con etichette leggibili, stato, argomenti, intervallo proporzionale e durata disponibile separata. Eliminata la duplicazione mappa/lista e la variante di layout dipendente dall’altezza del desktop.
+- Ricerca, filtri, ordinamento e pagine restano disponibili. A larghezze inferiori a 1024px il dettaglio sostituisce la lista, con ritorno esplicito; zero, tempi assenti e fine mancante restano distinti. I quattro tasti freccia spostano la selezione nella waterfall.
+- Test di rendering verificano etichette/selezione per chiamate brevi e senza timestamp, e separazione tra tempo catturato e durata tool. Le vecchie prove di packing delle tracce sono sostituite dai check del nuovo comportamento.
 
 ## Fase 1 — Cattura passiva implementata
 
