@@ -1,6 +1,6 @@
 # Stato dell'implementazione
 
-Branch: `telemetry-profiler`. Aggiornamento: 15 ottobre 2026.
+Branch: `telemetry-profiler`. Aggiornamento: 16 ottobre 2026.
 
 ## Fase 1 — Cattura passiva implementata
 
@@ -15,7 +15,7 @@ Branch: `telemetry-profiler`. Aggiornamento: 15 ottobre 2026.
 ## Cockpit — Trace Atlas implementato
 
 - Nuova identità Trace Atlas: navigazione grafite richiudibile, superfici fredde, colori per tool e selezione sincronizzata. Sui desktop bassi la mappa resta sopra la lista e l’inspector usa tutta l’altezza disponibile.
-- Timeline come vista iniziale, con mappa selezionabile per tool. Gli intervalli derivano dai timestamp catturati, separati dalla durata riportata; risposte senza timestamp valido restano punti. Ultime 120 chiamate nella mappa, tutte nella lista.
+- Timeline come vista iniziale, ora con waterfall per singola chiamata. La finestra segue la pagina corrente; sovrapposizioni e intervalli non attribuiti condividono l’asse temporale. Le durate riportate rimangono separate dagli intervalli catturati.
 - Tool profile con attività aggregata per tool: chiamate, errori segnalati, mediana/p95 disponibili e JSON conservato.
 - Classifiche delle cinque chiamate completate più lente e delle cinque risposte conservate più grandi. Ogni voce apre gli eventi da cui deriva; selezionare un tool filtra le sue chiamate.
 - Calls con filtri per esito e tool, ricerca negli argomenti conservati e ordinamento per cattura, durata o dimensione della risposta. Event log separato per osservazioni di protocollo e ciclo di vita.
@@ -23,7 +23,7 @@ Branch: `telemetry-profiler`. Aggiornamento: 15 ottobre 2026.
 - Navigazione da tastiera confinata alla lista attiva; focus contenuto nei dialoghi e ripristinato alla chiusura.
 - Durate assenti conservate come sconosciute; zero esplicito rimane un campione valido. L’intervallo della registrazione deriva dai timestamp catturati e non cresce col tempo trascorso nel browser.
 
-Queste aggregazioni sono calcolate nel frontend sui dati disponibili: anticipano l’ispezione del profiler, senza dichiarare completata la fase 2 del recorder o il motore di analisi Go.
+Le aggregazioni iniziali del frontend sono state sostituite dalla proiezione Go descritta sotto. Questo non chiude i lavori di affidabilità del recorder della fase 2.
 
 ## Fase 2 — Identità e correlazione implementate
 
@@ -49,11 +49,21 @@ Questa è una parte della fase 2: persistenza e stream restano da completare. Le
 - Metadati testuali sensibili riconosciuti vengono redatti; identità che corrispondono a pattern sensibili diventano HMAC opachi per registrazione, con campi modificati dichiarati. Il tracker mantiene correlazione e chiusura delle sessioni senza collassare ID distinti.
 - Configurazione persistita all’inizio della registrazione e disponibile in sessione e `/api/config`; replay senza nuova redazione dei log esistenti. Inspector e patch mostrano qualità e misure con dettaglio espandibile; sidebar e report indicano il profilo. Le classifiche rimangono basate sul JSON conservato.
 
+## Profiler — Waterfall, paginazione e metriche Go implementati
+
+- `internal/analysis`, versione `profiler-v1`: proiezione delle chiamate v2 e legacy, scope, conteggi, percentili nearest rank, classifiche e misure temporali. Eliminati la seconda proiezione e i calcoli delle metriche dal browser. Durate sconosciute e zero espliciti restano distinti; attese storiche non separabili e interruzioni non entrano nei percentili.
+- Waterfall con una riga per chiamata e finestra della pagina corrente, selezione sincronizzata con lista/inspector, sovrapposizioni visibili e controllo di espansione. Copertura = unione degli intervalli tool abbinati; tempo non attribuito = complemento nell’intervallo osservato. Massima concorrenza su intervalli positivi, senza doppio conteggio del tempo trascorso.
+- Incomplete, ambigue, osservazioni senza risposta e chiusure sintetiche non inventano una fine. Il confine dello snapshot deriva dalle evidenze conservate, senza crescita dipendente dall’orologio del browser. Nessuno span di ragionamento o turno LLM viene ricostruito.
+- [API profiler v1](PROFILER_API.md): elenco di sintesi paginato (default 50, massimo 200), ricerca sugli argomenti conservati, filtri e ordinamento nel server. Cursori legati a registrazione/revisione/query, stabili quando arrivano nuovi eventi. Il dettaglio completo arriva solo per la chiamata selezionata.
+- Metriche, profilo per tool e totali temporali seguono l’intero scope selezionato; filtri e pagine agiscono sull’elenco. Le classifiche e la ricerca aprono direttamente la pagina della chiamata. Stato di caricamento, errore e recupero con Refresh latest/Retry espliciti.
+- Una sessione attiva omette `endedAt`, con regressione specifica contro la data zero serializzata. Prima pagina live aggiornata con richieste seriali ogni due secondi. Cursori fissati e registrazioni concluse si caricano una volta. Il cockpit non riceve più tutti i payload tramite lo snapshot WebSocket; le API precedenti restano compatibili.
+- Report HTML con metriche, algoritmo, revisione e intervalli dello stesso snapshot Go, sempre sull’intera registrazione. Scarica tutte le sintesi solo su export esplicito e non i corpi dei payload; CSP ed escaping restano attivi.
+
 ## Verifiche riproducibili
 
 - Test Go di CLI, neutralità degli adattatori, installazione e proxy con fake server: input sintetici prima bloccati vengono registrati senza decisioni Sentinel e inoltrati invariati nel proxy.
 - Test del client hook contro collector chiuso, risposte legacy e server in stallo su header o body; nessuna attesa illimitata o override dei permessi di Claude Code.
-- Test frontend di percentili, durata zero, esclusione di chiamate interrotte/RPC, byte UTF-8 conservati, journey senza policy, ranking/filtri, durate mancanti, intervallo catturato e HTML con contenuti ostili resi inerti.
+- Le regressioni di proiezione/metriche sono ora in Go: nearest rank con zero, esclusioni, connessioni distinte, ambiguità, tempi invertiti, byte conservati, ordinamento e filtri. I test frontend verificano la presentazione dei valori del server, i journey storici e report con testo ostile reso inerte.
 - Smoke test locale con binario temporaneo: config osservativa e tre coppie sintetiche richiesta/risposta Cursor/Claude registrate con esito `ok` e senza policy. Nessun comando contenuto nei payload è stato eseguito.
 - Ispezione del cockpit su desktop 1440/1280 px e mobile da 390 px, nei temi chiaro/scuro, inclusi filtri senza risultati, mappa → chiamata → dettaglio, ricerca payload, precedente/successivo, classifica → dettaglio, errori e dialogo export con focus da tastiera. `profiler.png` mostra la nuova timeline Trace Atlas con 17 chiamate sintetiche (due errori e una aperta); `cockpit.png` resta la schermata storica. Nessun comando dei fixture viene eseguito.
 
@@ -62,18 +72,23 @@ Questa è una parte della fase 2: persistenza e stream restano da completare. Le
 - Regressioni di cattura: segreti sintetici assenti da JSONL e stream standard, redazione prima del limite, JSON valido entro soglia con Unicode e strutture grandi, numeri esatti, nessuna modifica dell’input del chiamante, full senza redazione e impostazioni ripristinate dal replay. Proxy con fake server che restituisce la richiesta ricevuta: frame inoltrati integri mentre la registrazione è ridotta/redatta.
 - Smoke CLI standard/full su porte effimere: output sintetico UTF-8 da 9.036 byte ridotto a massimo 2.048 byte JSON, redazione e troncamento dichiarati, lettura omessa con dimensione riferita dal client separata, zero esplicito, tool response full conservata, profilo ripristinato nel replay. Controllati dettaglio espandibile desktop 1280×800 e mobile 390×844. Nessun comando nei payload eseguito; collector e replay temporanei chiusi.
 
+Prova del profiler del 16 ottobre: fixture temporanea con 10.000 richieste, 9.998 risposte, due connessioni, 323 errori e due chiamate senza risposta. Verificati cambio pagina, salto da classifica alla pagina corretta, scope, filtro Open, dettaglio mobile a 390 px ed export HTML reale con 10.000 chiamate anche da una vista filtrata. Nessun comando dei mock eseguito.
+
+Nel collector live su 8848 è stato verificato anche il passaggio da 64 a 65 chiamate via polling, senza reload del browser, con un errore, una chiamata aperta e due intervalli sovrapposti. Gli eventi sono sintetici e i comandi restano solo stringhe.
+
+Ambiente della prova: macOS arm64, Go 1.27.1, Node 26.4.0. Una prima risposta HTTP locale da 50 sintesi pesava 109.877 byte e ha richiesto circa 53 ms nel singolo smoke; RSS del processo replay dopo la verifica circa 46,2 MiB (47.328 KiB), escluso il browser. Sono osservazioni di questa fixture sintetica, non benchmark o limiti garantiti. Nel browser sono state ispezionate le viste laptop 1280×800 e mobile 390×844; il trasferimento ordinario non include i 10.000 payload.
+
 Revisione del redesign: il problema materiale dell’altezza del payload sui laptop è stato corretto e verificato dal revisore come risolto.
 
-Check di chiusura passati: `make test` (vet, race test, typecheck e venti test frontend) e `cd web && npm run build`. Detector UI senza segnalazioni. Verificati anche link locali e whitespace. Non sono benchmark di performance né una verifica live delle versioni correnti degli agenti esterni.
+Check di chiusura passati: `make test` (vet, race test, typecheck e sette test frontend; proiezione e calcoli spostati nei test Go) e `cd web && npm run build`. Detector UI senza segnalazioni. Verificati anche link locali e whitespace. Non sono benchmark di performance né una verifica live delle versioni correnti degli agenti esterni.
 
 ## Limiti ancora aperti
 
-- Il recorder mantiene in memoria l’intera registrazione e scrive il sink in modo sincrono. Code limitate, errori del sink, gap dello stream e recupero della coda incompleta restano aperti nella fase 2. Gli endpoint HTTP correnti continuano a servire una registrazione per processo, senza paginazione.
-- `JSON retained` misura il JSON conservato di richieste e risposte abbinate nelle chiamate visualizzate, non il traffico originale; per i log precedenti viene riserializzato. Gli adattatori possono ridurre o omettere contenuti. Le dimensioni della sorgente non ricostruiscono ciò che non è arrivato al punto di cattura. Il limite per payload non limita envelope, input, code o memoria totale della registrazione.
-- Metriche ancora calcolate nel frontend; il motore Go unico viene introdotto nelle fasi successive.
-- La mappa mostra soltanto intervalli di cattura, non una waterfall completa di turni LLM/tool. Nessuna analisi automatica delle ripetizioni, occupazione del contesto, usage nativo, diagnostica degli schemi o catalogo multi-sessione implementati in questa fase.
+- Il recorder mantiene in memoria l’intera registrazione e scrive il sink in modo sincrono. Code limitate, errori del sink, gap dello stream e recupero della coda incompleta restano aperti nella fase 2. La paginazione v1 limita il trasferimento e la memoria ordinaria del browser; non limita la memoria totale del recorder o la dimensione di ogni riga del dettaglio.
+- `JSON retained` misura il JSON conservato di richieste e risposte abbinate nelle chiamate visualizzate, non il traffico originale; per i log precedenti usa il JSON conservato compatto. Gli adattatori possono ridurre o omettere contenuti. Le dimensioni della sorgente non ricostruiscono ciò che non è arrivato al punto di cattura. Il limite per payload non limita envelope, input, code o memoria totale della registrazione.
+- La waterfall mostra gli intervalli catturati dei tool, senza span nativi di modello o turno. I suoi intervalli non attribuiti non sono una diagnostica di perdita di eventi. Nessuna analisi automatica delle ripetizioni, occupazione del contesto, usage nativo, diagnostica degli schemi o catalogo multi-sessione implementati in questa fase.
 - Il package di policy e le sue regressioni interne restano nel repository, ma la CLI nuova non offre enforcement. La loro eliminazione non è un prerequisito per osservare passivamente.
 - Il binario installato e gli hook reali dell'utente non sono stati cambiati. La migrazione di un'installazione esistente è un'operazione separata ed esplicita.
 - Landing page invariata.
 
-Prossimo passo: proseguire la fase 2 con code e memoria limitate, errori del sink, gap distinguibili e recupero della coda JSONL; quindi capability e API paginata prima dei findings.
+Prossimo passo: proseguire la fase 2 con code e memoria limitate, errori del sink, gap distinguibili e recupero della coda JSONL; quindi capability e findings. La API paginata del profiler è già disponibile.

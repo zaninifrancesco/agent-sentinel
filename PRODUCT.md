@@ -24,7 +24,7 @@ The Local Profiler & Flight Recorder for AI Agents. A single Go binary with an e
 
 ## Operating Context
 
-- The hook collector normally listens on `127.0.0.1:8848`; sessions stream to the cockpit over WebSocket and are stored in local JSONL files.
+- The hook collector normally listens on `127.0.0.1:8848`; the cockpit polls paged snapshots while following live capture and are stored in local JSONL files.
 - Cursor and Claude Code hooks acknowledge neutrally, including when the collector is unavailable. Delivery has a one-second default HTTP timeout, configurable up to five seconds.
 - MCP stdio traffic is forwarded unchanged in the observation path. A transport-process crash can still interrupt the connection.
 - J/K and arrow keys navigate the focused call list; Cmd/Ctrl+K searches. Export downloads a self-contained HTML report.
@@ -34,20 +34,21 @@ The Local Profiler & Flight Recorder for AI Agents. A single Go binary with an e
 
 Implemented on the telemetry branch:
 
-- Timeline as the default view, with a selectable capture map grouped by tool. Map intervals use recorded request/response timestamps; source-reported duration remains a separate measure. Up to 120 recent calls are mapped, with every call still available in the list.
+- Timeline as the default view, with a call waterfall that zooms to the current 50-row page. Each call has a lane, with overlaps, incomplete points and unattributed intervals. Scope totals use interval union, independently of list filters; source-reported duration remains separate.
 - Tool profile: per-tool activity, top five completed calls by available duration and top five retained responses by JSON size. Every entry opens its captured calls.
 - Calls with exact tool and status filters, search across captured arguments, and sorting by capture order, duration or retained response size. Event log keeps lifecycle and protocol observations accessible separately.
 - Arguments/result inspector with safe syntax colouring, text search with match counts, previous/next event navigation, secondary event JSON, patch viewer where patch data exists, event search and dark/light themes. On mobile, opening a call replaces the list and provides a back action.
-- Tool-call counts, reported errors, available duration percentiles and retained payload JSON size. No fixed-price token or dollar estimates.
+- Go supplies call counts, reported errors, nearest-rank duration percentiles, retained JSON, tool rankings and temporal coverage for live, replay and export. The browser presents the supplied results.
 - Local JSONL recordings, replay of new and old traces, and an offline HTML report with expandable calls. Report payloads remain summarized.
 - Historical risk and policy decisions remain readable only where recorded; there are no live approval or budget controls.
 - Schema v2 recording/source/session/connection/call identity, type-preserving native IDs, explicit correlation quality and duration provenance. Concurrent indistinguishable calls stay unresolved; orphan responses remain inspectable.
 - A session/connection selector scopes the map, list, profile and metrics; reports retain the whole recording.
 - Standard capture redacts recognized sensitive fields/text before storage and streaming, with a 64 KiB default payload limit. Explicit full capture retains more hook content without redaction, bounded at 1 MiB by default. Limits are configurable per recording.
 - Inspector and reports distinguish observed source units, normalized/stored JSON, client-reported sizes and declared transformations. Missing original measurements stay unknown; full capture cannot recover upstream omissions.
+- Snapshot cursors keep pages stable during live appends. Server-side search and sorting cover the full retained recording; full call payloads load only for the selected inspector.
 - The frontend remains embedded, with local fonts and no required external assets.
 
-Planned, not implemented: bounded queues, sink-error and capture-gap diagnostics/recovery, a complete waterfall, an analysis engine with evidence-linked findings, recording catalog and a JSONL export flow. See `docs/ROADMAP.md` and `docs/PROGRESS.md` for status. Per-payload limits do not bound total recording memory. Standard redaction is best effort; existing recordings are not scrubbed on replay.
+Planned, not implemented: bounded queues, sink-error and capture-gap diagnostics/recovery, native model/turn spans, automatic findings linked to evidence, recording catalog and a JSONL export flow. See `docs/ROADMAP.md` and `docs/PROGRESS.md` for status. Per-payload limits do not bound total recording memory. Standard redaction is best effort; existing recordings are not scrubbed on replay.
 
 The current data does not reveal model reasoning, actual context occupancy, provider billing or a full workspace history. Some hook payloads are synthesized, reduced or omitted. Retained JSON size must never be labelled original wire traffic or model usage. Absence of a duration or an error signal does not prove zero execution time or success.
 

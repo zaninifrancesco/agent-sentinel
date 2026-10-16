@@ -1,6 +1,6 @@
 # Roadmap del pivot
 
-Stato: la fase 1 è implementata sul branch `telemetry-profiler`; la fase 2 è in corso, con identità, correlazione, selezione delle sessioni, profili e qualità dei payload implementati. Le fasi 3–5 non sono ancora complete. Evidenze e limiti in [PROGRESS.md](PROGRESS.md). Vedi [direzione](PRODUCT_DIRECTION.md), [architettura](ARCHITECTURE.md), [telemetria](TELEMETRY_SPEC.md) e [analisi](ANALYSIS_SPEC.md).
+Stato: la fase 1 è implementata sul branch `telemetry-profiler`; la fase 2 è in corso, con identità, correlazione, selezione delle sessioni, profili e qualità dei payload implementati. La base della fase 3 è implementata con waterfall tool, API paginata e metriche Go condivise; le fasi restano soggette ai limiti di cattura ancora aperti. Findings e catalogo delle fasi 4–5 non sono implementati. Evidenze e limiti in [PROGRESS.md](PROGRESS.md). Vedi [direzione](PRODUCT_DIRECTION.md), [architettura](ARCHITECTURE.md), [telemetria](TELEMETRY_SPEC.md) e [analisi](ANALYSIS_SPEC.md).
 
 Non vengono assegnate date arbitrarie. Ogni fase ha una condizione di uscita verificabile e prepara quella successiva.
 
@@ -38,7 +38,7 @@ Obiettivo: costruire una base che non confonda conversazioni, tempi e payload.
 
 Completato: envelope v2 additivo, identità di sorgente/sessione/connessione/chiamata, ID nativi tipizzati, correlazione dichiarata e filtri per sessione nel cockpit. Le chiamate indistinguibili concorrenti restano ambigue; le risposte orfane non generano richieste inventate. Durata e sua provenienza sono separate dagli intervalli osservati. Profili standard/full, redazione prima di persistenza/stream e limiti per payload dichiarati; misure della sorgente con unità separate dal JSON normalizzato/conservato, omissioni e trasformazioni visibili in inspector e report. Il replay preserva queste informazioni senza modificare vecchi log.
 
-Ancora aperto: capability esplicite, code e memoria totale limitate, errori del sink e gap, recupero della coda JSONL e API HTTP versionata/paginata. Le dimensioni originali sono note solo per i valori effettivamente misurati o dichiarati dalla sorgente; full non recupera omissioni a monte. La fase non è chiusa.
+Ancora aperto: capability esplicite, code e memoria totale limitate, errori del sink e gap, recupero della coda JSONL. La [API profiler v1](PROFILER_API.md) versionata/paginata è implementata. Le dimensioni originali sono note solo per i valori effettivamente misurati o dichiarati dalla sorgente; full non recupera omissioni a monte. La fase non è chiusa.
 
 Lavoro:
 
@@ -59,6 +59,8 @@ Accettazione:
 - Una traccia vecchia si apre senza riscritture; campi sconosciuti non diventano zero. Una traccia interrotta dichiara la propria incompletezza.
 
 ## Fase 3 — Profiler utilizzabile
+
+Implementato: waterfall per chiamata con unione degli intervalli, tempo non attribuito e incomplete visibili; profilo e classifiche per tool; liste paginate e dettaglio su richiesta; metriche Go condivise con replay/report; verifica con 10.000 chiamate sintetiche. Restano la suddivisione interna dei singoli payload in chunk e le garanzie di affidabilità della fase 2. Nessuno span LLM viene inventato.
 
 Obiettivo: rendere leggibile una sessione anche senza findings automatici.
 
@@ -83,7 +85,7 @@ Obiettivo: evidenziare sequenze utili senza sostituire i dati con giudizi opachi
 
 Lavoro:
 
-- Implementare `internal/analysis`, versioni delle regole e riferimenti stabili agli eventi.
+- Estendere `internal/analysis`, già usato per proiezione e metriche, con versioni delle regole e riferimenti stabili ai findings.
 - Aggiungere R1–R4: risposte grandi, chiamate identiche, errori ripetuti, chiamate lunghe.
 - Mostrare findings con dati mancanti, regola/parametri e collegamento alla selezione nella waterfall.
 - Raggruppare findings sovrapposti; mantenere polling e sessioni senza anomalie tra i controesempi.

@@ -10,11 +10,12 @@ Stato: specifica di destinazione, 15 ottobre 2026. Questo documento sostituisce 
 - `internal/proxy` inoltra frame invariati. Ogni interceptor ha una propria identità di connessione e distingue il lato che ha originato una richiesta. La durata locale è un round trip del proxy, non una misura interna del server o del modello.
 - `internal/recorder` scrive un envelope v2 additivo e usa `CallTracker` per accoppiare evidenze. La registrazione Sentinel è distinta dalla sessione dell’agente. Le sovrapposizioni indistinguibili vengono segnalate con candidati espliciti e non abbinate in ordine di arrivo.
 - `internal/recorder/capture.go` applica prima redazione, poi limite del payload, prima di memoria, sink e subscriber. Standard usa riconoscimento best effort e 64 KiB; full è esplicito, senza redazione, con 1 MiB. `capture` distingue byte osservati con unità e campo, JSON normalizzato/conservato, dimensioni dichiarate dal client e trasformazioni. Le identità riconosciute come sensibili diventano opache per registrazione senza collassare l’abbinamento. La configurazione è persistita all’inizio e ripristinata dal replay.
-- `internal/server` e `/ws` continuano a esporre una registrazione, tramite gli endpoint esistenti. L’API HTTP versionata e paginata resta prevista; non è stata introdotta una diversa semantica per `sessionId`.
-- `web/src/rows.ts` proietta le chiamate v2 usando `callId`, namespace e riferimento alla richiesta. La correlazione legacy è conservativa. `scopes.ts` distingue sessioni native e connessioni, con filtri coerenti su mappa, lista, profilo e metriche. Le metriche sono ancora calcolate nel browser.
+- `internal/server` espone la [API profiler v1](PROFILER_API.md): pagine di sintesi, snapshot fissati dai cursori, dettaglio per chiave e dati del report. Endpoint precedenti e `/ws` restano compatibili; una registrazione per processo.
+- `internal/analysis` proietta le chiamate v2 e legacy, gli scope, i conteggi, i percentili nearest rank, le classifiche e la copertura temporale. Versione `profiler-v1`, condivisa da live/replay/report. La waterfall usa unione degli intervalli validi; incompleti e sintetici non inventano tempo.
+- `web/src/useProfiler.ts` mantiene una pagina di sintesi e un dettaglio su richiesta. La prima pagina live viene aggiornata ogni due secondi, mentre i cursori fissano la revisione. Il browser non mantiene una seconda proiezione o implementazione delle metriche.
 - Il replay accetta vecchi log e v2 e rifiuta versioni incompatibili, senza applicare retroattivamente la redazione. Il report HTML autonomo conserva metadati di identità, abbinamento, profilo e copertura, con argomenti sintetizzati anziché payload completi. Non vengono eseguiti comandi nel replay.
 
-Restano aperti: errori del sink, code e memoria totale limitate, gap dello stream e recupero dei log interrotti, capability, API paginata, metriche/analisi condivise in Go, catalogo e findings. Il limite implementato è per payload e non limita la memoria di tutta la registrazione o il traffico in ingresso. Vedi [stato e verifiche](PROGRESS.md).
+Restano aperti: errori del sink, code e memoria totale limitate, gap dello stream e recupero dei log interrotti, capability, suddivisione dei singoli payload in chunk, catalogo e findings. Il limite implementato è per payload e non limita la memoria di tutta la registrazione o il traffico in ingresso. Vedi [stato e verifiche](PROGRESS.md).
 
 ## 2. Architettura di destinazione
 
@@ -59,7 +60,7 @@ Un browser lento non rallenta il recorder. La UI recupera i gap dallo store quan
 
 ### Motore di analisi
 
-Proposta: package Go `internal/analysis`, indipendente da HTTP, UI e policy. Riceve eventi normalizzati ordinati, capability e versione delle regole; produce metriche e findings con riferimenti agli eventi.
+Il package Go `internal/analysis` è implementato per proiezione e metriche, indipendente da HTTP, UI e policy. I findings e le relative versioni/parametri restano da implementare; non sono prodotti dai conteggi del profiler.
 
 L'analisi è derivata, ricalcolabile e separata dalle evidenze originali. Lo stesso input, con gli stessi parametri e la stessa versione, produce lo stesso risultato in live, replay ed export. Nessun servizio LLM nella prima release.
 

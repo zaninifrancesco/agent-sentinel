@@ -15,17 +15,18 @@ Available now:
 - Passive Cursor and Claude Code hooks, with neutral responses even if the collector is offline.
 - A bounded hook-delivery deadline: one second by default, configurable up to five seconds.
 - MCP stdio proxying without a policy gate; requests and responses are forwarded unchanged.
-- A timeline with a selectable recording map grouped by tool. Captured request/response intervals stay distinct from reported execution durations.
+- A paged call waterfall with one lane per call, visible overlaps and unattributed intervals. Matched capture coverage uses interval union; reported tool duration remains separate.
 - A tool profile with per-tool activity, longest completed calls and largest retained responses, each linked to its captured evidence.
 - A call inspector with status/tool filters, full-argument search, duration/response-size sorting, payload text search, previous/next navigation, available patch diffs and a separate event log.
 - Recording-scoped call identities and separate agent sessions/connections, with a cockpit scope selector.
 - Explicit native/fallback pairing, ambiguous-call filtering and orphan responses preserved in Event log.
-- Counts of tool calls and errors, available duration percentiles and retained payload JSON size.
+- Shared Go metrics for live, replay and export: call/error counts, nearest-rank percentiles, retained JSON, capture coverage and peak observed concurrency.
+- Versioned profiler API with stable snapshot cursors, 50-row cockpit pages, server-side search/sorting and payloads fetched only for the selected call.
 - Capture profiles with limits and transformation metadata: observed source bytes, normalized/stored JSON, redaction, truncation and omission, visible in the inspector and report.
 - Local JSONL recordings and read-only replay, including older enforcement traces.
 - Standalone HTML session reports, without scripts or external assets.
 
-**Planned, not implemented yet:** a full waterfall, bounded queues and capture-gap recovery, repeated-call findings, schema diagnostics and a recording catalog. See the [implementation roadmap](docs/ROADMAP.md).
+**Planned, not implemented yet:** native model/turn spans, bounded queues and capture-gap recovery, repeated-call findings, schema diagnostics and a recording catalog. See the [implementation roadmap](docs/ROADMAP.md).
 
 ![Trace Atlas timeline showing synthetic calls](docs/profiler.png)
 
@@ -113,15 +114,19 @@ The selected settings are saved in the recording and exposed by `/api/config`. L
 
 The first opens the latest recording; the second opens the selected file. Replay never executes captured commands. Historical blocks, holds and human decisions remain visible in old recordings, without approval controls.
 
-The cockpit's Export button always exports the whole recording, including all captured sessions and connections. It downloads an offline HTML report with summary figures, capture settings, payload-coverage summaries and expandable call history. It includes argument summaries, not full request/response payloads. The original JSONL is the trace for detailed local replay; a dedicated JSONL export flow is planned. `sentinel export` and `sentinel run` are not implemented.
+The cockpit's Export button uses a backend snapshot and always exports the whole recording, including all captured sessions and connections. It downloads an offline HTML report with summary figures, capture settings, payload-coverage summaries and expandable call history. It includes argument summaries, not full request/response payloads. The original JSONL is the trace for detailed local replay; a dedicated JSONL export flow is planned. `sentinel export` and `sentinel run` are not implemented.
 
 A synthetic multi-session recording is included at [`testdata/telemetry-v2.jsonl`](testdata/telemetry-v2.jsonl): seven observed requests, two ambiguous responses, one orphan response and one synthetic interruption. Open it with `sentinel ui testdata/telemetry-v2.jsonl`; its command strings were never executed.
+
+The profiler loads 50 call summaries per page. Next/previous pages stay pinned to the same recording revision while new events arrive; Refresh latest returns to current evidence. The inspector fetches one selected call's retained payloads. See the [profiler API contract](docs/PROFILER_API.md).
 
 ## What the numbers mean
 
 Durations are those available from the adapter or proxy; they are not the model's thinking time. Median and p95 include completed tool calls with available nonnegative durations, excluding interrupted calls and legacy approval-held spans. Zero milliseconds is valid; absent samples display as unavailable.
 
-**JSON retained** sums stored request and matched-response payload JSON bytes for the displayed tool calls. Unassigned responses are excluded. Legacy recordings use reserialized payload JSON where a stored measurement is absent. Some hook payloads are synthesized, omitted or truncated. This is neither original wire volume nor actual model tokens or context usage. Sentinel no longer calculates dollars from fixed token-price assumptions.
+**JSON retained** sums stored request and matched-response payload JSON bytes for the selected recording scope, independently of list filters or pagination. Unassigned responses are excluded. Legacy recordings use compact retained payload JSON where a stored measurement is absent. Some hook payloads are synthesized, omitted or truncated. This is neither original wire volume nor actual model tokens or context usage. Sentinel no longer calculates dollars from fixed token-price assumptions.
+
+Matched coverage is the union of valid captured tool intervals. Unattributed time is the remainder of the observed recording span; it can include model, user, scheduling and missing evidence. Pending or ambiguous calls and synthetic closures stay points. These measures never infer model thinking time or native context usage.
 
 New JSONL events use schema v2, retaining `sessionId` as the recording identity for compatibility. Native IDs keep their type and exact value unless standard capture recognizes a credential-like string: those identities become stable opaque values within the recording, with affected fields declared. An ambiguous response is never assigned to an arbitrary request. Missing requests are not fabricated. Duration provenance and explicit zero are preserved in `timing`; synthetic turn-end closures have no execution duration.
 

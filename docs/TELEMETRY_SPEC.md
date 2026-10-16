@@ -4,7 +4,7 @@ Stato: contratto di destinazione con un sottoinsieme implementato dichiarato sot
 
 ## 0. Contratto v2 attualmente implementato
 
-La nuova scrittura è un’estensione additiva dell’envelope precedente. Identità, correlazione e profili di cattura sono implementati; non introduce ancora l’envelope `data`, capability o paginazione descritti più avanti.
+La nuova scrittura è un’estensione additiva dell’envelope precedente. Identità, correlazione e profili di cattura sono implementati; non introduce ancora l’envelope `data` o capability descritte più avanti. La nuova [API profiler v1](PROFILER_API.md) pagina le sintesi delle chiamate senza modificare il formato JSONL.
 
 - `schemaVersion: 2`, `recordingId`, `seq`; `sessionId` mantiene il significato storico di registrazione Sentinel ed è uguale a `recordingId`.
 - `timestamp` rimane il nome serializzato dell’istante UTC di osservazione locale. `observedAt`, timestamp nativi e turni non sono ancora normalizzati.
@@ -162,7 +162,7 @@ I due profili implementati sono descritti nella sezione 0: `standard`, con limit
 
 Redazione e limiti avvengono prima della persistenza e della trasmissione alla UI. I byte del traffico inoltrato restano intatti. Ogni trasformazione registra motivo, quantità quando nota e metodo; non promettere di rilevare tutti i segreti. Evitare di conservare copie raw parallele che aggirino il profilo scelto.
 
-Le soglie di payload sono già esplicite e persistite. Soglie di coda e conservazione totale restano da implementare, insieme al dettaglio paginato. Quest’ultimo deve mostrare tutto il contenuto **conservato** senza troncarlo silenziosamente a schermo.
+Le soglie di payload sono già esplicite e persistite. Soglie di coda e conservazione totale restano da implementare. Le liste del profiler sono paginate e il dettaglio viene caricato per singola chiamata; la suddivisione del singolo payload in chunk resta prevista. Quest’ultimo deve mostrare tutto il contenuto **conservato** senza troncarlo silenziosamente a schermo.
 
 La cattura non legge file solo per completare un diff o indagare il repository. Usa quanto ricevuto; futuri snapshot del workspace richiedono una funzione separata e consapevole.
 

@@ -1,6 +1,8 @@
 # Analisi delle sessioni
 
-Stato: specifica di destinazione. Le regole seguenti sono deterministiche e locali; non sono già implementate. Dati e qualità seguono il [contratto di telemetria](TELEMETRY_SPEC.md).
+Stato: proiezione e metriche di base implementate in Go con versione `profiler-v1`; findings R1–R4 e analisi successive ancora previsti. Le regole seguenti sono deterministiche e locali. Dati e qualità seguono il [contratto di telemetria](TELEMETRY_SPEC.md).
+
+Il profiler attuale condivide conteggi, percentili, classifiche e unione degli intervalli tra live, replay e report. Copertura della sorgente, error rate con denominatori, dettaglio delle esclusioni e findings non vanno considerati implementati solo per la presenza del package. Vedi il [contratto API](PROFILER_API.md).
 
 ## 1. Contratto dei risultati
 
