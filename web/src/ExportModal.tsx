@@ -1,21 +1,34 @@
 import { useEffect, useState } from "react";
 import { Download, Copy, Check, X, FileText } from "lucide-react";
-import type { Session, Row, SentinelConfig } from "./types";
+import type { Session, ReportData, SentinelConfig } from "./types";
 import { buildReportHtml } from "./report";
-import { computeMetrics } from "./metrics";
+import { EMPTY_METRICS } from "./metrics";
+import { readJSON } from "./useProfiler";
 import { useDialogFocus } from "./useDialogFocus";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   session: Session | null;
-  rows: Row[];
+  revision?: number;
   config: SentinelConfig;
 }
 
-export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
+export function ExportModal({ isOpen, onClose, session, revision, config }: Props) {
   const dialog = useDialogFocus(isOpen);
   const [copied, setCopied] = useState(false);
+  const [data, setData] = useState<ReportData | null>(null);
+  const [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    if (!isOpen || !session || !revision) return;
+    const controller = new AbortController(); setData(null); setError("");
+    const query = new URLSearchParams({ recordingId: session.id, through: String(revision) });
+    void readJSON<ReportData>(`/api/v1/report?${query}`, controller.signal).then((value) => {
+      if (!controller.signal.aborted) setData(value);
+    }).catch((cause: unknown) => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Could not prepare report"); });
+    return () => controller.abort();
+  }, [isOpen, session?.id, retry]);
 
   // Escape closes the export dialog without reaching the timeline.
   useEffect(() => {
@@ -33,8 +46,8 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
 
   if (!isOpen) return null;
 
-  const m = computeMetrics(rows);
-  const generateReportHtml = () => buildReportHtml({ session, rows, config, exportedAt: new Date() });
+  const m = data?.metrics ?? EMPTY_METRICS;
+  const generateReportHtml = () => data ? buildReportHtml({ ...data, config, exportedAt: new Date() }) : "";
 
   const handleDownload = () => {
     const html = generateReportHtml();
@@ -47,10 +60,9 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
     URL.revokeObjectURL(url);
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(generateReportHtml());
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try { await navigator.clipboard.writeText(generateReportHtml()); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    catch { setError("Could not copy HTML. Download the report instead."); }
   };
 
   return (
@@ -67,6 +79,8 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
         </div>
 
         <div className="space-y-4 p-6 text-xs text-ink-2">
+          {error && <p role="alert" className="text-warn">{error} <button className="underline" onClick={() => setRetry((n) => n + 1)}>Retry</button></p>}
+          {!data && !error && <p role="status">Preparing the complete recording at snapshot #{revision}…</p>}
           <p>
             One self-contained HTML file with the recorded calls, their outcomes and durations.
             Historical policy decisions are included when present in the trace. It opens offline, runs no script, and follows the reader's
@@ -75,7 +89,7 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
 
           <div className="space-y-2 rounded-sm border border-rule bg-paper p-4">
             <Line label="Session" value={session?.id || "active"} />
-            <Line label="Entries" value={String(rows.length)} />
+            <Line label="Entries" value={data ? String(data.rows.length) : "Loading…"} />
             <Line label="Tool calls" value={String(m.calls)} />
             <Line label="Tool errors" value={String(m.errors)} />
             {m.refused > 0 && <Line label="Historical refusals" value={String(m.refused)} />}
@@ -91,7 +105,7 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
 
         <div className="flex items-center justify-end gap-3 border-t border-rule bg-paper px-6 py-3.5">
           <button
-            onClick={handleCopy}
+            disabled={!data} onClick={() => void handleCopy()}
             className="flex items-center gap-1.5 rounded-md border border-rule-strong bg-sheet px-3 py-2 text-xs text-ink hover:border-ink"
           >
             {copied ? <Check className="size-3.5 text-ok" /> : <Copy className="size-3.5" />}
@@ -99,7 +113,7 @@ export function ExportModal({ isOpen, onClose, session, rows, config }: Props) {
           </button>
 
           <button
-            onClick={handleDownload}
+            disabled={!data} onClick={handleDownload}
             className="flex items-center gap-1.5 rounded-md bg-accent px-4 py-2 text-xs font-semibold text-sheet hover:opacity-90"
           >
             <Download className="size-3.5" />

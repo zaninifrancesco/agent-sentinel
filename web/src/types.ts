@@ -99,6 +99,10 @@ export type ServerMessage =
 
 /** One row of the timeline: a request merged with its response, or a standalone event. */
 export interface Row {
+	requestBytes?: number;
+	responseBytes?: number;
+	toolDurationMs?: number;
+	span?: { startMs: number; endMs?: number };
   correlation?: Correlation;
   key: string;
   kind: "tool" | "rpc" | "notification" | "raw" | "session";
@@ -112,6 +116,27 @@ export interface Row {
   response?: SentinelEvent;
   resolution?: SentinelEvent; // how a held call was settled (ApprovalResolved)
   event?: SentinelEvent; // standalone
+}
+
+export interface ProfilerTimeline {
+  windowStartMs?: number; windowEndMs?: number; startMs?: number; endMs?: number; spanMs: number; coveredMs: number;
+  unattributedMs: number; overlapMs: number; peakConcurrency: number; incompleteCalls: number;
+  gapCount: number; gaps: { startMs: number; endMs: number }[];
+}
+export interface ProfilerProfile {
+  calls: number;
+  tools: { name: string; metrics: import("./metrics").Metrics }[];
+  longest: Row[]; largest: Row[];
+}
+export interface ProfilerPage {
+  version: string; revision: number; session: Session;
+  scopes: { id: string; label: string }[];
+  metrics: import("./metrics").Metrics; profile: ProfilerProfile; timeline: ProfilerTimeline;
+  rows: Row[]; total: number; offset: number; limit: number; current: string; next?: string; previous?: string;
+}
+export interface ReportData {
+  version: string; revision: number; session: Session; rows: Row[];
+  metrics: import("./metrics").Metrics; timeline: ProfilerTimeline;
 }
 
 /** Served at /api/config. */

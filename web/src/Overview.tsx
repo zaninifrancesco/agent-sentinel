@@ -1,6 +1,5 @@
 import { ArrowUpRight, ArrowRight } from "lucide-react";
-import type { Row } from "./types";
-import type { buildProfile } from "./profile";
+import type { Row, ProfilerProfile } from "./types";
 import { toolColor } from "./trace";
 import { responseSize } from "./profile";
 import { formatBytes, formatDuration } from "./format";
@@ -8,7 +7,7 @@ import { PAYLOAD_NOTE, toolDuration } from "./metrics";
 import { StatusIcon } from "./Timeline";
 
 interface Props {
-  profile: ReturnType<typeof buildProfile>;
+  profile: ProfilerProfile;
   onInspect: (row: Row) => void;
   onTool: (tool: string) => void;
   onCalls: () => void;
@@ -17,7 +16,7 @@ interface Props {
 }
 
 export function Overview({ profile, onInspect, onTool, onCalls, connecting, replay }: Props) {
-  const total = profile.calls.length;
+  const total = profile.calls;
   return (
     <main className="min-h-0 flex-1 overflow-y-auto" aria-label="Recording overview">
       <div className="mx-auto max-w-[1600px] px-4 py-5 sm:px-5">
@@ -26,12 +25,12 @@ export function Overview({ profile, onInspect, onTool, onCalls, connecting, repl
             <h2 className="text-lg font-semibold tracking-tight">Where the work happens</h2>
             <p className="mt-1 text-sm text-ink-2">Inspect tool time, captured responses and reported errors.</p>
           </div>
-          {profile.calls.length > 0 && <button onClick={onCalls} className="action-button">
+          {profile.calls > 0 && <button onClick={onCalls} className="action-button">
             Inspect calls <ArrowRight aria-hidden className="size-4" />
           </button>}
         </div>
 
-        {profile.calls.length === 0 ? (
+        {profile.calls === 0 ? (
           <section className="border-y border-rule-strong py-10 sm:py-14" aria-live="polite">
             <h2 className="text-lg font-semibold">{connecting ? "Connecting to the recorder" : replay ? "No tool calls in this recording" : "Ready for the first tool call"}</h2>
             <p className="mt-2 max-w-prose text-sm text-ink-2">
@@ -94,7 +93,7 @@ export function Overview({ profile, onInspect, onTool, onCalls, connecting, repl
         <details className="mt-8 border-t border-rule-strong py-4 text-xs text-ink-2">
           <summary className="w-fit cursor-pointer py-1 font-medium text-ink">What this recording can show</summary>
           <div className="mt-3 max-w-prose space-y-2 leading-relaxed">
-            <p>These summaries describe the tool events available in this recording. A recording may contain multiple agent conversations; they are not yet separated here.</p>
+            <p>These summaries describe the tool events available in this recording. The session selector scopes these measurements to captured conversations or connections.</p>
             <p>{PAYLOAD_NOTE} An absent duration is unavailable, not a measured zero.</p>
             <p>Time between tool calls is not model thinking time. This view does not measure the model context window or provider billing.</p>
           </div>

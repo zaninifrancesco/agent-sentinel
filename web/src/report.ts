@@ -1,7 +1,7 @@
 import type { Risk, Row, Session, SentinelConfig, Status } from "./types";
 import { formatBytes, formatDuration, formatTime } from "./format";
 import { captureSummary } from "./capture";
-import { computeMetrics, PAYLOAD_NOTE } from "./metrics";
+import { PAYLOAD_NOTE, type Metrics } from "./metrics";
 import { journeyStops, type Stop, type Tone } from "./journey";
 
 /**
@@ -25,6 +25,10 @@ export interface ReportInput {
   /** What the running Sentinel was configured with; null when unknown. */
   config: SentinelConfig | null;
   exportedAt: Date;
+  metrics: Metrics;
+  version: string;
+  revision: number;
+  timeline: import("./types").ProfilerTimeline;
 }
 
 /** Statuses are never told by colour alone: each has a glyph and a word. */
@@ -89,8 +93,8 @@ function rowHtml(row: Row, hasPolicy: boolean): string {
   const policy = [row.request?.rule ? `<code>${esc(row.request.rule)}</code>` : "", riskChip(row.risk)].join("");
   const event = row.request ?? row.response ?? row.event;
   const correlation = row.correlation ?? event?.correlation;
-  const context = [event?.source, event?.agentSessionId ? `agent session ${event.agentSessionId}` : event?.connectionId ? `connection ${event.connectionId}` : undefined, event?.callId, correlation ? `${correlation.method} / ${correlation.quality}` : undefined, event?.timing?.source, row.response?.timing?.source].filter(Boolean).join(" · ");
-  const coverage = [row.request, row.response, row.event].filter((e) => e?.payload !== undefined).map((e) => captureSummary(e!)).join("; ");
+  const context = [event?.source, event?.agentSessionId ? `agent session ${event.agentSessionId}` : event?.connectionId ? `connection ${event.connectionId}` : undefined, event?.callId, correlation ? `${correlation.method} / ${correlation.quality}` : undefined, event?.timing?.source, row.response?.timing?.source, row.span ? row.span.endMs === undefined ? "capture end unavailable" : `captured interval ${formatDuration(row.span.endMs - row.span.startMs)}` : undefined].filter(Boolean).join(" · ");
+  const coverage = [row.request, row.response, row.event].filter((e) => e && (row.kind === "tool" || e.capture !== undefined || e.payload !== undefined)).map((e) => captureSummary(e!)).join("; ");
   const cells = `
       <span class="fig t">${esc(formatTime(row.startedAt))}</span>
       <span class="status tone-${mark.tone}"><span aria-hidden="true">${mark.glyph}</span> ${mark.word}</span>
@@ -255,8 +259,7 @@ footer p { margin: 0 0 4px; }
 }
 `;
 
-export function buildReportHtml({ session, rows, config, exportedAt }: ReportInput): string {
-  const m = computeMetrics(rows);
+export function buildReportHtml({ session, rows, config, exportedAt, metrics: m, version, revision, timeline }: ReportInput): string {
   const tools = rows.filter((r) => r.kind === "tool");
 
   // How the held calls were settled.
@@ -272,8 +275,7 @@ export function buildReportHtml({ session, rows, config, exportedAt }: ReportInp
   const sessionId = session?.id || "session";
   const start = session?.startedAt;
   const end = session?.endedAt;
-  const spanMs = start && end ? new Date(end).getTime() - new Date(start).getTime() : NaN;
-  const lasted = Number.isNaN(spanMs) ? undefined : formatDuration(spanMs);
+  const lasted = end && timeline.startMs !== undefined ? formatDuration(timeline.spanMs) : undefined;
 
   const hasPolicy = tools.some((row) => row.request?.decision || row.risk !== "none");
   const mode = config?.mode === "observe" ? "Observation only" : "Recorded session";
@@ -283,6 +285,12 @@ export function buildReportHtml({ session, rows, config, exportedAt }: ReportInp
     fact("Started", esc(stamp(start))),
     fact("Ended", end ? `${esc(stamp(end))}${lasted ? ` (${esc(lasted)})` : ""}` : "still running when exported"),
     fact("Mode", mode),
+    fact("Analysis", `${esc(version)} · snapshot #${revision}`),
+    fact("Observed span", timeline.startMs === undefined ? "not available" : esc(formatDuration(timeline.spanMs))),
+    fact("Matched tool coverage", esc(formatDuration(timeline.coveredMs))),
+    fact("Unattributed interval", esc(formatDuration(timeline.unattributedMs))),
+    fact("Peak observed concurrency", String(timeline.peakConcurrency)),
+    fact("Calls without a measured capture end", String(timeline.incompleteCalls)),
     fact("Capture profile", session?.capture ? `${esc(session.capture.profile)} · ${esc(session.capture.redaction)} · ${esc(formatBytes(session.capture.maxPayloadBytes))} per payload` : "not recorded"),
     fact("Tool calls", String(m.calls)),
     ...(tools.some((row) => row.correlation?.quality === "ambiguous") ? [fact("Unresolved call pairing", String(tools.filter((row) => row.correlation?.quality === "ambiguous").length))] : []),
@@ -316,7 +324,7 @@ export function buildReportHtml({ session, rows, config, exportedAt }: ReportInp
     ${decisionsHtml(rows)}` : ""}
 
     <h2>Timetable</h2>
-    <p class="lede">Requests paired with their results, plus standalone captured events. Open a tool call to inspect its history.</p>
+    <p class="lede">Requests paired with their results, plus standalone captured events. Coverage is the union of matched capture intervals; unattributed time can include the model, user, scheduling or capture gaps. Open a tool call to inspect its history.</p>
     <div class="table">
       <div class="head${hasPolicy ? " with-policy" : ""}"><span>Time</span><span>Status</span><span>Event</span>${hasPolicy ? `<span class="pol">Historical policy</span>` : ""}<span>Took</span></div>
       ${rows.length === 0 ? `<p class="quiet" style="padding:12px 16px">No events were recorded.</p>` : rows.map((row) => rowHtml(row, hasPolicy)).join("")}

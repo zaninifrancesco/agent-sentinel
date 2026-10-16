@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from "react";
 import { ArrowLeft, Download, Moon, Search, Sun, X, ChartNoAxesCombined, ListTree, ScanLine, Radio, FileJson, HardDrive, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { useSentinel, type Connection } from "./useSentinel";
+import { useProfiler, useRow, type Connection } from "./useProfiler";
 import { useConfig } from "./useConfig";
 import { useTheme } from "./theme";
 import { Timeline } from "./Timeline";
@@ -10,11 +10,10 @@ import { MetricsBar } from "./MetricsBar";
 import { TraceMap } from "./TraceMap";
 import { ExportModal } from "./ExportModal";
 import { Overview } from "./Overview";
-import { computeMetrics } from "./metrics";
-import { buildProfile, filterCalls, recordedSpan, sortCalls, type CallFilter, type CallSort } from "./profile";
+import { EMPTY_METRICS } from "./metrics";
+import { type CallFilter, type CallSort } from "./profile";
 import { formatBytes, formatDuration, formatTime } from "./format";
 import type { Row } from "./types";
-import { filterScope, recordingScopes } from "./scopes";
 
 type View = "overview" | "calls" | "events";
 const VIEWS: { id: View; label: string }[] = [
@@ -31,14 +30,11 @@ function initialRailCollapsed(): boolean {
 }
 
 export default function App() {
-  const { session, rows: allRows, connection } = useSentinel();
   const { config } = useConfig();
   const [theme, toggleTheme] = useTheme();
   const [railCollapsed, setRailCollapsed] = useState(initialRailCollapsed);
   const [view, setView] = useState<View>("calls");
   const [scope, setScope] = useState("");
-  const scopes = useMemo(() => recordingScopes(allRows), [allRows]);
-  const rows = useMemo(() => filterScope(allRows, scope), [allRows, scope]);
   const [filter, setFilter] = useState<CallFilter>("all");
   const [sort, setSort] = useState<CallSort>("time");
   const [tool, setTool] = useState("");
@@ -47,6 +43,21 @@ export default function App() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [cursor, setCursor] = useState("");
+  const [focusKey, setFocusKey] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  useEffect(() => { const timer = window.setTimeout(() => setDebouncedQuery(query), 200); return () => clearTimeout(timer); }, [query]);
+  const pageQuery = useMemo(() => new URLSearchParams({ view: view === "events" ? "events" : "calls", scope, filter, sort, tool, q: debouncedQuery, limit: "50", ...(cursor ? { cursor } : {}), ...(focusKey ? { focus: focusKey } : {}) }).toString(), [view, scope, filter, sort, tool, debouncedQuery, cursor, focusKey]);
+  const { data, loading, error, connection, retry } = useProfiler(pageQuery);
+  const session = data?.session ?? null;
+  const scopes = data?.scopes ?? [];
+  const metrics = data?.metrics ?? EMPTY_METRICS;
+  const profile = data?.profile ?? { calls: 0, tools: [], longest: [], largest: [] };
+  const visible = data?.rows ?? [];
+  const span = data?.timeline.spanMs;
+  const detail = useRow(selectedKey, session?.id, data?.revision);
+  // Cursor signatures include every filter. Reset before issuing a new query.
+  const resetPage = () => { setCursor(""); setFocusKey(""); };
   const replay = config.mode === "replay";
 
   useEffect(() => {
@@ -54,8 +65,8 @@ export default function App() {
   }, [railCollapsed]);
 
   useEffect(() => {
-    if (scope && !scopes.some((item) => item.id === scope)) setScope("");
-  }, [scope, scopes]);
+    if (!loading && scope && !scopes.some((item) => item.id === scope)) { setScope(""); resetPage(); }
+  }, [scope, scopes, loading]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -68,33 +79,23 @@ export default function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isExportModalOpen]);
 
-  const metrics = useMemo(() => computeMetrics(rows), [rows]);
-  const profile = useMemo(() => buildProfile(rows), [rows]);
-  const span = useMemo(() => recordedSpan(session, rows), [session, rows]);
-  const visible = useMemo(() => {
-    if (view === "events") {
-      const q = query.trim().toLocaleLowerCase();
-      return q ? rows.filter((row) => `${row.title} ${row.subtitle ?? ""}`.toLocaleLowerCase().includes(q)) : rows;
-    }
-    return sortCalls(filterCalls(profile.calls, filter, tool, query), sort);
-  }, [rows, profile.calls, view, filter, tool, query, sort]);
-
   useEffect(() => {
-    if (view !== "overview" && !visible.some((row) => row.key === selectedKey)) {
+    if (!loading && !focusKey && view !== "overview" && !visible.some((row) => row.key === selectedKey)) {
       setSelectedKey(visible[0]?.key ?? null);
     }
-  }, [visible, selectedKey, view]);
+  }, [visible, selectedKey, view, loading, focusKey]);
+  useEffect(() => { if (!loading && focusKey && data) { if (visible.some((row) => row.key === focusKey)) { setSelectedKey(focusKey); setCursor(data.current); } setFocusKey(""); } }, [loading, focusKey, data, visible]);
   const selected = visible.find((row) => row.key === selectedKey) ?? null;
 
   const openCalls = (nextFilter: CallFilter = "all", nextTool = "") => {
-    setFilter(nextFilter); setTool(nextTool); setQuery(""); setSort("time"); setDetailOpen(false); setView("calls");
+    resetPage(); setFilter(nextFilter); setTool(nextTool); setQuery(""); setSort("time"); setDetailOpen(false); setView("calls");
   };
   const inspect = (row: Row) => {
-    setFilter("all"); setTool(""); setQuery(""); setSort("time");
+    setCursor(""); setFocusKey(row.key); setFilter("all"); setTool(""); setQuery(""); setSort("time");
     setSelectedKey(row.key); setDetailOpen(true); setView(row.kind === "tool" ? "calls" : "events");
   };
   const changeView = (next: View) => {
-    setView(next); setDetailOpen(false); setQuery("");
+    resetPage(); setView(next); setDetailOpen(false); setQuery("");
   };
 
   const selectedIndex = visible.findIndex((row) => row.key === selectedKey);
@@ -128,31 +129,37 @@ export default function App() {
       <div className="app-workspace">
         <header className="workspace-header">
           <div className="min-w-0"><div className="flex flex-wrap items-center gap-3"><h1>{VIEWS.find((item) => item.id === view)?.label}</h1><span className="recording-id">{session?.id ?? "Connecting"}</span></div><p className="workspace-caption">{subtitle[view]}</p></div>
-          {scopes.some((item) => item.id !== "unattributed") && <select aria-label="Filter agent session or connection" title={scopes.find((item) => item.id === scope)?.label ?? "All captured sessions and connections"} value={scope} onChange={(event) => { setScope(event.target.value); setDetailOpen(false); setSelectedKey(null); setQuery(""); setTool(""); setFilter("all"); }} className="field-input max-w-64 min-w-0 flex-1 sm:flex-none"><option value="">All sessions & connections</option>{scopes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}
+          {scopes.some((item) => item.id !== "unattributed") && <select aria-label="Filter agent session or connection" title={scopes.find((item) => item.id === scope)?.label ?? "All captured sessions and connections"} value={scope} onChange={(event) => { resetPage(); setScope(event.target.value); setDetailOpen(false); setSelectedKey(null); setQuery(""); setTool(""); setFilter("all"); }} className="field-input max-w-64 min-w-0 flex-1 sm:flex-none"><option value="">All sessions & connections</option>{scopes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}
           <div className="flex items-center gap-2">
-            <button disabled={!rows.length} onClick={() => setIsCommandPaletteOpen(true)} aria-label="Search events" className="icon-button"><Search aria-hidden className="size-4" /></button>
+            <button disabled={!data} onClick={() => setIsCommandPaletteOpen(true)} aria-label="Search events" className="icon-button"><Search aria-hidden className="size-4" /></button>
             <button onClick={toggleTheme} aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"} className="icon-button">{theme === "dark" ? <Sun aria-hidden className="size-4" /> : <Moon aria-hidden className="size-4" />}</button>
             <button disabled={!session} onClick={() => setIsExportModalOpen(true)} aria-label="Export session report" className="action-button"><Download aria-hidden className="size-3.5" /><span className="hidden sm:inline">Export report</span></button>
           </div>
         </header>
+        {error && <div role="alert" className="flex flex-wrap items-center gap-3 border-b border-rule bg-paper px-5 py-3 text-xs text-warn">Could not update the profiler: {error}<button className="action-button" onClick={() => { resetPage(); retry(); }}>Refresh latest</button></div>}
         <MetricsBar metrics={metrics} onErrors={() => openCalls("errors")} />
         {view === "overview" ? <Overview profile={profile} replay={replay} connecting={!replay && (connection === "connecting" || connection === "reconnecting")} onCalls={() => openCalls()} onTool={(name) => openCalls("all", name)} onInspect={inspect} /> : (
           <main className={`${view === "calls" ? "call-main " : ""}flex min-h-0 flex-1 flex-col`} aria-label={view === "calls" ? "Call inspector" : "Event log"}>
-            {view === "calls" && <div className={`trace-holder ${detailOpen ? "hidden lg:block" : "block"}`}><TraceMap rows={profile.calls} selectedKey={selectedKey} onSelect={inspect} /></div>}
+            {view === "calls" && <div className={`trace-holder ${detailOpen ? "hidden lg:block" : "block"}`}><TraceMap rows={visible} timeline={data?.timeline} selectedKey={selectedKey} onSelect={(row) => selectCall(row.key)} /></div>}
             <div className="inspector-workspace">
               <div className={`inspector-toolbar ${detailOpen ? "hidden lg:flex" : "flex"}`}>
-                <label className="relative min-w-40 flex-1 sm:max-w-xs"><Search aria-hidden className="pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-ink-3" /><input aria-label={view === "calls" ? "Filter calls by tool or arguments" : "Filter captured events"} value={query} onChange={(event) => { setQuery(event.target.value); setDetailOpen(false); }} placeholder={view === "calls" ? "Search calls or arguments…" : "Search events…"} className="field-input w-full pl-8" /></label>
-                {view === "calls" && <><select aria-label="Filter by tool" value={tool} onChange={(event) => { setTool(event.target.value); setDetailOpen(false); }} className="field-input max-w-36"><option value="">All tools</option>{profile.tools.map(({ name }) => <option key={name} value={name}>{name}</option>)}</select><select aria-label="Sort calls" value={sort} onChange={(event) => { setSort(event.target.value as CallSort); setSelectedKey(null); }} className="field-input max-w-40"><option value="time">Capture order</option><option value="duration">Longest first</option><option value="response">Largest response</option></select></>}
-                <span className="ml-auto text-[11px] text-ink-2">{visible.length} {view === "calls" ? "calls" : "entries"}</span>
+                <label className="relative min-w-40 flex-1 sm:max-w-xs"><Search aria-hidden className="pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-ink-3" /><input aria-label={view === "calls" ? "Filter calls by tool or arguments" : "Filter captured events"} value={query} onChange={(event) => { resetPage(); setQuery(event.target.value); setDetailOpen(false); }} placeholder={view === "calls" ? "Search calls or arguments…" : "Search events…"} className="field-input w-full pl-8" /></label>
+                {view === "calls" && <><select aria-label="Filter by tool" value={tool} onChange={(event) => { resetPage(); setTool(event.target.value); setDetailOpen(false); }} className="field-input max-w-36"><option value="">All tools</option>{profile.tools.map(({ name }) => <option key={name} value={name}>{name}</option>)}</select><select aria-label="Sort calls" value={sort} onChange={(event) => { resetPage(); setSort(event.target.value as CallSort); setSelectedKey(null); }} className="field-input max-w-40"><option value="time">Capture order</option><option value="duration">Longest first</option><option value="response">Largest response</option></select></>}
+                <span className="ml-auto text-[11px] text-ink-2">{data?.total ?? 0} {view === "calls" ? "calls" : "entries"}</span>
               </div>
               {view === "calls" && <div role="group" aria-label="Call status filters" className={`call-status-filters items-center gap-1 border-b border-rule px-3 py-2 ${detailOpen ? "hidden lg:flex" : "flex flex-wrap"}`}>
-                {FILTERS.map((item) => <button key={item.id} aria-pressed={filter === item.id} onClick={() => { setFilter(item.id); setDetailOpen(false); }} className="status-filter">{item.label}{item.id === "errors" && metrics.errors > 0 && <span className="text-warn">{metrics.errors}</span>}</button>)}
-                {tool && <button onClick={() => setTool("")} className="status-filter ml-auto" aria-label={`Clear ${tool} filter`}><span className="max-w-24 truncate">{tool}</span><X aria-hidden className="size-3" /></button>}
+                {FILTERS.map((item) => <button key={item.id} aria-pressed={filter === item.id} onClick={() => { resetPage(); setFilter(item.id); setDetailOpen(false); }} className="status-filter">{item.label}{item.id === "errors" && metrics.errors > 0 && <span className="text-warn">{metrics.errors}</span>}</button>)}
+                {tool && <button onClick={() => { resetPage(); setTool(""); }} className="status-filter ml-auto" aria-label={`Clear ${tool} filter`}><span className="max-w-24 truncate">{tool}</span><X aria-hidden className="size-3" /></button>}
               </div>}
-              <div className="inspector-split">
+              <div className="inspector-split" aria-busy={loading}>
                 <div className={`event-list-pane min-h-0 flex-col lg:border-r lg:border-rule ${detailOpen ? "hidden lg:flex" : "flex"}`}>
-                  <Timeline rows={visible} selectedKey={selectedKey} onSelect={selectCall} follow={!replay && connection === "live" && (view === "events" || sort === "time")} showResponseSize={view === "calls"}
-                    emptyTitle={rows.length === 0 ? "Your first call starts here" : "No matching calls or events"} emptyDescription={rows.length === 0 ? "Connect an agent with sentinel hook install, or observe an MCP server with sentinel mcp. Calls appear here as they are captured." : "Change the status, tool or search filters to inspect other events."} />
+                  <Timeline rows={visible} selectedKey={selectedKey} onSelect={selectCall} follow={false} showResponseSize={view === "calls"}
+                    emptyTitle={metrics.calls === 0 ? "Your first call starts here" : "No matching calls or events"} emptyDescription={metrics.calls === 0 ? "Connect an agent with sentinel hook install, or observe an MCP server with sentinel mcp. Calls appear here as they are captured." : "Change the status, tool or search filters to inspect other events."} />
+                  <div className="page-controls">
+                    <span aria-live="polite">{loading ? "Loading page…" : data?.total ? `${data.offset + 1}–${data.offset + visible.length} of ${data.total}` : "0 entries"}</span>
+                    <div className="flex items-center gap-1"><button className="icon-button" aria-label="Previous page" disabled={loading || !data?.previous} onClick={() => { setFocusKey(""); setCursor(data?.previous ?? ""); setDetailOpen(false); }}><ChevronLeft aria-hidden className="size-3.5" /></button><button className="icon-button" aria-label="Next page" disabled={loading || !data?.next} onClick={() => { setFocusKey(""); setCursor(data?.next ?? ""); setDetailOpen(false); }}><ChevronRight aria-hidden className="size-3.5" /></button></div>
+                    <button className="text-accent hover:underline" onClick={() => { resetPage(); retry(); }} title="Return to a fresh recording snapshot">{cursor ? `Snapshot #${data?.revision} · Refresh latest` : "Refresh latest"}</button>
+                  </div>
                 </div>
                 <div className={`call-detail-pane min-h-0 flex-col ${detailOpen ? "flex" : "hidden lg:flex"}`}>
                   <div className="flex items-center justify-between border-b border-rule bg-paper px-3 py-1.5 text-[11px] text-ink-2">
@@ -160,16 +167,16 @@ export default function App() {
                     <button onClick={() => setDetailOpen(false)} className="flex items-center gap-1.5 py-2 font-medium text-accent lg:hidden"><ArrowLeft aria-hidden className="size-3.5" />Back to {view === "calls" ? "timeline" : "event log"}</button>
                     <div className="flex items-center gap-1"><span className="mr-2">{selectedIndex >= 0 ? `${selectedIndex + 1} of ${visible.length}` : "No selection"}</span><button className="icon-button" aria-label="Inspect previous event" disabled={selectedIndex <= 0} onClick={() => selectCall(visible[selectedIndex - 1].key)}><ChevronLeft aria-hidden className="size-3.5" /></button><button className="icon-button" aria-label="Inspect next event" disabled={selectedIndex < 0 || selectedIndex >= visible.length - 1} onClick={() => selectCall(visible[selectedIndex + 1].key)}><ChevronRight aria-hidden className="size-3.5" /></button></div>
                   </div>
-                  <Detail key={selected?.key ?? "empty"} row={selected} />
+                  {selected && !detail.row ? <div className="flex-1 p-5 text-sm text-ink-2" role={detail.error ? "alert" : "status"}>{detail.error ? <>{detail.error}<button className="action-button mt-3 block" onClick={detail.retry}>Retry payload</button></> : <div className="space-y-3"><p>Loading captured payloads…</p><div className="h-24 rounded-md bg-paper" /><div className="h-32 rounded-md bg-paper" /></div>}</div> : <Detail key={selected?.key ?? "empty"} row={selected ? detail.row : null} />}
                 </div>
               </div>
             </div>
           </main>
         )}
       </div>
-      <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} rows={rows}
-        onSelectRow={(key) => { const row = rows.find((entry) => entry.key === key); if (row) inspect(row); }} onExport={() => setIsExportModalOpen(true)} />
-      <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} session={session} rows={allRows} config={config} />
+      <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} rows={visible} scope={scope}
+        onSelectRow={inspect} onExport={() => setIsExportModalOpen(true)} />
+      <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} session={session} revision={data?.revision} config={config} />
     </div>
   );
 }

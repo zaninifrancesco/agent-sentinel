@@ -1,19 +1,35 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { Search, Wrench, AlertTriangle, Download, X, Terminal, Radio } from "lucide-react";
 import type { Row } from "./types";
+import { readJSON } from "./useProfiler";
+import type { ProfilerPage } from "./types";
 import { useDialogFocus } from "./useDialogFocus";
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   rows: Row[];
-  onSelectRow: (key: string) => void;
+  onSelectRow: (row: Row) => void;
+  scope: string;
   onExport: () => void;
 }
 
-export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }: Props) {
+export function CommandPalette({ isOpen, onClose, rows, scope, onSelectRow, onExport }: Props) {
   const dialog = useDialogFocus(isOpen);
+  const [results, setResults] = useState<Row[]>(rows);
+  const [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  useEffect(() => {
+    if (!isOpen) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams({ view: "events", scope, q: query, limit: "15" });
+      void readJSON<ProfilerPage>(`/api/v1/profiler?${params}`, controller.signal)
+        .then((page) => { if (!controller.signal.aborted) { setResults(page.rows); setError(""); } })
+        .catch((cause: unknown) => { if (!controller.signal.aborted) { setResults([]); setError(cause instanceof Error ? cause.message : "Search unavailable"); } });
+    }, 150);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [isOpen, scope, query]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -57,7 +73,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
     }
 
     // Filter events
-    for (const r of rows) {
+    for (const r of results) {
       if (
         !query ||
         r.title.toLowerCase().includes(query.toLowerCase()) ||
@@ -67,7 +83,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
         list.push({
           id: r.key,
           title: r.title,
-          subtitle: `${r.kind} · ${r.status}${r.durationMs ? ` · ${r.durationMs}ms` : ""}`,
+          subtitle: `${r.kind} · ${r.status}${r.durationMs !== undefined ? ` · ${r.durationMs}ms` : ""}`,
           icon: isErr ? (
             <AlertTriangle className="size-4 text-signal" />
           ) : r.kind === "tool" ? (
@@ -78,7 +94,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
             <Radio className="size-4 text-ink-2" />
           ),
           action: () => {
-            onSelectRow(r.key);
+            onSelectRow(r);
             onClose();
           },
           category: isErr ? "Errors" : "Events",
@@ -87,7 +103,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
     }
 
     return list.slice(0, 15);
-  }, [rows, query, onExport, onSelectRow, onClose]);
+  }, [results, query, onExport, onSelectRow, onClose]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -155,6 +171,7 @@ export function CommandPalette({ isOpen, onClose, rows, onSelectRow, onExport }:
           </button>
         </div>
 
+        {error && <p role="alert" className="px-4 py-2 text-xs text-warn">{error}</p>}
         {/* Results List */}
         <div className="max-h-80 overflow-y-auto p-2">
           {items.length === 0 ? (

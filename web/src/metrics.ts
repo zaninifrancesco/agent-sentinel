@@ -1,4 +1,4 @@
-import type { Row, SentinelEvent } from "./types";
+import type { Row } from "./types";
 
 export interface Metrics {
   calls: number;
@@ -17,44 +17,8 @@ export interface Metrics {
   p95: number;
 }
 
-/** Metrics of retained tool events, not provider usage or billing. */
-export function computeMetrics(rows: Row[]): Metrics {
-  const tools = rows.filter((r) => r.kind === "tool");
-  const durations = tools
-    .map(toolDuration)
-    .filter((duration): duration is number => duration !== undefined)
-    .sort((a, b) => a - b);
-  const at = (q: number) => (durations.length ? durations[Math.max(0, Math.ceil(durations.length * q) - 1)] : 0);
+// Measurements are supplied by the Go profiler for live, replay and export.
+export const EMPTY_METRICS: Metrics = { calls: 0, waiting: 0, running: 0, refused: 0, errors: 0, interrupted: 0, payloadBytes: 0, latencySamples: 0, p50: 0, p95: 0 };
+export function toolDuration(row: Row): number | undefined { return row.toolDurationMs; }
 
-  return {
-    calls: tools.length,
-    waiting: tools.filter((r) => r.status === "awaiting_approval").length,
-    running: tools.filter((r) => r.status === "pending").length,
-    refused: tools.filter((r) => r.status === "blocked" || r.status === "rejected").length,
-    errors: tools.filter((r) => r.status === "error").length,
-    interrupted: tools.filter((r) => r.status === "interrupted").length,
-    payloadBytes: tools.reduce((total, row) => total + (eventPayloadSize(row.request) ?? 0) + (eventPayloadSize(row.response) ?? 0), 0),
-    latencySamples: durations.length,
-    p50: at(0.5),
-    p95: at(0.95),
-  };
-}
-
-/** Shared eligibility for percentiles, rankings and inspector sorting. */
-export function toolDuration(row: Row): number | undefined {
-  if (row.kind !== "tool" || (row.status !== "ok" && row.status !== "error") || row.request?.decision === "approve") return undefined;
-  return row.durationMs !== undefined && Number.isFinite(row.durationMs) && row.durationMs >= 0 ? row.durationMs : undefined;
-}
-
-/** This measures the payload JSON available to the UI, not original wire size. */
-export function payloadSize(payload: unknown): number {
-  return payload === undefined ? 0 : new TextEncoder().encode(JSON.stringify(payload)).length;
-}
-
-export function eventPayloadSize(event: SentinelEvent | undefined): number | undefined {
-  if (event?.payload === undefined) return undefined;
-  const stored = event.capture?.storedBytes;
-  return stored !== undefined && Number.isFinite(stored) && stored >= 0 ? stored : payloadSize(event.payload);
-}
-
-export const PAYLOAD_NOTE = "Stored request and matched-response JSON bytes for displayed tool calls; legacy logs use reserialized JSON. Unassigned responses are excluded. Observed source values use separate units. Not model tokens or context usage.";
+export const PAYLOAD_NOTE = "Stored request and matched-response JSON bytes for the selected recording scope; legacy logs use compact retained JSON. Unassigned responses are excluded. Observed source values use separate units. Not model tokens or context usage.";
