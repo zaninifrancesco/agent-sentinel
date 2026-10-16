@@ -54,3 +54,12 @@ func TestHistoricalKeepsScopesAndUnknownDatesDistinct(t *testing.T) {
 		t.Fatalf("merged identities or dates: %+v", h)
 	}
 }
+
+func TestHistoricalIncludesRecordingsWithoutCalls(t *testing.T) {
+	to := time.Now().UTC()
+	input := []Recording{{Session: recorder.Session{ID: "empty", StartedAt: to.Add(-time.Hour)}}}
+	h := Historical(input, HistoryQuery{From: to.Add(-24 * time.Hour), To: to})
+	if len(h.Sessions) != 1 || h.RecordingCount != 1 || h.NativeSessions != 0 || h.Sessions[0].Calls != 0 || h.Sessions[0].ErrorRate != nil {
+		t.Fatalf("empty recording missing: %+v", h)
+	}
+}

@@ -162,10 +162,12 @@ func Historical(recordings []Recording, q HistoryQuery) History {
 	previousFrom := q.From.Add(-q.To.Sub(q.From))
 	for _, recording := range recordings {
 		groups := map[string][]Row{}
+		hasTool := false
 		for _, row := range recording.Rows {
 			if row.Kind != "tool" {
 				continue
 			}
+			hasTool = true
 			agent, project := dimension(row)
 			availableAgents[agent], availableProjects[project] = true, true
 			if q.Agent != "" && q.Agent != agent || q.Project != "" && q.Project != project {
@@ -194,6 +196,12 @@ func Historical(recordings []Recording, q HistoryQuery) History {
 			recordingIDs[recording.Session.ID] = true
 			if e := Evidence(row); e != nil && e.AgentSessionID != "" {
 				nativeIDs[recording.Session.ID+"/"+Scope(row)] = true
+			}
+		}
+		if !hasTool && (q.Agent == "" || q.Agent == "unknown") && (q.Project == "" || q.Project == "unknown") && !recording.Session.StartedAt.Before(q.From) && recording.Session.StartedAt.Before(q.To) {
+			recordingIDs[recording.Session.ID] = true
+			if q.Day == "" || q.Day == recording.Session.StartedAt.UTC().Format("2006-01-02") {
+				h.Sessions = append(h.Sessions, HistorySession{RecordingID: recording.Session.ID, Scope: "", Agent: "unknown", Projects: []string{"unknown"}, First: recording.Session.StartedAt, Last: recording.Session.StartedAt, Live: recording.Live, Ended: !recording.Session.EndedAt.IsZero(), RecoveredTail: recording.Session.RecoveredTail, UsageMetrics: usage(nil)})
 			}
 		}
 		for scope, rows := range groups {

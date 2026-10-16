@@ -92,6 +92,10 @@ func (c *Catalog) Snapshot() ([]Recording, []string) {
 				continue
 			}
 			session, events, revision := rec.Snapshot()
+			if session.ID == "" {
+				warnings = append(warnings, filepath.Base(path)+": missing recording identity")
+				continue
+			}
 			rows := analysis.Project(events)
 			for i := range rows {
 				rows[i] = analysis.Summary(rows[i])
