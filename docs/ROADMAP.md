@@ -1,5 +1,7 @@
 # Roadmap del pivot
 
+Direzione aggiornata il 16 ottobre 2026: **an analytics platform for monitoring and analyzing AI agent usage and metrics**. Il [piano di completamento](COMPLETION_PLAN.md) definisce ora l’ordine di consegna: fondazione multi-sessione → dashboard e trend → diagnostica → usage nativo → confronto e report → chiusura della release. Le fasi tecniche sotto restano il riferimento per dipendenze e accettazione; la loro precedente definizione di prima release è superata dal perimetro analytics. Catalogo e dashboard non attendono il completamento di ogni attività di hardening.
+
 Stato: la fase 1 è implementata sul branch `telemetry-profiler`; la fase 2 è in corso, con identità, correlazione, selezione delle sessioni, profili e qualità dei payload implementati. La base della fase 3 è implementata con waterfall tool, API paginata e metriche Go condivise; le fasi restano soggette ai limiti di cattura ancora aperti. Findings e catalogo delle fasi 4–5 non sono implementati. Evidenze e limiti in [PROGRESS.md](PROGRESS.md). Vedi [direzione](PRODUCT_DIRECTION.md), [architettura](ARCHITECTURE.md), [telemetria](TELEMETRY_SPEC.md) e [analisi](ANALYSIS_SPEC.md).
 
 Non vengono assegnate date arbitrarie. Ogni fase ha una condizione di uscita verificabile e prepara quella successiva.
@@ -116,11 +118,11 @@ Accettazione:
 - Una demo copre un output grande, una chiamata lenta e retry falliti senza eseguire comandi pericolosi.
 - Il setup nuovo non richiede che Sentinel faccia da approvatore; i controlli documentati corrispondono al binario rilasciato.
 
-Le fasi 1–5 costituiscono la prima release del pivot. I lavori successivi non sono prerequisiti nascosti.
+Le fasi 1–5 completano la base di raccolta, profiling e diagnosi. Il primo MVP analytics richiede anche dashboard aggregata e trend sul catalogo multi-sessione; la release analytics completa include almeno un importatore di usage nativo e il confronto A/B descritti nel piano di completamento.
 
 ## Dopo la prima release
 
-Priorità da scegliere sulla base delle sessioni raccolte: diagnostica degli schemi MCP, cicli edit/test con patch sufficienti, importatori espliciti di transcript/usage, confronti controllati tra sessioni.
+Usage nativo e confronti controllati tra sessioni sono workstream centrali del piano analytics. Ulteriori priorità da scegliere sulla base delle sessioni raccolte: diagnostica degli schemi MCP, cicli edit/test con patch sufficienti e nuovi importatori di transcript/usage.
 
 Restano esclusi fino a nuova decisione: chiamate a LLM per spiegare le sessioni, integrazioni cloud, dashboard di team, benchmark pubblici di agenti e modifiche alla landing page.
 

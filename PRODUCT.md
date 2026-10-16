@@ -8,19 +8,19 @@ web
 
 ## Users
 
-Primary: a developer inspecting a local Cursor or Claude Code session to understand tool calls, errors, large outputs and repeated attempts. They use Sentinel live while the agent works and afterwards when debugging.
+Primary: a developer monitoring AI agent usage and metrics across sessions, projects and time periods. Cursor and Claude Code are the initial integrations. They use live monitoring, historical trends, diagnostics and session comparisons to understand changes and investigate their evidence.
 
 Secondary: an MCP server developer inspecting stdio requests, responses and protocol errors. Colleagues can read an exported offline report.
 
 ## Product Purpose
 
-Agent Sentinel is a local profiler and flight recorder for AI agents. It records observable actions, helps a developer inspect their evidence and preserves sessions for offline debugging. It does not block commands, hold calls for approval or enforce spending limits. The coding agent's own permissions remain responsible for execution decisions.
+Agent Sentinel is an analytics platform for monitoring and analyzing AI agent usage and metrics. Its target experience combines historical dashboards, live monitoring, diagnostics, native usage where available and session comparison. The recorder, profiler and call inspector provide the collection and evidence layers. These target capabilities are delivered incrementally; implemented features are listed separately below. Sentinel does not block commands, hold calls for approval or enforce spending limits.
 
-Success: the developer can identify a concrete problem in a session, inspect the calls behind it and choose an informed change for the next attempt.
+Success: the developer can monitor activity across sessions, spot a change in metrics, identify the sessions behind it, compare runs and inspect the supporting calls. Missing coverage stays visible.
 
 ## Positioning
 
-The Local Profiler & Flight Recorder for AI Agents. A single Go binary with an embedded cockpit, loopback-only by default, without cloud accounts or external databases. Offline describes Sentinel's recording and analysis; agents and MCP servers may make their own network requests.
+An analytics platform for monitoring and analyzing AI agent usage and metrics. Local-first delivery through a single Go binary with an embedded cockpit, loopback-only by default, without required cloud accounts or external databases. Offline describes Sentinel's recording and analysis; agents and MCP servers may make their own network requests.
 
 ## Operating Context
 
@@ -48,7 +48,7 @@ Implemented on the telemetry branch:
 - Snapshot cursors keep pages stable during live appends. Server-side search and sorting cover the full retained recording; full call payloads load only for the selected inspector.
 - The frontend remains embedded, with local fonts and no required external assets.
 
-Planned, not implemented: bounded queues, sink-error and capture-gap diagnostics/recovery, native model/turn spans, automatic findings linked to evidence, recording catalog and a JSONL export flow. See `docs/ROADMAP.md` and `docs/PROGRESS.md` for status. Per-payload limits do not bound total recording memory. Standard redaction is best effort; existing recordings are not scrubbed on replay.
+Planned, not implemented: multi-session catalog, aggregate dashboard and trends, native usage import, session comparison, automatic findings linked to evidence, bounded queues, sink-error and capture-gap diagnostics/recovery, native model/turn spans and a JSONL export flow. See `docs/COMPLETION_PLAN.md` for the analytics delivery sequence and `docs/PROGRESS.md` for current implementation status. Per-payload limits do not bound total recording memory. Standard redaction is best effort; existing recordings are not scrubbed on replay.
 
 The current data does not reveal model reasoning, actual context occupancy, provider billing or a full workspace history. Some hook payloads are synthesized, reduced or omitted. Retained JSON size must never be labelled original wire traffic or model usage. Absence of a duration or an error signal does not prove zero execution time or success.
 
@@ -59,6 +59,10 @@ The current data does not reveal model reasoning, actual context occupancy, prov
 No customer results, performance claims or savings measurements may be fabricated.
 
 ## Cockpit Information Hierarchy
+
+Target hierarchy: start with Analytics overview, with time/project/agent filters and drill-down into Sessions, Diagnostics, Usage and Compare. Every aggregate must lead to supporting sessions and calls. Historical dashboards and trends are core to the analytics MVP. Native usage and comparisons are explicit product workstreams; unavailable data remains unavailable.
+
+Current implemented hierarchy:
 
 Start with the timeline and debug one captured call. Navigation is Timeline, Tool profile and Event log. The recording map, selected list row and inspector refer to the same call. A collapsible graphite rail separates navigation from the cool layered workspace. Recording identity, capture connection and available metric sample counts stay accessible. Tool profile exposes observed activity, not automated diagnoses. Missing measurements remain unavailable, and retained JSON is never called context usage. Historical policy data is secondary and appears only when captured.
 

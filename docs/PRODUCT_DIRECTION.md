@@ -1,27 +1,28 @@
 # Direzione di prodotto
 
-Stato: specifica di destinazione, 15 ottobre 2026. Punto di ingresso: [indice](README.md).
+Stato: direzione aggiornata su indicazione dell’utente il 16 ottobre 2026. Punto di ingresso: [indice](README.md). Sequenza di consegna: [piano di completamento](COMPLETION_PLAN.md). Le funzioni previste qui non sono tutte implementate; lo stato corrente è in [PROGRESS.md](PROGRESS.md).
 
 ## Promessa
 
-**The Local Profiler & Flight Recorder for AI Agents.**
+**An analytics platform for monitoring and analyzing AI agent usage and metrics.**
 
-Sentinel aiuta uno sviluppatore a ispezionare le azioni osservabili del proprio coding agent, trovare colli di bottiglia e ripetizioni e conservare una traccia utile per il debugging. La metafora di riferimento è il pannello Network di DevTools: richieste, risposte, tempi, errori e dettagli consultabili.
+Sentinel permette di monitorare utilizzo, prestazioni osservabili, errori, volumi e usage disponibile degli agenti AI nel tempo. Aggrega sessioni e progetti, evidenzia trend e anomalie e permette di confrontare run. Recorder, profiler e inspector raccolgono i dati e consentono di approfondire ogni misura fino alle evidenze.
 
-Il prodotto deve rispondere a una domanda concreta: **«Cosa posso cambiare nel prossimo tentativo, sulla base di quello che è successo in questo?»**
+Il prodotto deve rispondere a domande concrete: **«Come sto usando i miei agenti? Cosa sta cambiando? Dove si concentrano tempo, errori e usage? Quali differenze emergono tra due run?»**
 
 La leggerezza dell'installazione e la conservazione locale dei dati sono scelte di prodotto. La domanda di mercato e la disponibilità a pagare sono ipotesi da validare; non assumiamo un mercato vuoto o l'assenza di concorrenti.
 
 ## Utente e momento d'uso
 
-Utente principale: uno sviluppatore che usa Cursor o Claude Code su un progetto locale e vuole capire una sessione lenta, ripetitiva o fallita. Apre Sentinel mentre l'agente lavora oppure subito dopo un problema.
+Utente principale: uno sviluppatore che usa agenti AI su uno o più progetti e vuole seguirne utilizzo e metriche sia durante il lavoro sia su giorni e settimane. Cursor e Claude Code sono le integrazioni iniziali, non il limite concettuale della piattaforma.
 
 Utente secondario: chi sviluppa un server MCP e vuole ispezionare il traffico stdio, correlare richieste e risposte e riprodurre un problema. Gli script custom sono coperti quando usano un trasporto già supportato; usare Ollama o vLLM, da solo, non rende un agente osservabile da Sentinel.
 
-Reviewer e colleghi possono consultare una traccia esportata. Non sono il pubblico su cui modellare la prima schermata.
+Reviewer e colleghi possono consultare report esportati. Il monitoraggio parte locale; un prodotto cloud o di team non è implicito nella parola piattaforma.
 
 ## Problemi prioritari
 
+0. **Utilizzo frammentato tra sessioni.** Quanta attività è stata osservata, su quali progetti e agenti, e come varia rispetto al periodo precedente? Quale copertura hanno i dati?
 1. **Tempo difficile da attribuire.** Una sessione è durata molto: quali tool hanno occupato gli intervalli più lunghi? Quali parti non sono osservabili?
 2. **Risposte sproporzionate.** Quali tool hanno prodotto più testo o dati? Ci sono letture o risultati ripetuti?
 3. **Tentativi che non convergono.** Lo stesso comando fallisce più volte? Gli argomenti cambiano? Ci sono modifiche osservate tra un tentativo e il successivo?
@@ -31,7 +32,11 @@ Reviewer e colleghi possono consultare una traccia esportata. Non sono il pubbli
 
 Lo sviluppatore collega un progetto con gli hook oppure configura un server MCP tramite proxy. Avvia la registrazione e continua a usare l'agente normalmente.
 
-Nel cockpit trova:
+La pagina iniziale è una Analytics overview con periodo, progetto e agente selezionabili. Mostra sessioni e chiamate osservate, errori con denominatore, distribuzione dei tempi disponibili, volumi e trend giornalieri. Ogni aggregazione conduce alle sessioni e alle chiamate che la compongono.
+
+La navigazione di destinazione comprende Overview, Sessions, Diagnostics, Usage e Compare. La timeline e l’inspector sono l’approfondimento di una sessione. Le sezioni Usage e Compare dichiarano dati disponibili e copertura; i dettagli dell’interfaccia verranno progettati durante l’implementazione.
+
+Dentro una sessione trova:
 
 - la sessione selezionata e la copertura dei dati disponibili;
 - una waterfall di chiamate, con sovrapposizioni e intervalli non attribuiti;
@@ -52,6 +57,10 @@ Inclusi:
 - separazione delle sessioni dell'agente dentro la registrazione del processo Sentinel;
 - waterfall dei tool, metriche con denominatori espliciti, ispezione dei payload;
 - segnalazioni deterministiche di ripetizioni, errori ricorrenti e output grandi;
+- catalogo persistente multi-sessione con filtri per periodo, progetto e agente quando noti;
+- dashboard aggregata, trend giornalieri e breakdown per agente, progetto e tool;
+- usage nativo attraverso almeno un importatore esplicito, con contatori, modello e provenienza quando disponibili;
+- confronto A/B di sessioni selezionate con condizioni, copertura e differenze osservate dichiarate;
 - replay di tracce nuove e precedenti, report HTML autonomo e JSONL esportabile;
 - visibilità sui limiti del recorder: troncamenti, correlazioni ambigue, dati persi.
 
@@ -60,7 +69,7 @@ Esclusi:
 - firewall di comandi, valutazione del rischio, approvazioni e circuit breaker di spesa;
 - tracing universale di qualsiasi agente o provider;
 - accesso implicito alle API del modello, ai transcript o al filesystem del progetto;
-- conteggio esatto del contesto, fatturazione reale o tempo interno di ragionamento;
+- ricostruzione del contesto, fatturazione o ragionamento interno dai soli hook; eventuali costi nativi riportati e scenari da listino restano distinti;
 - valutazione automatica della qualità del codice o del successo del task dai soli tool;
 - esecuzione automatica di rimedi, rilancio di comandi o riproduzione delle azioni;
 - piattaforma cloud, collaborazione live, database esterni obbligatori e redesign della landing page.
@@ -87,8 +96,8 @@ La protezione dei dati raccolti resta necessaria: minimizzazione, redazione conf
 
 ## Segnali di riuscita
 
-La prima release è utile se, su una sessione reale problematica, uno sviluppatore riesce a individuare una chiamata lenta, un output sproporzionato o una sequenza di tentativi, aprirne le prove e decidere una modifica al tentativo successivo.
+Il primo MVP analytics è utile se uno sviluppatore ritrova le sessioni dopo un riavvio, filtra un periodo/progetto/agente, individua una variazione delle metriche e apre le sessioni che la spiegano. La release analytics completa aggiunge diagnostica, usage nativo da almeno una sorgente e confronto A/B, con report riproducibili.
 
 Validazione iniziale manuale: raccogliere sessioni con problemi noti e sessioni senza quei problemi; verificare utilità e falsi positivi delle segnalazioni. Annotare il risultato localmente senza introdurre telemetria di utilizzo inviata dal prodotto.
 
-Conteggi di tool, token stimati e grafici da soli non dimostrano produttività o risparmio. Confronti tra agenti o prompt arrivano dopo, con task, configurazione e condizioni comparabili dichiarati.
+Conteggi di tool, token stimati e grafici da soli non dimostrano produttività o risparmio. I confronti fanno parte della piattaforma e dichiarano task, configurazione, condizioni iniziali e copertura; una differenza osservata non diventa automaticamente una classifica di qualità.
