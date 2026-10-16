@@ -136,5 +136,5 @@ type Session struct {
 	ID        string           `json:"id"`
 	Command   []string         `json:"command"`
 	StartedAt time.Time        `json:"startedAt"`
-	EndedAt   time.Time        `json:"endedAt,omitempty"`
+	EndedAt   time.Time        `json:"endedAt,omitzero"`
 }

@@ -4,6 +4,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/zaninifrancesco/agent-sentinel/internal/recorder"
 )
@@ -125,6 +126,8 @@ type Range struct {
 	EndMs   int64 `json:"endMs"`
 }
 type Timeline struct {
+	WindowStartMs   *int64  `json:"windowStartMs,omitempty"`
+	WindowEndMs     *int64  `json:"windowEndMs,omitempty"`
 	StartMs         *int64  `json:"startMs,omitempty"`
 	EndMs           *int64  `json:"endMs,omitempty"`
 	SpanMs          int64   `json:"spanMs"`
@@ -135,6 +138,49 @@ type Timeline struct {
 	IncompleteCalls int     `json:"incompleteCalls"`
 	GapCount        int     `json:"gapCount"`
 	Gaps            []Range `json:"gaps"`
+}
+
+// PageWaterfall keeps scope totals while zooming the plotted bounds and gaps
+// to the current page. A late page must not inherit the first 200 global gaps.
+func PageWaterfall(session recorder.Session, rows, page []Row, scoped bool) Timeline {
+	t := Waterfall(session, rows, scoped)
+	for _, r := range page {
+		if r.Kind != "tool" || r.Span == nil {
+			continue
+		}
+		start, end := r.Span.StartMs, r.Span.StartMs
+		if r.Span.EndMs != nil {
+			end = *r.Span.EndMs
+		}
+		if t.WindowStartMs == nil || start < *t.WindowStartMs {
+			v := start
+			t.WindowStartMs = &v
+		}
+		if t.WindowEndMs == nil || end > *t.WindowEndMs {
+			v := end
+			t.WindowEndMs = &v
+		}
+	}
+	if t.WindowStartMs == nil {
+		return t
+	}
+	clipped := []Row{}
+	for _, r := range rows {
+		if r.Kind != "tool" || r.Span == nil || r.Span.EndMs == nil {
+			continue
+		}
+		start, end := max(*t.WindowStartMs, r.Span.StartMs), min(*t.WindowEndMs, *r.Span.EndMs)
+		if end < start {
+			continue
+		}
+		copy := r
+		copy.Request, copy.Response, copy.Resolution, copy.Event = nil, nil, nil, nil
+		copy.Span = &Span{StartMs: start, EndMs: &end}
+		clipped = append(clipped, copy)
+	}
+	window := Waterfall(recorder.Session{StartedAt: time.UnixMilli(*t.WindowStartMs), EndedAt: time.UnixMilli(*t.WindowEndMs)}, clipped, false)
+	t.Gaps, t.GapCount = window.Gaps, window.GapCount
+	return t
 }
 
 // Waterfall anchors its end to the last observed evidence, never time.Now.

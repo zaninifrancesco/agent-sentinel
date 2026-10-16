@@ -43,6 +43,9 @@ func TestProfilerPagesPinSnapshotAndLoadBodiesOnlyOnDemand(t *testing.T) {
 	}
 	s := New(rec, nil)
 	first := decodeProfile(t, profilerGET(s, "/api/v1/profiler?limit=2"))
+	if strings.Contains(profilerGET(s, "/api/v1/profiler").Body.String(), `"endedAt"`) {
+		t.Fatal("live snapshot exposed a zero end date as a finished session")
+	}
 	if first.Total != 5 || len(first.Rows) != 2 || first.Next == "" || first.Current == "" || first.Metrics.Calls != 5 {
 		t.Fatalf("bad first page: %+v", first)
 	}
@@ -94,6 +97,15 @@ func TestProfilerPagesPinSnapshotAndLoadBodiesOnlyOnDemand(t *testing.T) {
 	}
 	if strings.Contains(w.Body.String(), "retained body") {
 		t.Fatal("HTML report metadata leaked retained bodies")
+	}
+	rec.Close()
+	closed := decodeProfile(t, profilerGET(s, "/api/v1/profiler"))
+	if closed.Session.EndedAt.IsZero() {
+		t.Fatal("completed recording lost its end")
+	}
+	pinned := decodeProfile(t, profilerGET(s, "/api/v1/profiler?through="+fmt.Sprint(first.Revision)))
+	if !pinned.Session.EndedAt.IsZero() {
+		t.Fatal("completion leaked into an earlier snapshot")
 	}
 }
 

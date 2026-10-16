@@ -137,4 +137,9 @@ func TestGapRenderingIsBoundedButTotalsAreComplete(t *testing.T) {
 	if len(timeline.Gaps) != 200 || timeline.GapCount != 251 || timeline.CoveredMs != 250 || timeline.UnattributedMs != 750 {
 		t.Fatalf("bounded gap display hid totals: %+v", timeline)
 	}
+	rows := Project(events)
+	page := PageWaterfall(recorder.Session{StartedAt: epoch, EndedAt: at(1000)}, rows, rows[245:247], false)
+	if page.CoveredMs != timeline.CoveredMs || page.WindowStartMs == nil || *page.WindowStartMs != at(981).UnixMilli() || len(page.Gaps) != 1 || page.Gaps[0].StartMs != at(982).UnixMilli() {
+		t.Fatalf("page zoom lost late gaps: %+v", page)
+	}
 }

@@ -98,7 +98,7 @@ func payloadSize(e *recorder.Event) *int {
 		return nil
 	}
 	n := 0
-	if e.Capture != nil {
+	if e.Capture != nil && e.Capture.StoredBytes >= 0 {
 		n = e.Capture.StoredBytes
 	} else {
 		var b bytes.Buffer

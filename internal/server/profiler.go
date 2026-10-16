@@ -157,7 +157,7 @@ func (s *Server) handleProfiler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	end := min(len(rows), offset+limit)
-	page := profilerPage{Version: analysis.Version, Revision: snapshot.Revision, Session: snapshot.Session, Scopes: analysis.Scopes(snapshot.Rows), Metrics: analysis.Measure(scoped), Profile: analysis.ToolProfile(scoped), Timeline: analysis.Waterfall(snapshot.Session, scoped, q.Get("scope") != ""), Rows: []analysis.Row{}, Total: len(rows), Offset: offset, Limit: limit}
+	page := profilerPage{Version: analysis.Version, Revision: snapshot.Revision, Session: snapshot.Session, Scopes: analysis.Scopes(snapshot.Rows), Metrics: analysis.Measure(scoped), Profile: analysis.ToolProfile(scoped), Timeline: analysis.PageWaterfall(snapshot.Session, scoped, rows[offset:end], q.Get("scope") != ""), Rows: []analysis.Row{}, Total: len(rows), Offset: offset, Limit: limit}
 	for _, row := range rows[offset:end] {
 		page.Rows = append(page.Rows, analysis.Summary(row))
 	}
