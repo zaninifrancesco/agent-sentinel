@@ -24,6 +24,20 @@ type Recorder struct {
 	closed      bool
 	capture     CaptureSettings
 	identityKey [32]byte
+	persistence Persistence
+}
+
+// Persistence reports writes acknowledged by the sink, not fsync durability.
+type Persistence struct {
+	Enabled        bool   `json:"enabled"`
+	WrittenThrough uint64 `json:"writtenThrough"`
+	Error          string `json:"error,omitempty"`
+}
+
+func (r *Recorder) Persistence() Persistence {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.persistence
 }
 
 // NewIdentity reserves a recording-scoped identity, serialized in the log so
@@ -57,6 +71,7 @@ func newRecorder(command []string, sink io.Writer, settings CaptureSettings) *Re
 	_, _ = rand.Read(r.identityKey[:])
 	if sink != nil {
 		r.sink = json.NewEncoder(sink)
+		r.persistence.Enabled = true
 	}
 	r.Record(Event{Type: EventSessionStarted, Status: StatusOK, CaptureSettings: &settings})
 	return r
@@ -109,7 +124,11 @@ func (r *Recorder) RecordHook(e Event, hook func(Event)) Event {
 	r.events = append(r.events, e)
 
 	if r.sink != nil {
-		_ = r.sink.Encode(e)
+		if err := r.sink.Encode(e); err != nil {
+			r.persistence.Error = err.Error()
+		} else if r.persistence.Error == "" {
+			r.persistence.WrittenThrough = e.Seq
+		}
 	}
 	for _, ch := range r.subs {
 		select {

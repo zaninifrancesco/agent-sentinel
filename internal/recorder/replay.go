@@ -19,6 +19,10 @@ func Load(r io.Reader) (*Recorder, error) {
 		if len(line) > 1 || (len(line) == 1 && line[0] != '\n') {
 			var e Event
 			if jerr := json.Unmarshal(line, &e); jerr != nil {
+				if errors.Is(err, io.EOF) && len(rec.events) > 0 {
+					rec.session.RecoveredTail = true
+					break
+				}
 				return nil, fmt.Errorf("line %d: %w", lineNo, jerr)
 			}
 			if e.SchemaVersion < 0 || e.SchemaVersion > 2 {

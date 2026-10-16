@@ -132,9 +132,10 @@ func NativeIDFromJSON(raw string) *NativeID {
 // Session is recording metadata (the name is retained for API compatibility).
 // One recording can contain several native agent sessions.
 type Session struct {
-	Capture   *CaptureSettings `json:"capture,omitempty"`
-	ID        string           `json:"id"`
-	Command   []string         `json:"command"`
-	StartedAt time.Time        `json:"startedAt"`
-	EndedAt   time.Time        `json:"endedAt,omitzero"`
+	RecoveredTail bool             `json:"recoveredTail,omitempty"`
+	Capture       *CaptureSettings `json:"capture,omitempty"`
+	ID            string           `json:"id"`
+	Command       []string         `json:"command"`
+	StartedAt     time.Time        `json:"startedAt"`
+	EndedAt       time.Time        `json:"endedAt,omitzero"`
 }
