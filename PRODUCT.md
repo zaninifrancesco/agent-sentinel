@@ -34,7 +34,9 @@ An analytics platform for monitoring and analyzing AI agent usage and metrics. L
 
 Implemented on the telemetry branch:
 
-- Timeline as the default view, with a call waterfall that zooms to the current 50-row page. Each call has a lane, with overlaps, incomplete points and unattributed intervals. Scope totals use interval union, independently of list filters; source-reported duration remains separate.
+- Analytics as the default view: local JSONL history plus current recording, period/agent/project filters, daily UTC calls/errors, previous-period call deltas, per-agent/project/tool breakdowns and native-session/connection drill-down. Session lists render 25 rows at a time.
+- Read-only recovery of a malformed final JSONL fragment at EOF and visible sink-write errors. Complete corrupt lines still fail. The catalog deduplicates identical copies and excludes conflicting identities with a notice.
+- Timeline as the call-level view, with a call waterfall that zooms to the current 50-row page. Each call has a lane, with overlaps, incomplete points and unattributed intervals. Scope totals use interval union, independently of list filters; source-reported duration remains separate.
 - Tool profile: per-tool activity, top five completed calls by available duration and top five retained responses by JSON size. Every entry opens its captured calls.
 - Calls with exact tool and status filters, search across captured arguments, and sorting by capture order, duration or retained response size. Event log keeps lifecycle and protocol observations accessible separately.
 - Arguments/result inspector with safe syntax colouring, text search with match counts, previous/next event navigation, secondary event JSON, patch viewer where patch data exists, event search and dark/light themes. On mobile, opening a call replaces the list and provides a back action.
@@ -48,7 +50,7 @@ Implemented on the telemetry branch:
 - Snapshot cursors keep pages stable during live appends. Server-side search and sorting cover the full retained recording; full call payloads load only for the selected inspector.
 - The frontend remains embedded, with local fonts and no required external assets.
 
-Planned, not implemented: multi-session catalog, aggregate dashboard and trends, native usage import, session comparison, automatic findings linked to evidence, bounded queues, sink-error and capture-gap diagnostics/recovery, native model/turn spans and a JSONL export flow. See `docs/COMPLETION_PLAN.md` for the analytics delivery sequence and `docs/PROGRESS.md` for current implementation status. Per-payload limits do not bound total recording memory. Standard redaction is best effort; existing recordings are not scrubbed on replay.
+Planned, not implemented: native usage import, session comparison, automatic findings linked to evidence, bounded queues and total memory, capture-gap diagnostics/recovery, native model/turn spans and a JSONL export flow. Sink writes remain synchronous; catalog caches and historical detail reads are not bounded by the browser pagination. See `docs/COMPLETION_PLAN.md` for the analytics delivery sequence and `docs/PROGRESS.md` for current implementation status. Per-payload limits do not bound total recording memory. Standard redaction is best effort; existing recordings are not scrubbed on replay.
 
 The current data does not reveal model reasoning, actual context occupancy, provider billing or a full workspace history. Some hook payloads are synthesized, reduced or omitted. Retained JSON size must never be labelled original wire traffic or model usage. Absence of a duration or an error signal does not prove zero execution time or success.
 
@@ -64,7 +66,7 @@ Target hierarchy: start with Analytics overview, with time/project/agent filters
 
 Current implemented hierarchy:
 
-Start with the timeline and debug one captured call. Navigation is Timeline, Tool profile and Event log. The recording map, selected list row and inspector refer to the same call. A collapsible graphite rail separates navigation from the cool layered workspace. Recording identity, capture connection and available metric sample counts stay accessible. Tool profile exposes observed activity, not automated diagnoses. Missing measurements remain unavailable, and retained JSON is never called context usage. Historical policy data is secondary and appears only when captured.
+Start with Analytics and monitor activity across recordings. Navigation is Analytics, Sessions, Timeline, Tool profile and Event log. Period, agent and project filters scope the historical totals; daily chart selection narrows the session list. Opening a session preserves the live collector and shows its entire captured scope. The existing timeline supports call-level inspection. The recording map, selected list row and inspector refer to the same call. A collapsible graphite rail separates navigation from the cool layered workspace. Recording identity, capture connection and available metric sample counts stay accessible. Tool profile exposes observed activity, not automated diagnoses. Missing measurements remain unavailable, and retained JSON is never called context usage. Historical policy data is secondary and appears only when captured.
 
 Keyboard shortcuts belong to the focused list. Search and export overlays contain keyboard focus and restore it when closed.
 

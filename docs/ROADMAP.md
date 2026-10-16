@@ -2,7 +2,7 @@
 
 Direzione aggiornata il 16 ottobre 2026: **an analytics platform for monitoring and analyzing AI agent usage and metrics**. Il [piano di completamento](COMPLETION_PLAN.md) definisce ora l’ordine di consegna: fondazione multi-sessione → dashboard e trend → diagnostica → usage nativo → confronto e report → chiusura della release. Le fasi tecniche sotto restano il riferimento per dipendenze e accettazione; la loro precedente definizione di prima release è superata dal perimetro analytics. Catalogo e dashboard non attendono il completamento di ogni attività di hardening.
 
-Stato: la fase 1 è implementata sul branch `telemetry-profiler`; la fase 2 è in corso, con identità, correlazione, selezione delle sessioni, profili e qualità dei payload implementati. La base della fase 3 è implementata con waterfall tool, API paginata e metriche Go condivise; le fasi restano soggette ai limiti di cattura ancora aperti. Findings e catalogo delle fasi 4–5 non sono implementati. Evidenze e limiti in [PROGRESS.md](PROGRESS.md). Vedi [direzione](PRODUCT_DIRECTION.md), [architettura](ARCHITECTURE.md), [telemetria](TELEMETRY_SPEC.md) e [analisi](ANALYSIS_SPEC.md).
+Stato: la fase 1 è implementata sul branch `telemetry-profiler`; la fase 2 è in corso, con identità, correlazione, selezione delle sessioni, profili e qualità dei payload implementati. La base della fase 3 è implementata con waterfall tool, API paginata e metriche Go condivise; le fasi restano soggette ai limiti di cattura ancora aperti. Il primo MVP analytics aggiunge catalogo storico, dashboard e trend; findings e completamento degli export restano aperti. Evidenze e limiti in [PROGRESS.md](PROGRESS.md). Vedi [direzione](PRODUCT_DIRECTION.md), [architettura](ARCHITECTURE.md), [telemetria](TELEMETRY_SPEC.md) e [analisi](ANALYSIS_SPEC.md).
 
 Non vengono assegnate date arbitrarie. Ogni fase ha una condizione di uscita verificabile e prepara quella successiva.
 
@@ -40,7 +40,7 @@ Obiettivo: costruire una base che non confonda conversazioni, tempi e payload.
 
 Completato: envelope v2 additivo, identità di sorgente/sessione/connessione/chiamata, ID nativi tipizzati, correlazione dichiarata e filtri per sessione nel cockpit. Le chiamate indistinguibili concorrenti restano ambigue; le risposte orfane non generano richieste inventate. Durata e sua provenienza sono separate dagli intervalli osservati. Profili standard/full, redazione prima di persistenza/stream e limiti per payload dichiarati; misure della sorgente con unità separate dal JSON normalizzato/conservato, omissioni e trasformazioni visibili in inspector e report. Il replay preserva queste informazioni senza modificare vecchi log.
 
-Ancora aperto: capability esplicite, code e memoria totale limitate, errori del sink e gap, recupero della coda JSONL. La [API profiler v1](PROFILER_API.md) versionata/paginata è implementata. Le dimensioni originali sono note solo per i valori effettivamente misurati o dichiarati dalla sorgente; full non recupera omissioni a monte. La fase non è chiusa.
+Errori del sink visibili e recupero dichiarato della coda JSONL implementati nel MVP analytics. Ancora aperto: capability esplicite, code e memoria totale limitate, gap e recupero dello stream. La [API profiler v1](PROFILER_API.md) versionata/paginata è implementata. Le dimensioni originali sono note solo per i valori effettivamente misurati o dichiarati dalla sorgente; full non recupera omissioni a monte. La fase non è chiusa.
 
 Lavoro:
 

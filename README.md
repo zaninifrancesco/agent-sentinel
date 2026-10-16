@@ -1,8 +1,8 @@
 # Agent Sentinel
 
-**The Local Profiler & Flight Recorder for AI Agents.**
+**An analytics platform for monitoring and analyzing AI agent usage and metrics.**
 
-Agent Sentinel records coding-agent hooks and MCP stdio traffic in a local cockpit. Inspect tool calls, arguments, responses, errors, available durations and patches; save the recording and inspect it again offline.
+Agent Sentinel monitors coding-agent hooks and MCP stdio traffic in a local analytics cockpit. Follow activity across recordings, filter by period, agent and project, explore daily trends and open the sessions behind the metrics. Inspect individual calls, captured payloads, available durations and patches offline.
 
 A single Go executable embeds the web UI. Recording and inspection require no cloud account, API key, Docker service or external database. Sentinel does not send recordings to remote services. Your coding agent and MCP servers may still use the network independently.
 
@@ -12,6 +12,10 @@ This branch starts the telemetry pivot with **passive capture**. Sentinel no lon
 
 Available now:
 
+- Analytics as the starting view: 24-hour, 7-day and 30-day filters, daily UTC call/error trends and breakdowns by agent, project and tool.
+- A historical catalog rebuilt from local JSONL files, with native-session/connection drill-down and 25-row session pages. Identical file copies count once; conflicting copies are excluded with a notice.
+- Shared historical metrics with explicit error denominators, duration samples, retained JSON and previous-period call comparison.
+- Visible sink-write errors and read-only recovery of a malformed final JSONL fragment at EOF; corruption in complete lines still fails.
 - Passive Cursor and Claude Code hooks, with neutral responses even if the collector is offline.
 - A bounded hook-delivery deadline: one second by default, configurable up to five seconds.
 - MCP stdio proxying without a policy gate; requests and responses are forwarded unchanged.
@@ -26,7 +30,7 @@ Available now:
 - Local JSONL recordings and read-only replay, including older enforcement traces.
 - Standalone HTML session reports, without scripts or external assets.
 
-**Planned, not implemented yet:** native model/turn spans, bounded queues and capture-gap recovery, repeated-call findings, schema diagnostics and a recording catalog. See the [implementation roadmap](docs/ROADMAP.md).
+**Planned, not implemented yet:** native model/turn spans, bounded queues and capture-gap recovery, repeated-call findings, schema diagnostics, native usage import and session comparison. See the [implementation roadmap](docs/ROADMAP.md).
 
 ![Trace Atlas timeline showing synthetic calls](docs/profiler.png)
 
@@ -112,13 +116,15 @@ The selected settings are saved in the recording and exposed by `/api/config`. L
 ~/.sentinel/bin/sentinel ui /path/to/trace.jsonl
 ```
 
-The first opens the latest recording; the second opens the selected file. Replay never executes captured commands. Historical blocks, holds and human decisions remain visible in old recordings, without approval controls.
+The first opens the latest recording; the second opens the selected file. Both start on Analytics, which includes `~/.sentinel/sessions/*.jsonl` and the explicitly opened file. The current collector also appears even without a file log. Custom log directories are not recursively discovered. Replay never executes captured commands. Historical blocks, holds and human decisions remain visible in old recordings, without approval controls.
 
 The cockpit's Export button uses a backend snapshot and always exports the whole recording, including all captured sessions and connections. It downloads an offline HTML report with summary figures, capture settings, payload-coverage summaries and expandable call history. It includes argument summaries, not full request/response payloads. The original JSONL is the trace for detailed local replay; a dedicated JSONL export flow is planned. `sentinel export` and `sentinel run` are not implemented.
 
 A synthetic multi-session recording is included at [`testdata/telemetry-v2.jsonl`](testdata/telemetry-v2.jsonl): seven observed requests, two ambiguous responses, one orphan response and one synthetic interruption. Open it with `sentinel ui testdata/telemetry-v2.jsonl`; its command strings were never executed.
 
 The profiler loads 50 call summaries per page. Next/previous pages stay pinned to the same recording revision while new events arrive; Refresh latest returns to current evidence. The inspector fetches one selected call's retained payloads. See the [profiler API contract](docs/PROFILER_API.md).
+
+Historical analytics uses captured call-start/observation timestamps, rolling intervals and UTC daily buckets. Empty days indicate no calls in the available archive; they do not prove the agent was inactive. Opening a session shows all of its retained calls, beyond the dashboard period. Browsing history never replaces the live hook collector. The catalog caches body-free projections by file size and modification time; it is rebuilt after restart. This MVP does not bound total recorder/catalog memory or make disk writes asynchronous. See the [analytics API](docs/ANALYTICS_API.md).
 
 ## What the numbers mean
 

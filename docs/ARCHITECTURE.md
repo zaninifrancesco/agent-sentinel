@@ -15,7 +15,7 @@ Stato: specifica di destinazione, 15 ottobre 2026. Questo documento sostituisce 
 - `web/src/useProfiler.ts` mantiene una pagina di sintesi e un dettaglio su richiesta. La prima pagina live viene aggiornata ogni due secondi, mentre i cursori fissano la revisione. Il browser non mantiene una seconda proiezione o implementazione delle metriche.
 - Il replay accetta vecchi log e v2 e rifiuta versioni incompatibili, senza applicare retroattivamente la redazione. Il report HTML autonomo conserva metadati di identità, abbinamento, profilo e copertura, con argomenti sintetizzati anziché payload completi. Non vengono eseguiti comandi nel replay.
 
-Restano aperti: errori del sink, code e memoria totale limitate, gap dello stream e recupero dei log interrotti, capability, suddivisione dei singoli payload in chunk, catalogo e findings. Il limite implementato è per payload e non limita la memoria di tutta la registrazione o il traffico in ingresso. Vedi [stato e verifiche](PROGRESS.md).
+Il MVP analytics aggiunge `internal/catalog` e aggregazioni storiche in `internal/analysis/history.go`, con dashboard/trend e apertura delle registrazioni tramite identità. Sono implementati visibilità degli errori del sink e recupero della coda JSONL malformata a EOF. Restano aperti: code e memoria totale limitate, recupero del sink, gap dello stream, capability, suddivisione dei singoli payload in chunk e findings. Il limite implementato è per payload e non limita la memoria di tutta la registrazione o il traffico in ingresso. Vedi [stato e verifiche](PROGRESS.md).
 
 ## 2. Architettura di destinazione
 

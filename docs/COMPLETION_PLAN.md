@@ -2,6 +2,8 @@
 
 Proposta del 16 ottobre 2026, basata sul checkout `telemetry-profiler` a `1389eab` e sull’analisi incollata dall’utente. Questo documento propone lavoro futuro: non dichiara nuove funzionalità implementate e non sostituisce le specifiche esistenti.
 
+Aggiornamento implementativo: il primo MVP catalogo/dashboard/trend è ora disponibile; stato e limiti correnti in [PROGRESS.md](PROGRESS.md) e [ANALYTICS_API.md](ANALYTICS_API.md). La ricognizione sotto rimane riferita al commit iniziale.
+
 ## Obiettivo di prodotto confermato
 
 **An analytics platform for monitoring and analyzing AI agent usage and metrics.**

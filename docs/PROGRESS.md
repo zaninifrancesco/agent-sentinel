@@ -2,6 +2,17 @@
 
 Branch: `telemetry-profiler`. Aggiornamento: 16 ottobre 2026.
 
+## Primo MVP analytics — implementato
+
+- Analytics è la vista iniziale: filtri 24h/7d/30d, agente e progetto; trend giornalieri UTC di chiamate/errori, classifiche per agente/progetto/tool e confronto del volume col periodo precedente.
+- Catalogo ricostruibile dai JSONL in `~/.sentinel/sessions` e dal file scelto esplicitamente. Cache in memoria delle proiezioni senza payload, invalidata da dimensione/mtime; nessun database o dipendenza aggiunta. Copie identiche contate una volta, identità con copie diverse escluse con avviso.
+- Elenco di sessioni native/connessioni con 25 righe per pagina UI; selezionare un giorno restringe l’elenco senza cambiare i totali del periodo. Registrazioni senza chiamate restano raggiungibili.
+- Apertura di uno scope storico nelle API profiler/dettaglio/report tramite `recordingId`, senza sostituire il recorder attivo. Le risposte profiler dichiarano `readOnly`; il frontend non segue in polling le registrazioni storiche. Il report della registrazione selezionata resta disponibile.
+- Metriche storiche Go: error rate `error/(ok+error)`, campioni e percentili nearest rank con zero valido, somma delle durate e JSON conservato. Giorni vuoti non provano inattività; timestamp assenti sono esclusi e dichiarati.
+- Il recorder espone errori di scrittura e ultimo `seq` del prefisso scritto senza errore, senza promettere fsync. Il replay recupera un frammento JSON finale malformato solo a EOF, marcando `recoveredTail`; una riga completa corrotta rimane fatale. Nessuna riscrittura del log.
+- Contratto e limiti in [ANALYTICS_API.md](ANALYTICS_API.md). Uso nativo/token/costi, findings, confronto A/B e heatmap annuale restano previsti.
+- Verifiche: test di catalogo/duplicati/conflitti/riavvio/crescita, denominatori/filtri/finestre/sessioni senza chiamate, guasto del sink e recupero EOF; regressione di drill-down HTTP storico e conservazione del collector. `make test` e build frontend passati, dieci test frontend. Smoke browser con 12 registrazioni sintetiche/318 chiamate, filtri, apertura della sessione storica da 25 chiamate, desktop 1280×800 e mobile 390×844, chiaro/scuro. Nessun comando dei fixture eseguito. Nessun binario installato o hook reale modificato.
+
 ## Fase 1 — Cattura passiva implementata
 
 - `serve`, `mcp` e `hook` espongono `--mode observe`, predefinito. La CLI non costruisce policy, budget o broker di approvazione; il proxy osservativo non passa dal gate.
@@ -84,11 +95,11 @@ Check di chiusura passati: `make test` (vet, race test, typecheck e nove test fr
 
 ## Limiti ancora aperti
 
-- Il recorder mantiene in memoria l’intera registrazione e scrive il sink in modo sincrono. Code limitate, errori del sink, gap dello stream e recupero della coda incompleta restano aperti nella fase 2. La paginazione v1 limita il trasferimento e la memoria ordinaria del browser; non limita la memoria totale del recorder o la dimensione di ogni riga del dettaglio.
+- Il recorder mantiene in memoria l’intera registrazione e scrive il sink in modo sincrono. Code limitate, gestione dei gap dello stream e recupero del sink restano aperti nella fase 2. Gli errori del sink sono ora visibili e la coda JSONL incompleta è recuperabile nel caso EOF dichiarato. La paginazione v1 limita il trasferimento e la memoria ordinaria del browser; non limita la memoria totale del recorder o la dimensione di ogni riga del dettaglio.
 - `JSON retained` misura il JSON conservato di richieste e risposte abbinate nelle chiamate visualizzate, non il traffico originale; per i log precedenti usa il JSON conservato compatto. Gli adattatori possono ridurre o omettere contenuti. Le dimensioni della sorgente non ricostruiscono ciò che non è arrivato al punto di cattura. Il limite per payload non limita envelope, input, code o memoria totale della registrazione.
-- La waterfall mostra gli intervalli catturati dei tool, senza span nativi di modello o turno. I suoi intervalli non attribuiti non sono una diagnostica di perdita di eventi. Nessuna analisi automatica delle ripetizioni, occupazione del contesto, usage nativo, diagnostica degli schemi o catalogo multi-sessione implementati in questa fase.
+- La waterfall mostra gli intervalli catturati dei tool, senza span nativi di modello o turno. I suoi intervalli non attribuiti non sono una diagnostica di perdita di eventi. Nessuna analisi automatica delle ripetizioni, occupazione del contesto, usage nativo o diagnostica degli schemi implementata. Catalogo e trend multi-sessione sono disponibili nel MVP analytics; la cache conserva le sintesi di tutte le registrazioni e non ha ancora un limite totale.
 - Il package di policy e le sue regressioni interne restano nel repository, ma la CLI nuova non offre enforcement. La loro eliminazione non è un prerequisito per osservare passivamente.
 - Il binario installato e gli hook reali dell'utente non sono stati cambiati. La migrazione di un'installazione esistente è un'operazione separata ed esplicita.
 - Landing page invariata.
 
-Prossimo passo: proseguire la fase 2 con code e memoria limitate, errori del sink, gap distinguibili e recupero della coda JSONL; quindi capability e findings. La API paginata del profiler è già disponibile.
+Prossimo passo di prodotto: diagnostica R1–R4 e analisi dei volumi con evidenze, poi usage nativo e confronto A/B. Proseguire anche con capability, code e memoria limitate e gap distinguibili. Il primo MVP di catalogo/dashboard/trend è disponibile.

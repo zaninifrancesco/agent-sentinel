@@ -1,8 +1,8 @@
 # Agent Sentinel — nuova direzione
 
-Decisione di prodotto del 15 ottobre 2026: **Agent Sentinel diventa un profiler locale e un flight recorder per coding agent e tool MCP.** Il valore principale è capire cosa è successo, dove è stato speso tempo e quali sequenze meritano attenzione.
+Decisione di prodotto del 15 ottobre 2026: **Agent Sentinel diventa una piattaforma analytics per monitorare e analizzare utilizzo e metriche degli agenti AI.** Direzione aggiornata il 16 ottobre 2026; recorder e profiler ne costituiscono la base di raccolta e approfondimento. Il valore principale è capire cosa è successo, dove è stato speso tempo e quali sequenze meritano attenzione.
 
-Questi documenti definiscono lo sviluppo del pivot. La prima fase di cattura passiva è implementata sul branch `telemetry-profiler`; il resto rimane una specifica di destinazione. Lo stato verificato è in [PROGRESS.md](PROGRESS.md). Configurazioni installate e landing page restano invariati.
+Questi documenti definiscono lo sviluppo del pivot. Cattura passiva, profiler paginato e primo MVP analytics storico sono implementati sul branch `telemetry-profiler`; le parti ancora previste sono distinte nei documenti. Lo stato verificato è in [PROGRESS.md](PROGRESS.md). Configurazioni installate e landing page restano invariati.
 
 ## Percorso di lettura
 
@@ -18,7 +18,7 @@ Questi documenti definiscono lo sviluppo del pivot. La prima fase di cattura pas
 - Il [README](../README.md), [PRODUCT.md](../PRODUCT.md) e il [playbook di setup](../AGENTS.md) descrivono il comportamento osservativo ora implementato e la migrazione esplicita dalle release di enforcement.
 - Le indicazioni operative e i vincoli del repository restano applicabili. Queste specifiche non autorizzano a cambiare installazioni o hook dell'utente.
 - `cockpit.png` documenta l'interfaccia precedente; `profiler.png` mostra la prima fase passiva con dati sintetici.
-- Schema v2 e identità/correlazione sono implementati nel sottoinsieme dichiarato in TELEMETRY_SPEC.md e PROGRESS.md; le API versionate, la qualità completa della cattura e il motore di findings restano contratti da implementare.
+- Schema v2 e identità/correlazione sono implementati nel sottoinsieme dichiarato in TELEMETRY_SPEC.md e PROGRESS.md; API profiler paginata e MVP analytics storico sono implementati; qualità completa della cattura e motore di findings restano da completare. Contratto analytics in [ANALYTICS_API.md](ANALYTICS_API.md).
 - Il nome Agent Sentinel rimane quello del progetto. Non è previsto un lavoro su nome, branding o landing page in questa fase.
 
 ## Decisioni già prese
