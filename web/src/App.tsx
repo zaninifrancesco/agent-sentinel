@@ -18,8 +18,8 @@ import type { Row, HistorySession } from "./types";
 
 type View = "analytics" | "sessions" | "overview" | "calls" | "events";
 const VIEWS: { id: View; label: string }[] = [
-  { id: "analytics", label: "Analytics" }, { id: "sessions", label: "Sessions" },
-  { id: "calls", label: "Timeline" }, { id: "overview", label: "Tool profile" }, { id: "events", label: "Event log" },
+  { id: "calls", label: "Timeline" }, { id: "sessions", label: "Sessions" },
+  { id: "analytics", label: "Statistics" }, { id: "overview", label: "Tool profile" }, { id: "events", label: "Event log" },
 ];
 const FILTERS: { id: CallFilter; label: string }[] = [
   { id: "all", label: "All calls" }, { id: "errors", label: "Errors" }, { id: "open", label: "Open" }, { id: "interrupted", label: "Interrupted" },
@@ -35,7 +35,7 @@ export default function App() {
   const { config } = useConfig();
   const [theme, toggleTheme] = useTheme();
   const [railCollapsed, setRailCollapsed] = useState(initialRailCollapsed);
-  const [view, setView] = useState<View>("analytics");
+  const [view, setView] = useState<View>("calls");
   const [recordingId, setRecordingId] = useState("");
   const [scope, setScope] = useState("");
   const [filter, setFilter] = useState<CallFilter>("all");
@@ -153,7 +153,6 @@ export default function App() {
         <Analytics active={analyticsView} sessionsOnly={view === "sessions"} onOpen={openHistory} />
         {!analyticsView && (view === "overview" ? <Overview profile={profile} replay={replay} connecting={!replay && (connection === "connecting" || connection === "reconnecting")} onCalls={() => openCalls()} onTool={(name) => openCalls("all", name)} onInspect={inspect} /> : (
           <main className={`${view === "calls" ? "call-main " : ""}flex min-h-0 flex-1 flex-col`} aria-label={view === "calls" ? "Call inspector" : "Event log"}>
-            {view === "calls" && <div className={`trace-holder ${detailOpen ? "hidden lg:block" : "block"}`}><TraceMap rows={visible} timeline={data?.timeline} selectedKey={selectedKey} onSelect={(row) => selectCall(row.key)} /></div>}
             <div className="inspector-workspace">
               <div className={`inspector-toolbar ${detailOpen ? "hidden lg:flex" : "flex"}`}>
                 <label className="relative min-w-40 flex-1 sm:max-w-xs"><Search aria-hidden className="pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-ink-3" /><input aria-label={view === "calls" ? "Filter calls by tool or arguments" : "Filter captured events"} value={query} onChange={(event) => { resetPage(); setQuery(event.target.value); setDetailOpen(false); }} placeholder={view === "calls" ? "Search calls or arguments…" : "Search events…"} className="field-input w-full pl-8" /></label>
@@ -166,8 +165,9 @@ export default function App() {
               </div>}
               <div className="inspector-split" aria-busy={loading}>
                 <div className={`event-list-pane min-h-0 flex-col lg:border-r lg:border-rule ${detailOpen ? "hidden lg:flex" : "flex"}`}>
-                  <Timeline rows={visible} selectedKey={selectedKey} onSelect={selectCall} follow={false} showResponseSize={view === "calls"}
-                    emptyTitle={metrics.calls === 0 ? "Your first call starts here" : "No matching calls or events"} emptyDescription={metrics.calls === 0 ? "Connect an agent with sentinel hook install, or observe an MCP server with sentinel mcp. Calls appear here as they are captured." : "Change the status, tool or search filters to inspect other events."} />
+                  {view === "calls" ? <TraceMap rows={visible} timeline={data?.timeline} selectedKey={selectedKey} onSelect={(row) => selectCall(row.key)} loading={loading}
+                    emptyTitle={metrics.calls === 0 ? "Your first call starts here" : "No matching calls"} emptyDescription={metrics.calls === 0 ? "Connect your agent with Sentinel hooks or the MCP proxy to capture calls." : "Change the status, tool or search filters to inspect other calls."} /> : <Timeline rows={visible} selectedKey={selectedKey} onSelect={selectCall} follow={false}
+                    emptyTitle="No matching events" emptyDescription="Change the search or session filters to inspect other events." />}
                   <div className="page-controls">
                     <span aria-live="polite">{loading ? "Loading page…" : data?.total ? `${data.offset + 1}–${data.offset + visible.length} of ${data.total}` : "0 entries"}</span>
                     <div className="flex items-center gap-1"><button className="icon-button" aria-label="Previous page" disabled={loading || !data?.previous} onClick={() => { setFocusKey(""); setCursor(data?.previous ?? ""); setDetailOpen(false); }}><ChevronLeft aria-hidden className="size-3.5" /></button><button className="icon-button" aria-label="Next page" disabled={loading || !data?.next} onClick={() => { setFocusKey(""); setCursor(data?.next ?? ""); setDetailOpen(false); }}><ChevronRight aria-hidden className="size-3.5" /></button></div>

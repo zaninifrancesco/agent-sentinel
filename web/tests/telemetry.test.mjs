@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { after, before, test } from "node:test";
 import { createServer } from "vite";
 
-let server, report, journeyStops, captureSummary, capturedInterval, responseSize, toolDuration, timelineTracks, periodChange;
+let server, report, journeyStops, captureSummary, capturedInterval, responseSize, toolDuration, waterfallInterval, TraceMap, periodChange;
 const backendMetrics = { calls: 17, waiting: 0, running: 0, refused: 0, errors: 2, interrupted: 0, payloadBytes: 8192, latencySamples: 12, p50: 333, p95: 987 };
 const timeline = { startMs: 0, endMs: 1000, spanMs: 1000, coveredMs: 600, unattributedMs: 400, overlapMs: 200, peakConcurrency: 2, incompleteCalls: 0, gapCount: 1, gaps: [{ startMs: 600, endMs: 1000 }] };
 
@@ -11,9 +13,10 @@ before(async () => {
   ({ buildReportHtml: report } = await server.ssrLoadModule("/src/report.ts"));
   ({ journeyStops } = await server.ssrLoadModule("/src/journey.ts"));
   ({ captureSummary } = await server.ssrLoadModule("/src/capture.ts"));
-  ({ capturedInterval, timelineTracks } = await server.ssrLoadModule("/src/trace.ts"));
+  ({ capturedInterval, waterfallInterval } = await server.ssrLoadModule("/src/trace.ts"));
   ({ responseSize } = await server.ssrLoadModule("/src/profile.ts"));
   ({ toolDuration } = await server.ssrLoadModule("/src/metrics.ts"));
+  ({ TraceMap } = await server.ssrLoadModule("/src/TraceMap.tsx"));
   ({ periodChange } = await server.ssrLoadModule("/src/Analytics.tsx"));
 });
 after(async () => { await server?.close(); });
@@ -105,26 +108,25 @@ test("report intervals keep capture timing separate from reported duration", () 
 });
 
 
-test("timeline reuses tracks for sequential calls and separates overlapping tool types", () => {
-  const shell = call({ key: "a", span: { startMs: 0, endMs: 100 } });
-  const edit = call({ key: "b", title: "edit_file", span: { startMs: 20, endMs: 70 } });
-  const read = call({ key: "c", title: "read_file", span: { startMs: 70, endMs: 90 } });
-  const next = call({ key: "d", span: { startMs: 100, endMs: 200 } });
-  const packed = timelineTracks([next, edit, shell, read]);
-  assert.deepEqual(packed.tracks.map((track) => track.map((row) => row.key)), [["a", "d"], ["b", "c"]]);
-  assert.equal(packed.unpositioned.length, 0);
+test("waterfall preserves zero, open and invalid capture bounds without inventing ends", () => {
+  assert.deepEqual(waterfallInterval(call({ span: { startMs: 0, endMs: 0 } })), { start: 0, end: 0 });
+  assert.deepEqual(waterfallInterval(call({ span: { startMs: 10, endMs: 5 } })), { start: 10, end: undefined });
+  assert.deepEqual(waterfallInterval(call({ span: { startMs: 10 } })), { start: 10, end: undefined });
+  assert.equal(waterfallInterval(call({ span: { startMs: NaN } })), undefined);
+  assert.equal(waterfallInterval(call()), undefined);
 });
 
-test("timeline keeps coincident observations distinct without extending unknown ends", () => {
+test("waterfall keeps each call labelled and selectable, including missing timestamps", () => {
   const rows = [
-    call({ key: "open", span: { startMs: 0 } }),
-    call({ key: "zero", span: { startMs: 0, endMs: 0 } }),
-    call({ key: "later", span: { startMs: 1, endMs: 5 } }),
-    call({ key: "missing", span: undefined }),
-    call({ key: "invalid", span: { startMs: NaN } }),
-    call({ key: "event", kind: "session" }),
+    call({ key: "short", title: "read_file", subtitle: "src/main.go", span: { startMs: 100, endMs: 110 }, toolDurationMs: 5000 }),
+    call({ key: "unknown", title: "search", subtitle: "query", span: undefined }),
+    call({ key: "open", title: "shell", span: { startMs: 200 }, response: undefined }),
   ];
-  const packed = timelineTracks(rows);
-  assert.deepEqual(packed.tracks.map((track) => track.map((row) => row.key)), [["open", "later"], ["zero"]]);
-  assert.deepEqual(packed.unpositioned.map((row) => row.key), ["missing", "invalid"]);
+  const html = renderToStaticMarkup(createElement(TraceMap, { rows, timeline, selectedKey: "short", onSelect() {}, loading: false, emptyTitle: "Empty", emptyDescription: "No calls" }));
+  assert.equal((html.match(/class="waterfall-columns waterfall-call/g) ?? []).length, 3);
+  assert.ok(html.includes("src/main.go"));
+  assert.ok(html.includes("Captured interval 10 ms. Tool time 5.0 s"));
+  assert.ok(html.includes("Time unavailable"));
+  assert.ok(html.includes("Capture end unavailable"));
+  assert.ok(html.includes('aria-pressed="true"'));
 });
