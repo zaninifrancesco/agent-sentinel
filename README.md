@@ -1,171 +1,283 @@
+<div align="center">
+
 # Agent Sentinel
 
-**An analytics platform for monitoring and analyzing AI agent usage and metrics.**
+### The Local Profiler & Flight Recorder for AI Agents
 
-Agent Sentinel monitors coding-agent hooks and MCP stdio traffic in a local analytics cockpit. Follow activity across recordings, filter by period, agent and project, explore daily trends and open the sessions behind the metrics. Inspect individual calls, captured payloads, available durations and patches offline.
+**Gain instant visibility into what your AI coding agents and MCP tools are actually doing.**  
+Inspect every shell command, file edit, API payload, latency bottleneck, and error — 100% locally with zero cloud dependencies.
 
-A single Go executable embeds the web UI. Recording and inspection require no cloud account, API key, Docker service or external database. Sentinel does not send recordings to remote services. Your coding agent and MCP servers may still use the network independently.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go Version](https://img.shields.io/badge/Go-1.27+-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![React UI](https://img.shields.io/badge/Cockpit-React%20%2B%20Tailwind-61DAFB?logo=react&logoColor=black)](web/)
+[![Zero Cloud](https://img.shields.io/badge/Telemetry-100%25%20Local%20JSONL-success)](#architecture--design-principles)
+[![Integrations](https://img.shields.io/badge/Agents-Cursor%20%7C%20Claude%20Code%20%7C%20MCP-8A2BE2)](#quickstart-in-30-seconds)
 
-## Development status
+<br/>
 
-This branch starts the telemetry pivot with **passive capture**. Sentinel no longer evaluates command policies, holds calls for approval or enforces spending limits. The coding agent's own permissions still apply.
+<a href="#quickstart-in-30-seconds"><strong>Quickstart (30s)</strong></a> ·
+<a href="#key-features"><strong>Features</strong></a> ·
+<a href="#capture-profiles"><strong>Capture Profiles</strong></a> ·
+<a href="#cli-reference"><strong>CLI Reference</strong></a> ·
+<a href="#architecture--design-principles"><strong>Architecture</strong></a> ·
+<a href="docs/ROADMAP.md"><strong>Roadmap</strong></a>
 
-Available now:
+<br/>
+<br/>
 
-- Timeline as the starting view, with readable per-call labels, proportional captured intervals and available tool durations. Select a row to inspect its arguments and result.
-- Statistics as a separate historical view: 24-hour, 7-day and 30-day filters, daily UTC call/error trends and breakdowns by agent, project and tool.
-- A historical catalog rebuilt from local JSONL files, with native-session/connection drill-down and 25-row session pages. Identical file copies count once; conflicting copies are excluded with a notice.
-- Shared historical metrics with explicit error denominators, duration samples, retained JSON and previous-period call comparison.
-- Visible sink-write errors and read-only recovery of a malformed final JSONL fragment at EOF; corruption in complete lines still fails.
-- Passive Cursor and Claude Code hooks, with neutral responses even if the collector is offline.
-- A bounded hook-delivery deadline: one second by default, configurable up to five seconds.
-- MCP stdio proxying without a policy gate; requests and responses are forwarded unchanged.
-- A paged call waterfall with one lane per call, visible overlaps and unattributed intervals. Matched capture coverage uses interval union; reported tool duration remains separate.
-- A tool profile with per-tool activity, longest completed calls and largest retained responses, each linked to its captured evidence.
-- A call inspector with status/tool filters, full-argument search, duration/response-size sorting, payload text search, previous/next navigation, available patch diffs and a separate event log.
-- Recording-scoped call identities and separate agent sessions/connections, with a cockpit scope selector.
-- Explicit native/fallback pairing, ambiguous-call filtering and orphan responses preserved in Event log.
-- Shared Go metrics for live, replay and export: call/error counts, nearest-rank percentiles, retained JSON, capture coverage and peak observed concurrency.
-- Versioned profiler API with stable snapshot cursors, 50-row cockpit pages, server-side search/sorting and payloads fetched only for the selected call.
-- Capture profiles with limits and transformation metadata: observed source bytes, normalized/stored JSON, redaction, truncation and omission, visible in the inspector and report.
-- Local JSONL recordings and read-only replay, including older enforcement traces.
-- Standalone HTML session reports, without scripts or external assets.
+[![Agent Sentinel Cockpit Timeline](docs/screenshot-waterfall.png)](docs/screenshot-waterfall.png)
+*The Agent Sentinel cockpit: Interactive call timeline waterfall, concurrency tracks, and real-time evidence inspector.*
 
-**Planned, not implemented yet:** native model/turn spans, bounded queues and capture-gap recovery, repeated-call findings, schema diagnostics, native usage import and session comparison. See the [implementation roadmap](docs/ROADMAP.md).
+</div>
 
-![Trace Atlas timeline showing synthetic calls](docs/profiler.png)
+---
 
-This screenshot uses a synthetic JSONL recording from the earlier Trace Atlas build, before the graphite sidebar and session selector. No command shown in it was executed by the fixture generator. The previous enforcement cockpit is retained in `docs/cockpit.png` as historical material.
+## Why Agent Sentinel?
 
-## Build
+Modern AI coding agents (like **Cursor** and **Claude Code**) and **MCP (Model Context Protocol)** servers execute shell commands, patch local files, run background tasks, and query tools autonomously. 
 
-Build prerequisites: Go 1.27+ and Node.js 20.19+ or 22.12+.
+Until now, understanding their actions meant squinting at fragmented terminal logs or trusting opaque status bars. When a tool fails, loops, or takes 15 seconds, you are left wondering: *What exact arguments were passed? Why did it hang? What diff was generated?*
+
+**Agent Sentinel** solves this by acting as a passive, non-intrusive flight recorder:
+
+- 🪶 **Zero Intrusion & Non-Blocking**: Runs locally via passive hooks with bounded 1s delivery deadlines. If Sentinel stops or crashes, your coding agent continues uninterrupted with neutral responses.
+- ⏱️ **Full Call Observability**: Captures execution intervals, start/end timestamps, observed tool durations, and concurrency overlaps.
+- 🔍 **Deep Evidence Inspector**: Inspect full request arguments, tool responses, structured error codes, file diffs, and redaction flags.
+- 📊 **Historical Analytics**: Aggregates sessions across projects, daily UTC trends, p50/p95 latency percentiles, and error ratios.
+- 🔒 **100% Local & Private**: Single Go executable with an embedded single-page cockpit. No accounts, no API keys, no Docker, and zero data leaves your machine.
+
+---
+
+## Key Features
+
+### 1. Interactive Call Waterfall & Timeline
+Navigate agent tool activity with proportional interval bars, concurrency indicators, and status tags (`Ok`, `Error`, `Open`, `Interrupted`). Filter by specific tools (`shell`, `read_file`, `edit_file`, MCP methods), text search inside arguments, and sort by duration or payload size.
+
+<div align="center">
+  <img src="docs/screenshot-waterfall.png" alt="Timeline Waterfall" width="100%" />
+</div>
+
+### 2. Deep Evidence Inspector
+Click any call in the timeline to open the evidence panel. Inspect exact input arguments, output results, payload sizes, capture transformations, and the step-by-step timing journey. Copy normalized JSON payloads with one click.
+
+### 3. Historical Analytics Dashboard
+Track agent usage across time, projects, and agent types. View UTC daily activity trends, compare call volume against previous periods, and identify latency regressions with nearest-rank p50 and p95 duration percentiles.
+
+<div align="center">
+  <img src="docs/screenshot-statistics.png" alt="Historical Analytics" width="100%" />
+</div>
+
+### 4. Tool Profiling & Bottleneck Detection
+Quickly see where time and errors concentrate. Sentinel highlights your top completed calls by duration, largest retained responses, and cumulative tool execution time.
+
+<div align="center">
+  <img src="docs/screenshot-tools.png" alt="Tool Profile" width="100%" />
+</div>
+
+### 5. Command Palette & Keyboard Speed
+Built for developer speed. Press <kbd>Cmd</kbd> + <kbd>K</kbd> (or <kbd>Ctrl</kbd> + <kbd>K</kbd>) to open the command palette, navigate calls with vim-style <kbd>J</kbd> / <kbd>K</kbd>, press <kbd>?</kbd> for the shortcut sheet, and use <kbd>Esc</kbd> to dismiss inspectors.
+
+<div align="center">
+  <img src="docs/screenshot-palette.png" alt="Command Palette" width="70%" />
+</div>
+
+### 6. Session Archive & Replay
+Replay past recordings offline directly from local JSONL files without re-executing any captured commands. Drill down into individual native agent sessions and connection scopes.
+
+<div align="center">
+  <img src="docs/screenshot-sessions.png" alt="Sessions Catalog" width="100%" />
+</div>
+
+### 7. Self-Contained Offline HTML Reports
+Need to share a bug report or review an agent session with a teammate? Export the entire session into a standalone, script-free, zero-dependency HTML report with a single click.
+
+---
+
+## Quickstart in 30 Seconds
+
+### 1. Build and Install
+
+Prerequisites: **Go 1.27+** and **Node.js 20.19+ / 22.12+**.
 
 ```bash
-make build
-./bin/sentinel version
-./bin/sentinel help
+# Clone and build the binary with embedded web cockpit
+git clone https://github.com/zaninifrancesco/agent-sentinel.git
+cd agent-sentinel
+make install
 ```
 
-For an installation, `make install` builds the embedded cockpit and copies the executable to `~/.sentinel/bin/sentinel`. Hook entries store its absolute path, so choose the final binary before installing hooks. Building this checkout is separate from replacing an existing installed binary.
+`make install` builds the embedded UI and installs the binary to `~/.sentinel/bin/sentinel`. Verify the installation:
 
-An installed executable needs neither Go nor Node.js to run. Source builds use npm to obtain build dependencies; recording, replay and reports do not require a network connection.
+```bash
+~/.sentinel/bin/sentinel version
+```
 
-## Record a coding agent
-
-Choose the project you want to observe. Installing inside the Sentinel source tree only observes agents working in that tree.
-
-First start the collector in a background terminal or process:
+### 2. Start the Background Collector
 
 ```bash
 ~/.sentinel/bin/sentinel serve --mode observe
 ```
 
-It prints a session ID, JSONL path and cockpit URL: `http://127.0.0.1:8848`. Check the active mode before connecting hooks:
+The collector starts in observation mode and listens at `http://127.0.0.1:8848`. Verify its configuration:
 
 ```bash
 curl -sf http://127.0.0.1:8848/api/config
+# => {"mode":"observe","policy":"off","approvals":false,"budgetEditable":false}
 ```
 
-Expected: `"mode":"observe"`, `"approvals":false`, `"budgetEditable":false`, `"policy":"off"`.
+### 3. Attach to Your Coding Agent
 
-Install for one agent in the target project:
+Run the installation command in your target project workspace:
 
+#### For Cursor:
 ```bash
-# Cursor
 ~/.sentinel/bin/sentinel hook install --dir /path/to/project
+```
+*Injects passive hooks into `.cursor/hooks.json` while preserving all existing hooks and custom configurations.*
 
-# Claude Code
+#### For Claude Code:
+```bash
 ~/.sentinel/bin/sentinel hook install --agent claude --dir /path/to/project
 ```
+*Injects passive hooks into `.claude/settings.local.json`. Restart Claude Code to load the hooks.*
 
-Run only the command for the chosen agent. Install preserves other hooks and settings; running it again replaces Sentinel's entries rather than duplicating them. New entries include `hook --mode observe` and a six-second process timeout, allowing a margin around the client's delivery deadline.
+*(Optional: Add `--mcp` to record agent MCP tool hooks, or `--user` to configure globally across all projects).*
 
-Cursor reloads its hook file on change; if it has not loaded, reopen the project. Restart Claude Code after installation, because it loads hooks at session start.
+### 4. Record an MCP Stdio Server
 
-MCP hooks are opt-in with `hook install --mcp`. Use either those hooks or the MCP proxy for the same traffic to avoid recording it twice. `--user` explicitly installs for all projects instead of one.
-
-For the complete ordered setup and a synthetic verification, follow [AGENTS.md](AGENTS.md).
-
-## Record an MCP stdio server
+You can also record any MCP server directly via stdio proxying:
 
 ```bash
-~/.sentinel/bin/sentinel mcp --ui -- /path/to/mcp-server arg1
+~/.sentinel/bin/sentinel mcp --ui -- /path/to/mcp-server arg1 arg2
 ```
 
-The proxy writes protocol traffic to stdout and its own diagnostics to stderr. It does not modify tool permissions or server results. A proxy/server process failure can still interrupt the stdio connection.
+Traffic is forwarded transparently while protocol frames and execution intervals are mirrored to the cockpit.
 
-Without `--ui`, it records without opening a cockpit listener. Use `--log /path/to/trace.jsonl` for a chosen log or `--log -` to disable file logging.
+### 5. Open the Cockpit
 
-## Capture profiles
+Open your browser to:
+👉 **[http://127.0.0.1:8848](http://127.0.0.1:8848)**
 
-`serve` and `mcp` default to `--capture standard`: recognized sensitive fields and text patterns are redacted before storage and streaming; each retained payload is limited to 64 KiB of JSON. This is best-effort recognition, not a guarantee that every secret is removed. Standard capture also omits read contents and summarizes some hook results.
+Or inspect any existing recording file:
+```bash
+~/.sentinel/bin/sentinel ui ~/.sentinel/sessions/<session-id>.jsonl
+```
 
-Choose `--capture full` explicitly to retain more of the supplied hook content, without redaction and with a default limit of 1 MiB per payload. It cannot recover content omitted or shortened before it reached the collector. Both profiles accept `--max-payload-bytes N` (256–16,777,216 bytes; zero selects the profile default).
+---
+
+## Capture Profiles
+
+Sentinel provides configurable capture profiles to balance diagnostic depth against disk and memory usage:
+
+| Profile | Sensitive Data Redaction | Max Stored Payload | Ideal For |
+| :--- | :--- | :--- | :--- |
+| **`standard`** *(default)* | ✅ Best-effort regex & field redaction of tokens/secrets | **64 KiB** per payload | Daily development, shared machines, safe traces |
+| **`full`** | ❌ Retains raw payload without redaction | **1 MiB** per payload (configurable) | Deep debugging, protocol troubleshooting, local testing |
+
+Configure your profile when starting the collector:
 
 ```bash
+# Standard profile with custom 32 KiB cap
 ~/.sentinel/bin/sentinel serve --capture standard --max-payload-bytes 32768
+
+# Full capture for deep MCP debugging
 ~/.sentinel/bin/sentinel mcp --capture full --ui -- /path/to/mcp-server
 ```
 
-The selected settings are saved in the recording and exposed by `/api/config`. Limits apply to the retained payload value, not the whole event, incoming transport, queues or total recording memory. The MCP bytes forwarded to the agent/server are unchanged. Existing recordings are replayed as stored; replay does not apply the new redaction policy retroactively.
+---
 
-## Replay and export
+## CLI Reference
 
-```bash
-~/.sentinel/bin/sentinel ui
-~/.sentinel/bin/sentinel ui /path/to/trace.jsonl
+```text
+Usage:
+  sentinel serve [--mode observe] [--port N] [--log FILE|-] [--open]
+                 Record Cursor / Claude Code hooks in the local cockpit
+  sentinel hook install [--agent cursor|claude] [--dir PATH] [--mcp] [--user] [--dry-run]
+                 Install passive hooks, preserving existing entries
+  sentinel hook uninstall [--agent cursor|claude] [--dir PATH] [--user]
+                 Remove only Sentinel hooks
+  sentinel hook [--mode observe] [--timeout 1s] [--url URL]
+                 Deliver hook JSON from stdin; returns neutral response even if offline
+  sentinel mcp [--mode observe] [--ui] [--port N] [--log FILE|-] -- <server-cmd> [args]
+                 Forward MCP stdio unchanged and record protocol frames
+  sentinel ui [--port N] [--open] [FILE]
+                 Inspect a recorded JSONL session (defaults to latest recording)
+  sentinel version
+                 Print current version
+  sentinel help
+                 Show full help message
 ```
 
-The first opens the latest recording; the second opens the selected file. Both start on Timeline. The separate Statistics view includes `~/.sentinel/sessions/*.jsonl` and the explicitly opened file. The current collector also appears even without a file log. Custom log directories are not recursively discovered. Replay never executes captured commands. Historical blocks, holds and human decisions remain visible in old recordings, without approval controls.
+---
 
-The cockpit's Export button uses a backend snapshot and always exports the whole recording, including all captured sessions and connections. It downloads an offline HTML report with summary figures, capture settings, payload-coverage summaries and expandable call history. It includes argument summaries, not full request/response payloads. The original JSONL is the trace for detailed local replay; a dedicated JSONL export flow is planned. `sentinel export` and `sentinel run` are not implemented.
+## Architecture & Design Principles
 
-A synthetic multi-session recording is included at [`testdata/telemetry-v2.jsonl`](testdata/telemetry-v2.jsonl): seven observed requests, two ambiguous responses, one orphan response and one synthetic interruption. Open it with `sentinel ui testdata/telemetry-v2.jsonl`; its command strings were never executed.
-
-The profiler loads 50 call summaries per page. Next/previous pages stay pinned to the same recording revision while new events arrive; Refresh latest returns to current evidence. The inspector fetches one selected call's retained payloads. See the [profiler API contract](docs/PROFILER_API.md).
-
-Historical analytics uses captured call-start/observation timestamps, rolling intervals and UTC daily buckets. Empty days indicate no calls in the available archive; they do not prove the agent was inactive. Opening a session shows all of its retained calls, beyond the dashboard period. Browsing history never replaces the live hook collector. The catalog caches body-free projections by file size and modification time; it is rebuilt after restart. This MVP does not bound total recorder/catalog memory or make disk writes asynchronous. See the [analytics API](docs/ANALYTICS_API.md).
-
-## What the numbers mean
-
-Durations are those available from the adapter or proxy; they are not the model's thinking time. Median and p95 include completed tool calls with available nonnegative durations, excluding interrupted calls and legacy approval-held spans. Zero milliseconds is valid; absent samples display as unavailable.
-
-**JSON retained** sums stored request and matched-response payload JSON bytes for the selected recording scope, independently of list filters or pagination. Unassigned responses are excluded. Legacy recordings use compact retained payload JSON where a stored measurement is absent. Some hook payloads are synthesized, omitted or truncated. This is neither original wire volume nor actual model tokens or context usage. Sentinel no longer calculates dollars from fixed token-price assumptions.
-
-Matched coverage is the union of valid captured tool intervals. Unattributed time is the remainder of the observed recording span; it can include model, user, scheduling and missing evidence. Pending or ambiguous calls and synthetic closures stay points. These measures never infer model thinking time or native context usage.
-
-New JSONL events use schema v2, retaining `sessionId` as the recording identity for compatibility. Native IDs keep their type and exact value unless standard capture recognizes a credential-like string: those identities become stable opaque values within the recording, with affected fields declared. An ambiguous response is never assigned to an arbitrary request. Missing requests are not fabricated. Duration provenance and explicit zero are preserved in `timing`; synthetic turn-end closures have no execution duration.
-
-The inspector distinguishes the adapter's observed source value (a named text/JSON field or MCP frame), normalized JSON and stored JSON. Hook-client reported sizes remain separate from collector measurements. Completeness applies to that source value, not the entire model conversation; legacy original sizes stay unknown. Current logs do not reconstruct full model context, task boundaries or workspace state. Capture-gap diagnostics remain planned. Local recordings can contain commands, source text and tool output; inspect them before sharing.
-
-## Migrating from enforcement releases
-
-This is a behavior change. The new default is observation only; `--mode observe` makes that explicit. If you need the previous command-blocking behavior, keep the previous release.
-
-The new CLI rejects `--policy`, `--max-cost`, `--approval-timeout` and `--offline` with migration guidance instead of silently ignoring them. Stop the old collector before starting the new one and explicitly reinstall Sentinel's hooks for each project you migrate. A new hook never forwards a legacy collector's permission decision to the agent; it returns neutrally and reports an unexpected decision on stderr.
-
-Do not rebuild over an executable referenced by active hooks during normal development. Replacing that executable changes every project using it even if the hook files remain unchanged. Prepare and test the new build separately; perform the installed-binary replacement and hook migration only as an explicit upgrade.
-
-Stopping the new collector loses telemetry while it is offline but does not add Sentinel confirmation prompts. Hook delivery errors are reported on stderr and acknowledged neutrally.
-
-## Remove integration
-
-```bash
-~/.sentinel/bin/sentinel hook uninstall --dir /path/to/project
-~/.sentinel/bin/sentinel hook uninstall --agent claude --dir /path/to/project
+```
+  ┌──────────────────────────────────────────────┐
+  │         AI Coding Agent / Workspace          │
+  │            (Cursor / Claude Code)            │
+  └──────────────────────┬───────────────────────┘
+                         │ Passive Hooks (stdin/stdout)
+                         │ Bounded timeout (1s default)
+                         ▼
+  ┌──────────────────────────────────────────────┐
+  │        Agent Sentinel (Local Go Binary)      │
+  │                                              │
+  │  ┌────────────────────┐ ┌──────────────────┐ │
+  │  │   Hook Receiver    │ │  MCP Stdio Proxy │ │
+  │  └─────────┬──────────┘ └────────┬─────────┘ │
+  │            │                     │           │
+  │            ▼                     ▼           │
+  │    [Normalizer & Sensitive Redaction Engine] │
+  │                        │                     │
+  │  ┌─────────────────────┴──────────────────┐  │
+  │  │    Local JSONL Stream & History Store   │  │
+  │  │          (~/.sentinel/sessions)         │  │
+  │  └─────────────────────┬──────────────────┘  │
+  │                        │                     │
+  │  ┌─────────────────────▼──────────────────┐  │
+  │  │  Embedded Web Cockpit (React+Tailwind) │  │
+  │  │   Timeline · Inspector · Analytics     │  │
+  │  └────────────────────────────────────────┘  │
+  └──────────────────────────────────────────────┘
 ```
 
-Use the command matching the installed agent, then stop the collector. Only Sentinel's entries are removed.
+1. **Non-Blocking & Failsafe**: Sentinel never blocks your agent, prompts for approval, or enforces token budgets. If the collector process terminates, hooks immediately return `{}` or `{"permission":"allow"}` so work never stalls.
+2. **Honest Metrics**: Sentinel strictly separates observed transport intervals from agent-reported tool durations. It never invents token costs, context sizes, or thinking times that cannot be verified from captured evidence.
+3. **Local-First & Zero Telemetry**: All traces are saved to `~/.sentinel/sessions/*.jsonl`. Sentinel never makes outbound network calls.
+4. **Replay Fidelity**: Replaying an existing session never executes the captured commands; it reads strictly from the saved JSONL ledger.
 
-## Development checks
+---
+
+## Migrating from Enforcement Releases
+
+The current release is an **observation profiler**. Command policies, approval holds, and spending limits have been removed.
+
+- Flags `--policy`, `--max-cost`, `--approval-timeout`, and `--offline` are rejected with migration guidance.
+- To upgrade an existing project, run `sentinel hook install --dir <path>` to update hooks to observation mode.
+- Uninstalling cleanly removes only Sentinel entries:
+  ```bash
+  sentinel hook uninstall --dir /path/to/project
+  sentinel hook uninstall --agent claude --dir /path/to/project
+  ```
+
+---
+
+## Development & Testing
 
 ```bash
-make test       # Go vet, race tests, frontend typecheck and telemetry/report tests
+# Run all tests: Go vet, race detection, frontend typecheck, and telemetry tests
+make test
+
+# Typecheck and build embedded frontend only
 cd web
-npm run build  # Typecheck and build the embedded UI
+npm run build
 ```
 
-[Product direction](docs/PRODUCT_DIRECTION.md) · [Architecture](docs/ARCHITECTURE.md) · [Telemetry contract](docs/TELEMETRY_SPEC.md) · [Analysis specification](docs/ANALYSIS_SPEC.md) · [Roadmap](docs/ROADMAP.md) · [Progress](docs/PROGRESS.md)
+Follow [AGENTS.md](AGENTS.md) for the setup verification playbook.
 
-MIT © Francesco Zanini. See [LICENSE](LICENSE).
+---
+
+## License
+
+MIT © [Francesco Zanini](LICENSE).
