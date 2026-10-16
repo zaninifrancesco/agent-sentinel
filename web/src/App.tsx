@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { ArrowLeft, Download, Moon, Search, Sun, X, ChartNoAxesCombined, ListTree, ScanLine, Radio, FileJson, HardDrive, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { ArrowLeft, Download, Moon, Search, Sun, X, ChartNoAxesCombined, ListTree, ScanLine, Radio, FileJson, HardDrive, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen, Activity, FolderClock } from "lucide-react";
 import { useProfiler, useRow, type Connection } from "./useProfiler";
 import { useConfig } from "./useConfig";
 import { useTheme } from "./theme";
@@ -10,13 +10,15 @@ import { MetricsBar } from "./MetricsBar";
 import { TraceMap } from "./TraceMap";
 import { ExportModal } from "./ExportModal";
 import { Overview } from "./Overview";
+import { Analytics } from "./Analytics";
 import { EMPTY_METRICS } from "./metrics";
 import { type CallFilter, type CallSort } from "./profile";
 import { formatBytes, formatDuration, formatTime } from "./format";
-import type { Row } from "./types";
+import type { Row, HistorySession } from "./types";
 
-type View = "overview" | "calls" | "events";
+type View = "analytics" | "sessions" | "overview" | "calls" | "events";
 const VIEWS: { id: View; label: string }[] = [
+  { id: "analytics", label: "Analytics" }, { id: "sessions", label: "Sessions" },
   { id: "calls", label: "Timeline" }, { id: "overview", label: "Tool profile" }, { id: "events", label: "Event log" },
 ];
 const FILTERS: { id: CallFilter; label: string }[] = [
@@ -33,7 +35,8 @@ export default function App() {
   const { config } = useConfig();
   const [theme, toggleTheme] = useTheme();
   const [railCollapsed, setRailCollapsed] = useState(initialRailCollapsed);
-  const [view, setView] = useState<View>("calls");
+  const [view, setView] = useState<View>("analytics");
+  const [recordingId, setRecordingId] = useState("");
   const [scope, setScope] = useState("");
   const [filter, setFilter] = useState<CallFilter>("all");
   const [sort, setSort] = useState<CallSort>("time");
@@ -47,7 +50,7 @@ export default function App() {
   const [focusKey, setFocusKey] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   useEffect(() => { const timer = window.setTimeout(() => setDebouncedQuery(query), 200); return () => clearTimeout(timer); }, [query]);
-  const pageQuery = useMemo(() => new URLSearchParams({ view: view === "events" ? "events" : "calls", scope, filter, sort, tool, q: debouncedQuery, limit: "50", ...(cursor ? { cursor } : {}), ...(focusKey ? { focus: focusKey } : {}) }).toString(), [view, scope, filter, sort, tool, debouncedQuery, cursor, focusKey]);
+  const pageQuery = useMemo(() => new URLSearchParams({ view: view === "events" ? "events" : "calls", scope, filter, sort, tool, q: debouncedQuery, limit: "50", ...(recordingId ? { recordingId } : {}), ...(cursor ? { cursor } : {}), ...(focusKey ? { focus: focusKey } : {}) }).toString(), [view, scope, filter, sort, tool, debouncedQuery, cursor, focusKey, recordingId]);
   const { data, loading, error, connection, retry } = useProfiler(pageQuery);
   const session = data?.session ?? null;
   const scopes = data?.scopes ?? [];
@@ -58,7 +61,8 @@ export default function App() {
   const detail = useRow(selectedKey, session?.id, data?.revision);
   // Cursor signatures include every filter. Reset before issuing a new query.
   const resetPage = () => { setCursor(""); setFocusKey(""); };
-  const replay = config.mode === "replay";
+  const replay = config.mode === "replay" || data?.readOnly === true;
+  const analyticsView = view === "analytics" || view === "sessions";
 
   useEffect(() => {
     try { localStorage.setItem(RAIL_KEY, String(railCollapsed)); } catch { /* preference is optional */ }
@@ -80,10 +84,10 @@ export default function App() {
   }, [isExportModalOpen]);
 
   useEffect(() => {
-    if (!loading && !focusKey && view !== "overview" && !visible.some((row) => row.key === selectedKey)) {
+    if (!loading && !focusKey && !analyticsView && view !== "overview" && !visible.some((row) => row.key === selectedKey)) {
       setSelectedKey(visible[0]?.key ?? null);
     }
-  }, [visible, selectedKey, view, loading, focusKey]);
+  }, [visible, selectedKey, view, loading, focusKey, analyticsView]);
   useEffect(() => { if (!loading && focusKey && data) { if (visible.some((row) => row.key === focusKey)) { setSelectedKey(focusKey); setCursor(data.current); } setFocusKey(""); } }, [loading, focusKey, data, visible]);
   const selected = visible.find((row) => row.key === selectedKey) ?? null;
 
@@ -98,10 +102,16 @@ export default function App() {
     resetPage(); setView(next); setDetailOpen(false); setQuery("");
   };
 
+  const openHistory = (item: HistorySession) => {
+    resetPage(); setRecordingId(item.recordingId); setScope(item.scope);
+    setFilter("all"); setSort("time"); setTool(""); setQuery(""); setDebouncedQuery("");
+    setSelectedKey(null); setDetailOpen(false); setView("calls");
+  };
+
   const selectedIndex = visible.findIndex((row) => row.key === selectedKey);
   const selectCall = (key: string) => { setSelectedKey(key); setDetailOpen(true); };
-  const viewIcons = { calls: ListTree, overview: ChartNoAxesCombined, events: FileJson };
-  const subtitle = { calls: "Follow the sequence. Inspect every call.", overview: "Compare tool time, errors and retained output.", events: "Inspect protocol and recording lifecycle events." };
+  const viewIcons = { analytics: Activity, sessions: FolderClock, calls: ListTree, overview: ChartNoAxesCombined, events: FileJson };
+  const subtitle = { analytics: "Monitor agent activity across sessions, projects and time.", sessions: "Revisit the sessions behind your metrics.", calls: "Follow the sequence. Inspect every call.", overview: "Compare tool time, errors and retained output.", events: "Inspect protocol and recording lifecycle events." };
   return (
     <div className="app-shell">
       <aside className="app-rail" data-collapsed={railCollapsed} aria-label="Workspace navigation">
@@ -118,7 +128,7 @@ export default function App() {
           </button>; })}
         </nav>
         <div className="rail-recording" aria-hidden={railCollapsed}>
-          <div className="mb-3 flex items-center gap-2 text-[#e0e8fa]"><Radio aria-hidden className="size-3.5" />Current recording</div>
+          <div className="mb-3 flex items-center gap-2 text-[#e0e8fa]"><Radio aria-hidden className="size-3.5" />{replay ? "Selected recording" : "Current recording"}</div>
           <p className="break-all font-mono text-[10px] text-[#b9c8e6]">{session?.id ?? "Waiting for connection"}</p>
           {session && <p className="mt-3">Started {formatTime(session.startedAt)}</p>}
           {span !== undefined && <p className="mt-1">{formatDuration(span)} captured span</p>}
@@ -128,17 +138,20 @@ export default function App() {
       </aside>
       <div className="app-workspace">
         <header className="workspace-header">
-          <div className="min-w-0"><div className="flex flex-wrap items-center gap-3"><h1>{VIEWS.find((item) => item.id === view)?.label}</h1><span className="recording-id">{session?.id ?? "Connecting"}</span></div><p className="workspace-caption">{subtitle[view]}</p></div>
-          {scopes.some((item) => item.id !== "unattributed") && <select aria-label="Filter agent session or connection" title={scopes.find((item) => item.id === scope)?.label ?? "All captured sessions and connections"} value={scope} onChange={(event) => { resetPage(); setScope(event.target.value); setDetailOpen(false); setSelectedKey(null); setQuery(""); setTool(""); setFilter("all"); }} className="field-input max-w-64 min-w-0 flex-1 sm:flex-none"><option value="">All sessions & connections</option>{scopes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}
+          <div className="min-w-0"><div className="flex flex-wrap items-center gap-3"><h1>{VIEWS.find((item) => item.id === view)?.label}</h1>{!analyticsView && <span className="recording-id">{session?.id ?? "Connecting"}</span>}</div><p className="workspace-caption">{subtitle[view]}</p></div>
+          {!analyticsView && scopes.some((item) => item.id !== "unattributed") && <select aria-label="Filter agent session or connection" title={scopes.find((item) => item.id === scope)?.label ?? "All captured sessions and connections"} value={scope} onChange={(event) => { resetPage(); setScope(event.target.value); setDetailOpen(false); setSelectedKey(null); setQuery(""); setTool(""); setFilter("all"); }} className="field-input max-w-64 min-w-0 flex-1 sm:flex-none"><option value="">All sessions & connections</option>{scopes.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select>}
           <div className="flex items-center gap-2">
-            <button disabled={!data} onClick={() => setIsCommandPaletteOpen(true)} aria-label="Search events" className="icon-button"><Search aria-hidden className="size-4" /></button>
+            {!analyticsView && recordingId && <button className="action-button" onClick={() => { setRecordingId(""); setScope(""); resetPage(); setSelectedKey(null); setDetailOpen(false); }}>Current recording</button>}
+            {!analyticsView && <button disabled={!data} onClick={() => setIsCommandPaletteOpen(true)} aria-label="Search events" className="icon-button"><Search aria-hidden className="size-4" /></button>}
             <button onClick={toggleTheme} aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"} className="icon-button">{theme === "dark" ? <Sun aria-hidden className="size-4" /> : <Moon aria-hidden className="size-4" />}</button>
-            <button disabled={!session} onClick={() => setIsExportModalOpen(true)} aria-label="Export session report" className="action-button"><Download aria-hidden className="size-3.5" /><span className="hidden sm:inline">Export report</span></button>
+            {!analyticsView && <button disabled={!session} onClick={() => setIsExportModalOpen(true)} aria-label="Export session report" className="action-button"><Download aria-hidden className="size-3.5" /><span className="hidden sm:inline">Export report</span></button>}
           </div>
         </header>
-        {error && <div role="alert" className="flex flex-wrap items-center gap-3 border-b border-rule bg-paper px-5 py-3 text-xs text-warn">Could not update the profiler: {error}<button className="action-button" onClick={() => { resetPage(); retry(); }}>Refresh latest</button></div>}
-        <MetricsBar metrics={metrics} onErrors={() => openCalls("errors")} />
-        {view === "overview" ? <Overview profile={profile} replay={replay} connecting={!replay && (connection === "connecting" || connection === "reconnecting")} onCalls={() => openCalls()} onTool={(name) => openCalls("all", name)} onInspect={inspect} /> : (
+        {!analyticsView && error && <div role="alert" className="flex flex-wrap items-center gap-3 border-b border-rule bg-paper px-5 py-3 text-xs text-warn">Could not update the profiler: {error}<button className="action-button" onClick={() => { resetPage(); retry(); }}>Refresh latest</button></div>}
+        {!analyticsView && <MetricsBar metrics={metrics} onErrors={() => openCalls("errors")} />}
+        {!analyticsView && session?.recoveredTail && <p className="analytics-alert">Recovered an incomplete final JSONL line. This recording may be missing events.</p>}
+        <Analytics active={analyticsView} sessionsOnly={view === "sessions"} onOpen={openHistory} />
+        {!analyticsView && (view === "overview" ? <Overview profile={profile} replay={replay} connecting={!replay && (connection === "connecting" || connection === "reconnecting")} onCalls={() => openCalls()} onTool={(name) => openCalls("all", name)} onInspect={inspect} /> : (
           <main className={`${view === "calls" ? "call-main " : ""}flex min-h-0 flex-1 flex-col`} aria-label={view === "calls" ? "Call inspector" : "Event log"}>
             {view === "calls" && <div className={`trace-holder ${detailOpen ? "hidden lg:block" : "block"}`}><TraceMap rows={visible} timeline={data?.timeline} selectedKey={selectedKey} onSelect={(row) => selectCall(row.key)} /></div>}
             <div className="inspector-workspace">
@@ -172,11 +185,11 @@ export default function App() {
               </div>
             </div>
           </main>
-        )}
+        ))}
       </div>
       <CommandPalette isOpen={isCommandPaletteOpen} onClose={() => setIsCommandPaletteOpen(false)} rows={visible} scope={scope}
         onSelectRow={inspect} onExport={() => setIsExportModalOpen(true)} />
-      <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} session={session} revision={data?.revision} config={config} />
+      <ExportModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} session={session} revision={data?.revision} config={{ ...config, ...(replay ? { mode: "replay" as const } : {}), capture: session?.capture }} />
     </div>
   );
 }

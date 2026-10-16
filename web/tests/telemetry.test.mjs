@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { createServer } from "vite";
 
-let server, report, journeyStops, captureSummary, capturedInterval, responseSize, toolDuration, timelineTracks;
+let server, report, journeyStops, captureSummary, capturedInterval, responseSize, toolDuration, timelineTracks, periodChange;
 const backendMetrics = { calls: 17, waiting: 0, running: 0, refused: 0, errors: 2, interrupted: 0, payloadBytes: 8192, latencySamples: 12, p50: 333, p95: 987 };
 const timeline = { startMs: 0, endMs: 1000, spanMs: 1000, coveredMs: 600, unattributedMs: 400, overlapMs: 200, peakConcurrency: 2, incompleteCalls: 0, gapCount: 1, gaps: [{ startMs: 600, endMs: 1000 }] };
 
@@ -14,8 +14,17 @@ before(async () => {
   ({ capturedInterval, timelineTracks } = await server.ssrLoadModule("/src/trace.ts"));
   ({ responseSize } = await server.ssrLoadModule("/src/profile.ts"));
   ({ toolDuration } = await server.ssrLoadModule("/src/metrics.ts"));
+  ({ periodChange } = await server.ssrLoadModule("/src/Analytics.tsx"));
 });
 after(async () => { await server?.close(); });
+
+test("analytics period comparison distinguishes no baseline from a measured percentage", () => {
+  assert.equal(periodChange(15, 10), "+50.0% calls vs previous period");
+  assert.equal(periodChange(0, 10), "-100.0% calls vs previous period");
+  assert.equal(periodChange(0, 0), "No observed calls in either period");
+  assert.ok(periodChange(5, 0).includes("previous period had none"));
+  assert.ok(!periodChange(5, 0).includes("%"));
+});
 
 function call(overrides = {}) {
   const request = { seq: 1, sessionId: "mock", timestamp: "2026-10-16T10:00:00Z", type: "ToolCallRequest", toolName: "shell", risk: "none", status: "pending" };

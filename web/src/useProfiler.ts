@@ -26,7 +26,7 @@ export function useProfiler(query: string) {
       try {
         const page = await readJSON<ProfilerPage>(`/api/v1/profiler?${query}`, controller.signal);
         if (controller.signal.aborted) return;
-        follow = !page.session.endedAt && !new URLSearchParams(query).has("cursor");
+        follow = !page.readOnly && !page.session.endedAt && !new URLSearchParams(query).has("cursor");
         setData(page); setLoadedQuery(query); setError(""); setConnection(page.session.endedAt ? "ended" : "live");
       } catch (cause) {
         if (controller.signal.aborted) return;
@@ -42,7 +42,7 @@ export function useProfiler(query: string) {
     void load();
     return () => { controller.abort(); window.clearTimeout(timer); };
   }, [query, refresh]);
-  return { data, loading: loading || loadedQuery !== query, error, connection, retry: () => setRefresh((value) => value + 1) };
+  return { data: loadedQuery === query ? data : null, loading: loading || loadedQuery !== query, error, connection, retry: () => setRefresh((value) => value + 1) };
 }
 
 export function useRow(key: string | null, recordingId?: string, revision?: number) {

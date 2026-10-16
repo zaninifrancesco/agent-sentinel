@@ -86,6 +86,7 @@ export interface Correlation {
 }
 
 export interface Session {
+	recoveredTail?: boolean;
   capture?: CaptureSettings;
   id: string;
   command: string[] | null;
@@ -129,10 +130,30 @@ export interface ProfilerProfile {
   longest: Row[]; largest: Row[];
 }
 export interface ProfilerPage {
+	readOnly: boolean;
   version: string; revision: number; session: Session;
   scopes: { id: string; label: string }[];
   metrics: import("./metrics").Metrics; profile: ProfilerProfile; timeline: ProfilerTimeline;
   rows: Row[]; total: number; offset: number; limit: number; current: string; next?: string; previous?: string;
+}
+
+export interface UsageMetrics {
+  calls: number; ok: number; errors: number; open: number; interrupted: number; other: number;
+  errorSamples: number; errorRate: number | null; latencySamples: number;
+  p50: number | null; p95: number | null; toolDurationMs: number; retainedBytes: number;
+}
+export interface UsageBreakdown extends UsageMetrics { name: string }
+export interface HistorySession extends UsageMetrics {
+  recordingId: string; scope: string; agent: string; nativeSessionId?: string; projects: string[];
+  first: string; last: string; live: boolean; ended: boolean; recoveredTail: boolean;
+}
+export interface AnalyticsData {
+  version: string; from: string; to: string; timezone: string; totals: UsageMetrics; previous: UsageMetrics;
+  recordingCount: number; nativeSessions: number; days: UsageBreakdown[];
+  agents: UsageBreakdown[]; projects: UsageBreakdown[]; tools: UsageBreakdown[];
+  availableAgents: string[]; availableProjects: string[]; sessions: HistorySession[]; undatedCalls: number;
+  warnings: string[]; persistence: { enabled: boolean; writtenThrough: number; error?: string };
+  currentRecordingId: string;
 }
 export interface ReportData {
   version: string; revision: number; session: Session; rows: Row[];
