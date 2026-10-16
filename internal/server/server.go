@@ -19,6 +19,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"github.com/zaninifrancesco/agent-sentinel/internal/catalog"
 	"github.com/zaninifrancesco/agent-sentinel/internal/policy"
 	"github.com/zaninifrancesco/agent-sentinel/internal/recorder"
 )
@@ -61,17 +62,19 @@ type Server struct {
 	Budget *policy.Budget
 
 	// Config is what the cockpit needs to know about the running session.
-	Config Config
+	Config  Config
+	Catalog *catalog.Catalog
 }
 
 // Config is served at /api/config.
 type Config struct {
-	Capture    *recorder.CaptureSettings `json:"capture,omitempty"`
-	Mode       string                    `json:"mode,omitempty"` // observe or replay; absent in older servers
-	MaxCostUSD float64                   `json:"maxCostUsd"`     // 0 = no budget
-	MaxTokens  int64                     `json:"maxTokens"`
-	Policy     string                    `json:"policy"`    // "default", a file path or "off"
-	Approvals  bool                      `json:"approvals"` // can this session approve held calls?
+	RecordingPath string                    `json:"-"`
+	Capture       *recorder.CaptureSettings `json:"capture,omitempty"`
+	Mode          string                    `json:"mode,omitempty"` // observe or replay; absent in older servers
+	MaxCostUSD    float64                   `json:"maxCostUsd"`     // 0 = no budget
+	MaxTokens     int64                     `json:"maxTokens"`
+	Policy        string                    `json:"policy"`    // "default", a file path or "off"
+	Approvals     bool                      `json:"approvals"` // can this session approve held calls?
 	// BudgetEditable is true when the limits can be changed from the cockpit.
 	BudgetEditable bool `json:"budgetEditable"`
 	// ApprovalTimeoutSec is how long a held call waits before it is refused;
@@ -93,6 +96,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("GET /api/config", s.handleConfig)
 	mux.HandleFunc("GET /api/v1/profiler", s.handleProfiler)
+	mux.HandleFunc("GET /api/v1/analytics", s.handleAnalytics)
 	mux.HandleFunc("GET /api/v1/rows/{key}", s.handleRow)
 	mux.HandleFunc("GET /api/v1/report", s.handleReportData)
 	mux.HandleFunc("POST /api/approvals/{seq}", s.handleApproval)

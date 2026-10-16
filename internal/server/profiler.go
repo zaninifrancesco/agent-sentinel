@@ -23,20 +23,33 @@ type profilerSnapshot struct {
 
 // At most the newest projection is cached. Old cursors reconstruct a prefix
 // of retained events; neither cache nor browser accumulates payload pages.
-func (s *Server) profileSnapshot(through uint64) (*profilerSnapshot, error) {
+func (s *Server) profileSnapshot(through uint64, id string) (*profilerSnapshot, error) {
 	s.profilerMu.Lock()
 	defer s.profilerMu.Unlock()
-	if s.profilerCache == nil || s.profilerCache.Revision != s.rec.Revision() {
-		session, events, revision := s.rec.Snapshot()
-		session.EndedAt = time.Time{}
-		for _, e := range events {
-			if e.Type == recorder.EventSessionCompleted {
-				session.EndedAt = e.Timestamp
-			}
+	var current *profilerSnapshot
+	if id != "" && id != s.rec.Session().ID {
+		if s.Catalog == nil {
+			return nil, fmt.Errorf("recording not found")
 		}
-		s.profilerCache = &profilerSnapshot{session, revision, events, analysis.Project(events)}
+		rec, err := s.Catalog.Open(id)
+		if err != nil {
+			return nil, err
+		}
+		session, events, revision := rec.Snapshot()
+		current = &profilerSnapshot{session, revision, events, analysis.Project(events)}
+	} else {
+		if s.profilerCache == nil || s.profilerCache.Revision != s.rec.Revision() {
+			session, events, revision := s.rec.Snapshot()
+			session.EndedAt = time.Time{}
+			for _, e := range events {
+				if e.Type == recorder.EventSessionCompleted {
+					session.EndedAt = e.Timestamp
+				}
+			}
+			s.profilerCache = &profilerSnapshot{session, revision, events, analysis.Project(events)}
+		}
+		current = s.profilerCache
 	}
-	current := s.profilerCache
 	if through == 0 || through == current.Revision {
 		return current, nil
 	}
@@ -66,6 +79,7 @@ type pageCursor struct {
 	Signature   string `json:"signature"`
 }
 type profilerPage struct {
+	ReadOnly bool                   `json:"readOnly"`
 	Version  string                 `json:"version"`
 	Revision uint64                 `json:"revision"`
 	Session  recorder.Session       `json:"session"`
@@ -127,7 +141,11 @@ func (s *Server) handleProfiler(w http.ResponseWriter, r *http.Request) {
 		}
 		through = n
 	}
-	snapshot, err := s.profileSnapshot(through)
+	id := q.Get("recordingId")
+	if id == "" {
+		id = cursor.RecordingID
+	}
+	snapshot, err := s.profileSnapshot(through, id)
 	if err != nil {
 		http.Error(w, err.Error(), 409)
 		return
@@ -158,6 +176,7 @@ func (s *Server) handleProfiler(w http.ResponseWriter, r *http.Request) {
 	}
 	end := min(len(rows), offset+limit)
 	page := profilerPage{Version: analysis.Version, Revision: snapshot.Revision, Session: snapshot.Session, Scopes: analysis.Scopes(snapshot.Rows), Metrics: analysis.Measure(scoped), Profile: analysis.ToolProfile(scoped), Timeline: analysis.PageWaterfall(snapshot.Session, scoped, rows[offset:end], q.Get("scope") != ""), Rows: []analysis.Row{}, Total: len(rows), Offset: offset, Limit: limit}
+	page.ReadOnly = s.Config.Mode == "replay" || snapshot.Session.ID != s.rec.Session().ID
 	for _, row := range rows[offset:end] {
 		page.Rows = append(page.Rows, analysis.Summary(row))
 	}
@@ -185,7 +204,7 @@ func (s *Server) requestedSnapshot(w http.ResponseWriter, r *http.Request) *prof
 			return nil
 		}
 	}
-	snapshot, err := s.profileSnapshot(through)
+	snapshot, err := s.profileSnapshot(through, r.URL.Query().Get("recordingId"))
 	if err != nil {
 		http.Error(w, err.Error(), 409)
 		return nil

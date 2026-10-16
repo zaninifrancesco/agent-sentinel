@@ -80,7 +80,7 @@ func runMCP(args []string) int {
 
 	fmt.Fprintln(os.Stderr, "sentinel: observe mode; MCP traffic is recorded without policy or spending limits.")
 	if *withUI {
-		cfg := serverpkg.Config{Mode: "observe", Policy: "off"}
+		cfg := serverpkg.Config{Mode: "observe", Policy: "off", RecordingPath: path}
 		url, err := startCockpit(ctx, rec, *port, *dev, nil, nil, nil, cfg)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)

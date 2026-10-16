@@ -14,6 +14,7 @@ import (
 	"sort"
 	"syscall"
 
+	"github.com/zaninifrancesco/agent-sentinel/internal/catalog"
 	"github.com/zaninifrancesco/agent-sentinel/internal/policy"
 	"github.com/zaninifrancesco/agent-sentinel/internal/recorder"
 	"github.com/zaninifrancesco/agent-sentinel/internal/server"
@@ -36,6 +37,9 @@ func startCockpit(ctx context.Context, rec *recorder.Recorder, port int, dev boo
 	srv.Budget = budget
 	srv.Hook = hook
 	srv.Config = cfg
+	if home, err := os.UserHomeDir(); err == nil {
+		srv.Catalog = catalog.New(filepath.Join(home, ".sentinel", "sessions"), cfg.RecordingPath)
+	}
 	if dev {
 		srv.AllowedOrigins = server.DevOrigins
 	}
@@ -85,7 +89,7 @@ func runUI(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	url, err := startCockpit(ctx, rec, *port, *dev, nil, nil, nil, server.Config{Mode: "replay", Policy: "replay"})
+	url, err := startCockpit(ctx, rec, *port, *dev, nil, nil, nil, server.Config{Mode: "replay", Policy: "replay", RecordingPath: path})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "sentinel ui: %v\n", err)
 		return 1

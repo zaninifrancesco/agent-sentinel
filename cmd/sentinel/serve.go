@@ -70,7 +70,7 @@ func runServe(args []string) int {
 
 	hooks := cursorhooks.NewObserver(rec)
 	hooks.Logf = func(format string, args ...any) { fmt.Fprintf(os.Stderr, "sentinel: "+format+"\n", args...) }
-	cfg := serverpkg.Config{Mode: "observe", Policy: "off"}
+	cfg := serverpkg.Config{Mode: "observe", Policy: "off", RecordingPath: path}
 	url, err := startCockpit(ctx, rec, *port, *dev, nil, nil, hooks, cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "sentinel: %v\n", err)
