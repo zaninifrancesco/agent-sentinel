@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import { createServer } from "vite";
 
-let server, report, journeyStops, captureSummary, capturedInterval, responseSize, toolDuration;
+let server, report, journeyStops, captureSummary, capturedInterval, responseSize, toolDuration, timelineTracks;
 const backendMetrics = { calls: 17, waiting: 0, running: 0, refused: 0, errors: 2, interrupted: 0, payloadBytes: 8192, latencySamples: 12, p50: 333, p95: 987 };
 const timeline = { startMs: 0, endMs: 1000, spanMs: 1000, coveredMs: 600, unattributedMs: 400, overlapMs: 200, peakConcurrency: 2, incompleteCalls: 0, gapCount: 1, gaps: [{ startMs: 600, endMs: 1000 }] };
 
@@ -11,7 +11,7 @@ before(async () => {
   ({ buildReportHtml: report } = await server.ssrLoadModule("/src/report.ts"));
   ({ journeyStops } = await server.ssrLoadModule("/src/journey.ts"));
   ({ captureSummary } = await server.ssrLoadModule("/src/capture.ts"));
-  ({ capturedInterval } = await server.ssrLoadModule("/src/trace.ts"));
+  ({ capturedInterval, timelineTracks } = await server.ssrLoadModule("/src/trace.ts"));
   ({ responseSize } = await server.ssrLoadModule("/src/profile.ts"));
   ({ toolDuration } = await server.ssrLoadModule("/src/metrics.ts"));
 });
@@ -93,4 +93,29 @@ test("report intervals keep capture timing separate from reported duration", () 
   assert.ok(html.includes("captured interval 10 ms"));
   const partial = buildReport({ rows: [call({ span: { startMs: 100 }, response: undefined })] });
   assert.ok(partial.includes("capture end unavailable"));
+});
+
+
+test("timeline reuses tracks for sequential calls and separates overlapping tool types", () => {
+  const shell = call({ key: "a", span: { startMs: 0, endMs: 100 } });
+  const edit = call({ key: "b", title: "edit_file", span: { startMs: 20, endMs: 70 } });
+  const read = call({ key: "c", title: "read_file", span: { startMs: 70, endMs: 90 } });
+  const next = call({ key: "d", span: { startMs: 100, endMs: 200 } });
+  const packed = timelineTracks([next, edit, shell, read]);
+  assert.deepEqual(packed.tracks.map((track) => track.map((row) => row.key)), [["a", "d"], ["b", "c"]]);
+  assert.equal(packed.unpositioned.length, 0);
+});
+
+test("timeline keeps coincident observations distinct without extending unknown ends", () => {
+  const rows = [
+    call({ key: "open", span: { startMs: 0 } }),
+    call({ key: "zero", span: { startMs: 0, endMs: 0 } }),
+    call({ key: "later", span: { startMs: 1, endMs: 5 } }),
+    call({ key: "missing", span: undefined }),
+    call({ key: "invalid", span: { startMs: NaN } }),
+    call({ key: "event", kind: "session" }),
+  ];
+  const packed = timelineTracks(rows);
+  assert.deepEqual(packed.tracks.map((track) => track.map((row) => row.key)), [["open", "later"], ["zero"]]);
+  assert.deepEqual(packed.unpositioned.map((row) => row.key), ["missing", "invalid"]);
 });
