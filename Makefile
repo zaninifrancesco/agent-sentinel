@@ -32,12 +32,21 @@ dist: web
 	  name=sentinel_$(VERSION)_$${os}_$${arch}; \
 	  mkdir -p dist/$$name; \
 	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags "$(LDFLAGS)" -o dist/$$name/sentinel ./cmd/sentinel || exit 1; \
-	  cp README.md LICENSE dist/$$name/; \
+	  cp README.md LICENSE install.sh dist/$$name/; \
+	  cp -r skills dist/$$name/; \
 	  tar -C dist -czf dist/$$name.tar.gz $$name; \
 	  rm -rf dist/$$name; \
 	done
 	cd dist && shasum -a 256 *.tar.gz > checksums.txt
 	@cat dist/checksums.txt
+
+# Install the Agent Sentinel skill into ~/.cursor, ~/.claude, and ~/.agents
+install-skill:
+	@mkdir -p $(HOME)/.cursor/skills/agent-sentinel $(HOME)/.claude/skills/agent-sentinel $(HOME)/.agents/skills/agent-sentinel
+	@cp -r skills/agent-sentinel/* $(HOME)/.cursor/skills/agent-sentinel/
+	@cp -r skills/agent-sentinel/* $(HOME)/.claude/skills/agent-sentinel/
+	@cp -r skills/agent-sentinel/* $(HOME)/.agents/skills/agent-sentinel/
+	@echo "Installed Agent Sentinel skill to ~/.cursor/skills, ~/.claude/skills, and ~/.agents/skills"
 
 test:
 	go vet ./...

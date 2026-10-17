@@ -95,7 +95,43 @@ Need to share a bug report or review an agent session with a teammate? Export th
 
 ## Quickstart in 30 Seconds
 
-### 1. Build and Install
+### Option A: 1-Line Universal Installer (Recommended)
+
+Let Sentinel set up the binary, background collector, agent hooks, and self-test automatically:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zaninifrancesco/agent-sentinel/main/install.sh | bash
+```
+
+Or run directly from a local clone:
+```bash
+./install.sh --agent all
+```
+
+---
+
+### Option B: AI Agent Plugin & Skill (Autonomous Setup)
+
+You can ask your AI coding agent (Claude Code, Cursor, Codex) to configure Sentinel directly:
+
+* **Claude Code Plugin**: Agent Sentinel includes native `.claude-plugin/plugin.json` and hooks.
+  Install or point Claude Code to the repository:
+  ```bash
+  claude --plugin-dir /path/to/agent-sentinel
+  ```
+* **Agent Skill (Cursor / Claude / Codex)**:
+  Install the official skill into your global agent skills directory:
+  ```bash
+  make install-skill
+  ```
+  Then simply tell your agent in chat:
+  > *"Set up Agent Sentinel for this project"*
+  
+  The agent will download/verify the binary, launch the background collector, configure hooks in `.cursor/` or `.claude/`, run the synthetic self-test, and return your Cockpit link!
+
+---
+
+### Option C: Manual Build and Install
 
 Prerequisites: **Go 1.27+** and **Node.js 20.19+ / 22.12+**.
 
@@ -112,7 +148,7 @@ make install
 ~/.sentinel/bin/sentinel version
 ```
 
-### 2. Start the Background Collector
+#### Start the Background Collector:
 
 ```bash
 ~/.sentinel/bin/sentinel serve --mode observe
@@ -125,17 +161,15 @@ curl -sf http://127.0.0.1:8848/api/config
 # => {"mode":"observe","policy":"off","approvals":false,"budgetEditable":false}
 ```
 
-### 3. Attach to Your Coding Agent
+#### Attach Hooks Manually:
 
-Run the installation command in your target project workspace:
-
-#### For Cursor:
+##### For Cursor:
 ```bash
 ~/.sentinel/bin/sentinel hook install --dir /path/to/project
 ```
 *Injects passive hooks into `.cursor/hooks.json` while preserving all existing hooks and custom configurations.*
 
-#### For Claude Code:
+##### For Claude Code:
 ```bash
 ~/.sentinel/bin/sentinel hook install --agent claude --dir /path/to/project
 ```

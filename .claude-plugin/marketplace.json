@@ -1,0 +1,12 @@
+{
+  "name": "agent-sentinel",
+  "description": "Agent Sentinel official plugins for Claude Code",
+  "plugins": [
+    {
+      "name": "agent-sentinel",
+      "description": "Local profiler & flight recorder for AI coding agents",
+      "version": "0.2.0",
+      "source": "./"
+    }
+  ]
+}

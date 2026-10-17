@@ -1,0 +1,13 @@
+{
+  "name": "agent-sentinel",
+  "version": "0.2.0",
+  "description": "Local profiler & flight recorder for Claude Code and AI coding agents. Inspect shell commands, tool calls, and latencies in a local web cockpit.",
+  "author": {
+    "name": "Francesco Zanini",
+    "url": "https://github.com/zaninifrancesco/agent-sentinel"
+  },
+  "homepage": "https://github.com/zaninifrancesco/agent-sentinel",
+  "keywords": ["profiler", "telemetry", "observability", "mcp", "latency", "flight-recorder"],
+  "skills": ["skills/agent-sentinel/SKILL.md"],
+  "hooks": "hooks/hooks.json"
+}
